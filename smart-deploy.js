@@ -439,35 +439,6 @@ class ReactSmartDeployer {
         return true;
     }
 
-    hasExistingVersionedBranches(targetEnv, remoteBranches) {
-        // Check if there are any existing versioned branches for this environment type
-        const branches = remoteBranches.split('\n')
-            .map(branch => branch.trim())
-            .filter(branch => branch && !branch.includes('->'));
-        
-        if (targetEnv.startsWith('feature/')) {
-            // Look for any feature branches with versions
-            return branches.some(branch => 
-                branch.startsWith('origin/feature/') && 
-                branch.includes('-') && 
-                this.isValidVersion(branch.split('-').pop())
-            );
-        } else if (targetEnv === 'dev') {
-            // Look for dev branches with versions
-            return branches.some(branch => 
-                branch.startsWith('origin/dev/') && 
-                this.isValidVersion(branch.replace('origin/dev/', ''))
-            );
-        } else if (targetEnv === 'production') {
-            // Look for prod branches with versions
-            return branches.some(branch => 
-                branch.startsWith('origin/prod/') && 
-                this.isValidVersion(branch.replace('origin/prod/', ''))
-            );
-        }
-        
-        return false;
-    }
 
     bumpVersion(bumpType, currentVersion) {
         const parts = currentVersion.split('.').map(Number);
@@ -781,11 +752,7 @@ ${currentContent.replace('# Changelog', '').replace('All notable changes to this
             // For subsequent deployments, bump the version
             let newVersion;
             
-            // Check if this is truly the first deployment (no remote versions found)
-            const remoteBranches = this.runCommand('git branch -r', { silent: true });
-            const hasAnyVersionedBranches = this.hasExistingVersionedBranches(targetEnv, remoteBranches);
-            
-            if (!hasAnyVersionedBranches) {
+            if (currentVersion === '1.0.0') {
                 // This is the first deployment for this branch type
                 this.logInfo(`First deployment for ${targetEnv} - using version 1.0.0`);
                 newVersion = '1.0.0';
