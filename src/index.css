@@ -1,13 +1,110 @@
+/* Mobile-first and responsive base styles */
+
+/* Improved mobile viewport handling */
+html {
+  box-sizing: border-box;
+  scroll-behavior: smooth;
+  /* Mobile viewport height fixes */
+  height: -webkit-fill-available; /* For iOS Safari */
+  -webkit-text-size-adjust: 100%; /* Prevent font size inflation */
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+}
+
+/* Ensure all elements inherit border-box */
+*, *::before, *::after {
+  box-sizing: inherit;
+}
+
 body {
   margin: 0;
+  padding: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
+  /* Improved font rendering on all devices */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Mobile viewport height fixes */
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+  /* Touch behavior improvements */
+  touch-action: manipulation; /* Prevent double-tap zoom */
+  /* Text rendering optimizations */
+  text-rendering: optimizeSpeed;
+  /* Prevent horizontal overflow */
+  overflow-x: hidden;
+  /* Prevent content jumping when scrollbars appear */
+  width: 100%;
+  /* Set base font size for responsive typography */
+  font-size: 16px;
+  line-height: 1.5;
 }
 
+/* Remove 300ms tap delay on mobile browsers */
+a, button, input, select, textarea, [role="button"] {
+  touch-action: manipulation;
+}
+
+/* Improved focus outlines for accessibility */
+:focus {
+  outline: 3px solid rgba(30, 64, 175, 0.5);
+  outline-offset: 2px;
+}
+
+/* Make images and media responsive */
+img, video, canvas, svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Set base font size for mobile */
+@media (max-width: 576px) {
+  html {
+    font-size: 15px; /* Slightly smaller base size on mobile */
+  }
+  
+  /* Prevent pull-to-refresh but allow component scrolling */
+  body {
+    overscroll-behavior-y: contain;
+  }
+}
+
+/* Improve scrollbar appearance on browsers that support it */
+@media (min-width: 768px) {
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+  }
+}
+
+/* Monospace font for code elements */
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
+  font-size: 0.9em;
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

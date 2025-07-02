@@ -1,22 +1,33 @@
 {
   "name": "adakings_frontend",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "dependencies": {
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^13.5.0",
+    "bootstrap": "^5.3.6",
+    "bootstrap-icons": "^1.13.1",
+    "http-proxy-middleware": "^3.0.5",
     "react": "^19.1.0",
+    "react-bootstrap": "^2.10.10",
     "react-dom": "^19.1.0",
+    "react-modal": "^3.16.3",
+    "react-router-dom": "^7.6.2",
     "react-scripts": "5.0.1",
+    "react-toastify": "^11.0.5",
     "web-vitals": "^2.1.4"
   },
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "deploy:feature": "node deploy.js feature",
+    "deploy:dev": "node deploy.js dev",
+    "deploy:production": "node deploy.js production",
+    "deploy:help": "node deploy.js"
   },
   "eslintConfig": {
     "extends": [

@@ -1,0 +1,1554 @@
+/* ===========================================
+   ADAKINGS MOBILE-NATIVE PWA STYLES
+   =========================================== */
+
+/* Base app container for mobile-first experience */
+.pwa-app {
+  max-width: 420px;
+  margin: 0 auto;
+  background: var(--ada-white);
+  min-height: 100vh;
+  position: relative;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.08);
+  overflow-x: hidden;
+}
+
+/* Status bar spacer for iOS */
+.pwa-status-bar {
+  height: env(safe-area-inset-top);
+  background: var(--ada-primary);
+}
+
+/* Mobile header */
+.pwa-header {
+  position: sticky;
+  top: 0;
+  z-index: 1050;
+  background: var(--ada-primary);
+  color: white;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.pwa-header h1 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+  color: white;
+}
+
+.pwa-header-action {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1.2rem;
+  padding: 8px;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.pwa-header-action:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Main content area */
+.pwa-content {
+  padding: 16px;
+  padding-bottom: calc(80px + env(safe-area-inset-bottom));
+  background: var(--ada-off-white);
+  min-height: calc(100vh - 60px);
+}
+
+/* App header styles */
+.pwa-app-header {
+  text-align: center;
+  padding: 20px 16px 16px 16px;
+  margin-bottom: 16px;
+}
+
+.pwa-app-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--ada-primary);
+  margin: 0;
+  letter-spacing: -0.5px;
+}
+
+.pwa-app-subtitle {
+  font-size: 0.9rem;
+  color: var(--ada-gray);
+  margin: 4px 0 0 0;
+  font-weight: 500;
+}
+
+/* PWA Login specific text styles */
+.pwa-welcome-title {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--ada-charcoal);
+  margin: 0 0 8px 0;
+}
+
+.pwa-welcome-subtitle {
+  font-size: 0.9rem;
+  color: var(--ada-gray);
+  margin: 0;
+}
+
+.pwa-help-text {
+  font-size: 0.8rem;
+  color: var(--ada-gray);
+  margin: 0;
+}
+
+.pwa-footer-text {
+  font-size: 0.75rem;
+  color: var(--ada-gray);
+  margin: 0;
+}
+
+.pwa-error-alert {
+  background: rgba(220, 53, 69, 0.1);
+  color: var(--ada-danger);
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  font-size: 0.9rem;
+  border: 1px solid rgba(220, 53, 69, 0.2);
+  flex-direction: column;
+  text-align: center;
+  gap: 12px;
+}
+
+.pwa-error-alert p {
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Enhanced loading indicators */
+.pwa-loading-enhanced {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pwa-loading-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 240px;
+}
+
+.pwa-loading-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  transition: all 0.3s ease;
+}
+
+.pwa-loading-step.active {
+  background: rgba(33, 150, 243, 0.1);
+  color: var(--ada-primary);
+}
+
+.pwa-loading-step.success {
+  background: rgba(76, 175, 80, 0.1);
+  color: #4caf50;
+}
+
+.pwa-loading-step.error {
+  background: rgba(244, 67, 54, 0.1);
+  color: #f44336;
+}
+
+.pwa-loading-step-icon {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Connection status indicators */
+.pwa-connection-status {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1055;
+  background: var(--ada-white);
+  border: 1px solid var(--ada-border-light);
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-size: 0.8rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: pwa-slide-down 0.3s ease;
+}
+
+@keyframes pwa-slide-down {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.pwa-connection-status.offline {
+  background: #fff3cd;
+  border-color: #ffeaa7;
+  color: #856404;
+}
+
+.pwa-connection-status.error {
+  background: #f8d7da;
+  border-color: #f5c6cb;
+  color: #721c24;
+}
+
+/* Retry and fallback UI */
+.pwa-fallback-ui {
+  padding: 20px;
+  text-align: center;
+  border: 2px dashed var(--ada-border-medium);
+  border-radius: 12px;
+  margin: 20px 0;
+}
+
+.pwa-fallback-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--ada-dark-gray);
+  margin: 0 0 8px 0;
+}
+
+.pwa-fallback-message {
+  font-size: 0.9rem;
+  color: var(--ada-gray);
+  margin: 0 0 16px 0;
+  line-height: 1.4;
+}
+
+.pwa-retry-controls {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+
+/* Mobile responsive error states */
+@media (max-width: 375px) {
+  .pwa-error-alert {
+    padding: 10px 12px;
+    font-size: 0.85rem;
+  }
+  
+  .pwa-loading-enhanced {
+    padding: 40px 16px;
+  }
+  
+  .pwa-fallback-ui {
+    padding: 16px;
+    margin: 16px 0;
+  }
+  
+  .pwa-retry-controls {
+    flex-direction: column;
+  }
+  
+  .pwa-connection-status {
+    left: 16px;
+    right: 16px;
+    transform: none;
+    width: auto;
+  }
+}
+
+/* Enhanced PWA Mobile Responsiveness */
+@media (max-width: 480px) {
+  .pwa-modal {
+    max-width: calc(100vw - 32px);
+    margin: 16px;
+  }
+  
+  .pwa-modal-actions {
+    flex-direction: column;
+  }
+  
+  .pwa-modal-actions .pwa-btn {
+    width: 100%;
+  }
+  
+  .pwa-card {
+    border-radius: 12px;
+    margin-bottom: 12px;
+  }
+  
+  .pwa-list-item {
+    padding: 14px 16px;
+  }
+  
+  .pwa-dashboard-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .pwa-retry-controls {
+    gap: 8px;
+  }
+  
+  .pwa-retry-controls .pwa-btn {
+    min-width: 100px;
+    font-size: 0.85rem;
+    padding: 10px 12px;
+  }
+}
+
+/* Very small screens (iPhone SE, etc.) */
+@media (max-width: 320px) {
+  .pwa-content {
+    padding: 8px;
+  }
+  
+  .pwa-app-header {
+    padding: 16px 8px 12px 8px;
+  }
+  
+  .pwa-app-title {
+    font-size: 1.6rem;
+  }
+  
+  .pwa-card {
+    padding: 16px;
+    border-radius: 8px;
+  }
+  
+  .pwa-btn {
+    padding: 12px 16px;
+    font-size: 0.9rem;
+  }
+  
+  .pwa-loading {
+    padding: 30px 8px;
+  }
+  
+  .pwa-empty {
+    padding: 40px 16px;
+  }
+  
+  .pwa-empty-icon {
+    font-size: 3rem;
+  }
+  
+  .pwa-modal {
+    padding: 20px;
+    max-width: calc(100vw - 16px);
+    margin: 8px;
+  }
+}
+
+/* Landscape orientation optimizations */
+@media (max-height: 500px) and (orientation: landscape) {
+  .pwa-app-header {
+    padding: 12px 16px 8px 16px;
+  }
+  
+  .pwa-app-title {
+    font-size: 1.4rem;
+  }
+  
+  .pwa-loading {
+    padding: 20px;
+  }
+  
+  .pwa-empty {
+    padding: 30px 20px;
+  }
+  
+  .pwa-modal {
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+}
+
+/* High density displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .pwa-spinner {
+    border-width: 2px;
+  }
+  
+  .pwa-connection-status {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+}
+
+/* PWA specific responsive grid layouts */
+@media (max-width: 400px) {
+  .pwa-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .pwa-stats-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  
+  .pwa-payment-summary-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+
+/* Touch target optimization for mobile */
+@media (pointer: coarse) {
+  .pwa-btn {
+    min-height: 44px;
+    padding: 12px 24px;
+  }
+  
+  .pwa-list-item {
+    min-height: 56px;
+    padding: 14px 16px;
+  }
+  
+  .pwa-nav-item {
+    min-height: 48px;
+    padding: 10px 12px;
+  }
+  
+  .pwa-form-input {
+    min-height: 44px;
+    padding: 12px 16px;
+  }
+  
+  .pwa-header-action {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 10px;
+  }
+}
+
+/* Dark mode safe overrides for PWA */
+@media (prefers-color-scheme: dark) {
+  .pwa-error-alert {
+    background: rgba(220, 53, 69, 0.1) !important;
+    border-color: rgba(220, 53, 69, 0.2) !important;
+  }
+  
+  .pwa-connection-status.offline {
+    background: #fff3cd !important;
+    border-color: #ffeaa7 !important;
+    color: #856404 !important;
+  }
+  
+  .pwa-connection-status.error {
+    background: #f8d7da !important;
+    border-color: #f5c6cb !important;
+    color: #721c24 !important;
+  }
+}
+
+/* Accessibility enhancements for mobile */
+@media (prefers-reduced-motion: reduce) {
+  .pwa-spinner {
+    animation: none;
+    border: 3px solid var(--ada-border-light);
+    border-top-color: var(--ada-primary);
+  }
+  
+  .pwa-slide-down,
+  .pwa-haptic,
+  .pulse {
+    animation: none !important;
+  }
+  
+  .pwa-btn:active,
+  .pwa-card:active {
+    transform: none;
+  }
+}
+
+/* Mobile card design */
+.pwa-card {
+  background: var(--ada-white);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 16px;
+  border: 1px solid var(--ada-border-light);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s ease;
+}
+
+.pwa-card:active {
+  transform: scale(0.98);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+.pwa-card-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.pwa-card-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: var(--ada-primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  margin-right: 16px;
+}
+
+.pwa-card-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--ada-charcoal);
+  margin: 0;
+}
+
+.pwa-card-subtitle {
+  font-size: 0.9rem;
+  color: var(--ada-gray);
+  margin: 4px 0 0 0;
+}
+
+/* Mobile button styles */
+.pwa-btn {
+  border: none;
+  border-radius: 12px;
+  padding: 14px 24px;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: all 0.2s;
+  cursor: pointer;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.pwa-btn-primary {
+  background: var(--ada-primary);
+  color: white;
+}
+
+.pwa-btn-primary:active {
+  background: var(--ada-primary-dark);
+  transform: scale(0.98);
+}
+
+.pwa-btn-secondary {
+  background: var(--ada-light-gray);
+  color: var(--ada-dark-gray);
+  border: 1px solid var(--ada-border-medium);
+}
+
+.pwa-btn-secondary:active {
+  background: var(--ada-border-light);
+  transform: scale(0.98);
+}
+
+.pwa-btn-danger {
+  background: #ea4335;
+  color: white;
+}
+
+.pwa-btn-danger:active {
+  background: #d93025;
+  transform: scale(0.98);
+}
+
+/* Dashboard grid */
+.pwa-dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.pwa-dashboard-item {
+  background: var(--ada-white);
+  border-radius: 16px;
+  padding: 20px;
+  text-align: center;
+  border: 1px solid var(--ada-border-light);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s ease;
+  cursor: pointer;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.pwa-dashboard-item:active {
+  transform: scale(0.95);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+.pwa-dashboard-icon {
+  font-size: 2rem;
+  color: var(--ada-primary);
+  margin-bottom: 8px;
+}
+
+.pwa-dashboard-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ada-charcoal);
+  margin: 0;
+  line-height: 1.3;
+}
+
+/* List styles */
+.pwa-list {
+  background: var(--ada-white);
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--ada-border-light);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.pwa-list-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--ada-border-light);
+  display: flex;
+  align-items: center;
+  transition: background-color 0.2s;
+}
+
+.pwa-list-item:last-child {
+  border-bottom: none;
+}
+
+.pwa-list-item:active {
+  background: var(--ada-light-gray);
+}
+
+.pwa-list-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--ada-primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+  font-size: 0.9rem;
+}
+
+.pwa-list-content {
+  flex: 1;
+}
+
+.pwa-list-title {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--ada-charcoal);
+  margin: 0 0 2px 0;
+}
+
+.pwa-list-subtitle {
+  font-size: 0.75rem;
+  color: var(--ada-gray);
+  margin: 0;
+}
+
+.pwa-list-action {
+  color: var(--ada-gray);
+  font-size: 1.2rem;
+}
+
+/* Form styles */
+.pwa-form-group {
+  margin-bottom: 20px;
+}
+
+.pwa-form-label {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ada-dark-gray);
+  margin-bottom: 8px;
+}
+
+.pwa-form-input {
+  width: 100%;
+  padding: 16px;
+  border: 2px solid var(--ada-border-light);
+  border-radius: 12px;
+  font-size: 1rem;
+  transition: border-color 0.2s;
+  background: var(--ada-white);
+}
+
+.pwa-form-input:focus {
+  outline: none;
+  border-color: var(--ada-primary);
+}
+
+.pwa-form-input::placeholder {
+  color: var(--ada-gray);
+}
+
+/* Mobile navigation */
+.pwa-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 420px;
+  background: var(--ada-white);
+  border-top: 1px solid var(--ada-border-light);
+  padding: 8px 16px calc(8px + env(safe-area-inset-bottom)) 16px;
+  display: flex;
+  justify-content: space-around;
+  z-index: 1040;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.pwa-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 12px;
+  text-decoration: none;
+  color: var(--ada-gray);
+  border-radius: 12px;
+  transition: all 0.2s;
+  min-width: 60px;
+}
+
+.pwa-nav-item.active {
+  color: var(--ada-primary);
+  background: rgba(30, 64, 175, 0.1);
+}
+
+.pwa-nav-icon {
+  font-size: 1.3rem;
+  margin-bottom: 4px;
+}
+
+.pwa-nav-label {
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+/* Special styling for home button */
+.pwa-nav-home {
+  position: relative;
+}
+
+.pwa-nav-home-icon {
+  background: var(--ada-primary);
+  color: white;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  margin: -8px auto 4px auto;
+  box-shadow: 0 4px 12px rgba(30, 64, 175, 0.3);
+  transition: all 0.3s ease;
+}
+
+.pwa-nav-home.active .pwa-nav-home-icon {
+  background: var(--ada-primary-dark);
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(30, 64, 175, 0.4);
+}
+
+.pwa-nav-home:active .pwa-nav-home-icon {
+  transform: scale(0.95);
+}
+
+.pwa-nav-home .pwa-nav-label {
+  font-weight: 600;
+  color: var(--ada-primary);
+}
+
+.pwa-nav-home.active .pwa-nav-label {
+  color: var(--ada-primary-dark);
+}
+
+/* Status indicators */
+.pwa-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 6px;
+  border-radius: 6px;
+  font-size: 0.65rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.pwa-status-success {
+  background: rgba(76, 175, 80, 0.1);
+  color: var(--ada-success);
+  border: 1px solid rgba(76, 175, 80, 0.2);
+}
+
+.pwa-status-accepted {
+  background: rgba(103, 58, 183, 0.1);
+  color: #673ab7;
+  border: 1px solid rgba(103, 58, 183, 0.2);
+}
+
+.pwa-status-warning {
+  background: rgba(255, 152, 0, 0.1);
+  color: #e65100;
+  border: 1px solid rgba(255, 152, 0, 0.2);
+}
+
+.pwa-status-danger {
+  background: rgba(244, 67, 54, 0.1);
+  color: var(--ada-danger);
+  border: 1px solid rgba(244, 67, 54, 0.2);
+}
+
+.pwa-status-info {
+  background: rgba(33, 150, 243, 0.1);
+  color: var(--ada-primary);
+  border: 1px solid rgba(33, 150, 243, 0.2);
+}
+
+/* ===========================================
+   ACTIVITY TYPE STYLING - ORDER STATUS CHANGES
+   =========================================== */
+
+/* Order Status Activity Classes */
+.pwa-activity-order {
+  border-left: 4px solid #2196f3;
+  background: rgba(33, 150, 243, 0.03);
+}
+
+.pwa-status-pending {
+  background: rgba(255, 152, 0, 0.1);
+  color: #e65100;
+  border: 1px solid rgba(255, 152, 0, 0.2);
+}
+
+.pwa-status-pending .pwa-activity-icon {
+  background: #ff9800;
+  color: white;
+}
+
+.pwa-status-accepted {
+  background: rgba(33, 150, 243, 0.1);
+  color: #1976d2;
+  border: 1px solid rgba(33, 150, 243, 0.2);
+}
+
+.pwa-status-accepted .pwa-activity-icon {
+  background: #2196f3;
+  color: white;
+}
+
+.pwa-status-fulfilled {
+  background: rgba(76, 175, 80, 0.1);
+  color: #388e3c;
+  border: 1px solid rgba(76, 175, 80, 0.2);
+}
+
+.pwa-status-fulfilled .pwa-activity-icon {
+  background: #4caf50;
+  color: white;
+}
+
+.pwa-status-cancelled {
+  background: rgba(244, 67, 54, 0.1);
+  color: #d32f2f;
+  border: 1px solid rgba(244, 67, 54, 0.2);
+}
+
+.pwa-status-cancelled .pwa-activity-icon {
+  background: #f44336;
+  color: white;
+}
+
+.pwa-status-out-for-delivery {
+  background: rgba(156, 39, 176, 0.1);
+  color: #7b1fa2;
+  border: 1px solid rgba(156, 39, 176, 0.2);
+}
+
+.pwa-status-out-for-delivery .pwa-activity-icon {
+  background: #9c27b0;
+  color: white;
+}
+
+/* ===========================================
+   ACTIVITY TYPE STYLING - PAYMENT TRANSACTIONS
+   =========================================== */
+
+/* Payment Transaction Activity Classes */
+.pwa-activity-payment {
+  border-left: 4px solid #4caf50;
+  background: rgba(76, 175, 80, 0.03);
+}
+
+.pwa-status-payment {
+  background: rgba(76, 175, 80, 0.1);
+  color: #2e7d32;
+  border: 1px solid rgba(76, 175, 80, 0.2);
+}
+
+.pwa-status-payment .pwa-activity-icon {
+  background: #4caf50;
+  color: white;
+}
+
+.pwa-status-overpayment {
+  background: rgba(33, 150, 243, 0.1);
+  color: #1565c0;
+  border: 1px solid rgba(33, 150, 243, 0.2);
+}
+
+.pwa-status-overpayment .pwa-activity-icon {
+  background: #2196f3;
+  color: white;
+}
+
+.pwa-status-partial-payment {
+  background: rgba(255, 193, 7, 0.1);
+  color: #f57c00;
+  border: 1px solid rgba(255, 193, 7, 0.2);
+}
+
+.pwa-status-partial-payment .pwa-activity-icon {
+  background: #ffc107;
+  color: #333;
+}
+
+.pwa-status-pending-payment {
+  background: rgba(255, 152, 0, 0.1);
+  color: #ef6c00;
+  border: 1px solid rgba(255, 152, 0, 0.2);
+}
+
+.pwa-status-pending-payment .pwa-activity-icon {
+  background: #ff9800;
+  color: white;
+}
+
+.pwa-status-failed-payment {
+  background: rgba(244, 67, 54, 0.1);
+  color: #c62828;
+  border: 1px solid rgba(244, 67, 54, 0.2);
+}
+
+.pwa-status-failed-payment .pwa-activity-icon {
+  background: #f44336;
+  color: white;
+}
+
+.pwa-status-refund {
+  background: rgba(103, 58, 183, 0.1);
+  color: #4527a0;
+  border: 1px solid rgba(103, 58, 183, 0.2);
+}
+
+.pwa-status-refund .pwa-activity-icon {
+  background: #673ab7;
+  color: white;
+}
+
+/* ===========================================
+   ACTIVITY ICON CONTAINERS
+   =========================================== */
+
+.pwa-activity-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  margin-right: 12px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.pwa-activity-icon-large {
+  width: 48px;
+  height: 48px;
+  font-size: 1.3rem;
+}
+
+.pwa-activity-icon-small {
+  width: 32px;
+  height: 32px;
+  font-size: 0.9rem;
+  margin-right: 8px;
+}
+
+/* ===========================================
+   ACTIVITY LIST STYLING
+   =========================================== */
+
+.pwa-activity-item {
+  display: flex;
+  align-items: flex-start;
+  padding: 16px;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  background: var(--ada-white);
+  border: 1px solid var(--ada-border-light);
+  transition: all 0.2s ease;
+}
+
+.pwa-activity-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
+}
+
+.pwa-activity-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.pwa-activity-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ada-charcoal);
+  margin: 0 0 4px 0;
+  line-height: 1.3;
+}
+
+.pwa-activity-subtitle {
+  font-size: 0.8rem;
+  color: var(--ada-gray);
+  margin: 0 0 8px 0;
+  line-height: 1.3;
+}
+
+.pwa-activity-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pwa-activity-time {
+  font-size: 0.75rem;
+  color: var(--ada-gray);
+  white-space: nowrap;
+}
+
+.pwa-activity-amount {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ada-charcoal);
+}
+
+/* ===========================================
+   PAYMENT METHOD ICONS
+   =========================================== */
+
+.pwa-payment-method {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--ada-gray);
+  margin-top: 4px;
+}
+
+.pwa-payment-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  background: var(--ada-light-gray);
+  color: var(--ada-gray);
+}
+
+.pwa-payment-icon.cash {
+  background: rgba(76, 175, 80, 0.1);
+  color: #4caf50;
+}
+
+.pwa-payment-icon.momo {
+  background: rgba(255, 193, 7, 0.1);
+  color: #ffa000;
+}
+
+.pwa-payment-icon.telecel {
+  background: rgba(233, 30, 99, 0.1);
+  color: #e91e63;
+}
+
+.pwa-payment-icon.paystack {
+  background: rgba(33, 150, 243, 0.1);
+  color: #2196f3;
+}
+
+/* ===========================================
+   ACTIVITY TIMELINE STYLING
+   =========================================== */
+
+.pwa-activity-timeline {
+  position: relative;
+  padding-left: 32px;
+}
+
+.pwa-activity-timeline::before {
+  content: '';
+  position: absolute;
+  left: 20px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--ada-border-light);
+}
+
+.pwa-activity-timeline-item {
+  position: relative;
+  margin-bottom: 24px;
+}
+
+.pwa-activity-timeline-item::before {
+  content: '';
+  position: absolute;
+  left: -26px;
+  top: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ada-border-medium);
+}
+
+.pwa-activity-timeline-item.payment::before {
+  background: #4caf50;
+}
+
+.pwa-activity-timeline-item.order::before {
+  background: #2196f3;
+}
+
+.pwa-activity-timeline-item.refund::before {
+  background: #673ab7;
+}
+
+.pwa-activity-timeline-item.failed::before {
+  background: #f44336;
+}
+
+/* Modal/Dialog styles */
+.pwa-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1060;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.pwa-modal {
+  background: var(--ada-white);
+  border-radius: 16px;
+  padding: 24px;
+  width: 100%;
+  max-width: 320px;
+  border: 1px solid var(--ada-border-light);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+}
+
+.pwa-modal-header {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.pwa-modal-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--ada-charcoal);
+  margin: 0;
+}
+
+.pwa-modal-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.pwa-modal-actions .pwa-btn {
+  flex: 1;
+}
+
+/* Loading states */
+.pwa-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  flex-direction: column;
+}
+
+.pwa-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--ada-border-light);
+  border-top: 3px solid var(--ada-primary);
+  border-radius: 50%;
+  animation: pwa-spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes pwa-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.pwa-loading-text {
+  color: var(--ada-gray);
+  font-size: 0.9rem;
+}
+
+/* Empty states */
+.pwa-empty {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.pwa-empty-icon {
+  font-size: 4rem;
+  color: var(--ada-border-medium);
+  margin-bottom: 16px;
+}
+
+.pwa-empty-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--ada-dark-gray);
+  margin: 0 0 8px 0;
+}
+
+.pwa-empty-subtitle {
+  font-size: 0.9rem;
+  color: var(--ada-gray);
+  margin: 0;
+}
+
+/* Search and filters */
+.pwa-search-container {
+  position: relative;
+  margin-bottom: 20px;
+}
+
+.pwa-search-input {
+  width: 100%;
+  padding: 16px 16px 16px 48px;
+  border: 2px solid var(--ada-border-light);
+  border-radius: 12px;
+  font-size: 1rem;
+  background: var(--ada-white);
+}
+
+.pwa-search-icon {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ada-gray);
+  font-size: 1.2rem;
+}
+
+/* Notification styles */
+.pwa-notification {
+  background: var(--ada-white);
+  border-radius: 12px;
+  padding: 16px;
+  margin: 8px 16px;
+  border: 1px solid var(--ada-border-light);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  border-left: 4px solid var(--ada-primary);
+}
+
+.pwa-notification-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ada-charcoal);
+  margin: 0 0 4px 0;
+}
+
+.pwa-notification-body {
+  font-size: 0.85rem;
+  color: var(--ada-gray);
+  margin: 0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 375px) {
+  .pwa-content {
+    padding: 12px;
+  }
+  
+  .pwa-dashboard-grid {
+    gap: 12px;
+  }
+  
+  .pwa-card {
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+}
+
+/* Light theme enforcement - consistent across all devices */
+.pwa-app,
+.pwa-card,
+.pwa-list,
+.pwa-dashboard-item,
+.pwa-bottom-nav,
+.pwa-modal,
+.pwa-form-input {
+  color-scheme: light !important;
+}
+
+/* Force light theme colors regardless of system preference */
+@media (prefers-color-scheme: dark) {
+  .pwa-app {
+    background: var(--ada-white) !important;
+  }
+  
+  .pwa-content {
+    background: var(--ada-off-white) !important;
+  }
+  
+  .pwa-card,
+  .pwa-list,
+  .pwa-dashboard-item,
+  .pwa-bottom-nav,
+  .pwa-modal {
+    background: var(--ada-white) !important;
+    color: var(--ada-charcoal) !important;
+    border-color: var(--ada-border-light) !important;
+  }
+  
+  .pwa-card-title,
+  .pwa-dashboard-title,
+  .pwa-list-title,
+  .pwa-modal-title {
+    color: var(--ada-charcoal) !important;
+  }
+  
+  .pwa-card-subtitle,
+  .pwa-list-subtitle,
+  .pwa-loading-text,
+  .pwa-empty-subtitle {
+    color: var(--ada-gray) !important;
+  }
+  
+  .pwa-form-input {
+    background: var(--ada-white) !important;
+    border-color: var(--ada-border-light) !important;
+    color: var(--ada-charcoal) !important;
+  }
+  
+  .pwa-list-item {
+    border-bottom-color: var(--ada-border-light) !important;
+  }
+  
+  .pwa-bottom-nav {
+    border-top-color: var(--ada-border-light) !important;
+  }
+}
+
+/* Haptic feedback simulation */
+.pwa-haptic:active {
+  animation: pwa-haptic 0.1s;
+}
+
+@keyframes pwa-haptic {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.98); }
+  100% { transform: scale(1); }
+}
+
+/* Pull to refresh indicator */
+.pwa-pull-refresh {
+  position: absolute;
+  top: -60px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 40px;
+  background: var(--ada-white);
+  border: 1px solid var(--ada-border-light);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s;
+}
+
+.pwa-pull-refresh.active {
+  top: 20px;
+}
+
+/* Swipe gestures */
+.pwa-swipeable {
+  position: relative;
+  overflow: hidden;
+}
+
+.pwa-swipe-action {
+  position: absolute;
+  top: 0;
+  right: -80px;
+  width: 80px;
+  height: 100%;
+  background: var(--ada-danger);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: right 0.3s;
+}
+
+.pwa-swipeable.swiped .pwa-swipe-action {
+  right: 0;
+}
+
+/* Safe area handling */
+@supports (padding: max(0px)) {
+  .pwa-header {
+    padding-top: max(12px, env(safe-area-inset-top));
+  }
+  
+  .pwa-bottom-nav {
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+  }
+  
+  .pwa-content {
+    padding-bottom: calc(80px + max(0px, env(safe-area-inset-bottom)));
+  }
+}
+
+/* Real-time refresh animations */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Auto-refresh indicator */
+.auto-refresh-indicator {
+  position: relative;
+}
+
+.auto-refresh-indicator::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  background: #4CAF50;
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7);
+  }
+  
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 10px rgba(76, 175, 80, 0);
+  }
+  
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
+  }
+}
+
+/* Time ago text styling */
+.time-ago {
+  font-size: 0.75rem;
+  color: #666;
+  font-style: italic;
+}
+
+.time-ago.just-now {
+  color: #4CAF50;
+  font-weight: 500;
+}
+
+/* Real-time update indicators */
+.pwa-real-time-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  color: #4CAF50;
+  padding: 2px 6px;
+  background: rgba(76, 175, 80, 0.1);
+  border-radius: 4px;
+  border: 1px solid rgba(76, 175, 80, 0.2);
+}
+
+.pwa-real-time-indicator i {
+  animation: pulse 2s infinite;
+}
+
+/* Enhanced status colors for time-ago display */
+.pwa-time-fresh {
+  color: #4CAF50 !important;
+  font-weight: 500;
+}
+
+.pwa-time-recent {
+  color: #FF9800 !important;
+}
+
+.pwa-time-old {
+  color: #666 !important;
+}

@@ -1,0 +1,181 @@
+﻿/* ===== BUTTON ICON & SPACING FIXES ===== */
+/* These overrides ensure consistent button icons and spacing in all modals */
+
+/* 1. Fix Button Icons */
+/* Prevent doubled icons by hiding Font Awesome icons when Bootstrap Icons are present */
+.btn i.bi + i.fa,
+.btn i.bi + i.fas,
+.btn i.bi + i.far,
+.btn i.bi + i.fal,
+.AdaButton i.bi + i.fa,
+.AdaButton i.bi + i.fas,
+.AdaButton i.bi + i.far,
+.AdaButton i.bi + i.fal {
+  display: none !important;
+}
+
+/* Ensure proper icon sizing and spacing */
+.btn i,
+.AdaButton i,
+.btn .bi,
+.AdaButton .bi,
+.btn .fa,
+.AdaButton .fa,
+.btn .fas,
+.AdaButton .fas {
+  font-size: 0.95rem !important;
+  margin-right: 0.5rem !important;
+  vertical-align: middle !important;
+  display: inline-block !important;
+  position: relative !important;
+  top: -0.05em !important;
+}
+
+/* Remove any before/after content that might be adding icons */
+.modal-footer .btn::before,
+.modal-footer .btn::after,
+.modal-footer .AdaButton::before,
+.modal-footer .AdaButton::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* 2. Fix Button Spacing */
+/* Force consistent button spacing in all modal footers */
+.modal-footer {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: flex-end !important;
+  gap: 0.75rem !important;
+  padding: 1.25rem 1.5rem !important;
+}
+
+/* Fix flex container within modal footers */
+.modal-footer > div,
+.modal-footer .d-flex {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 0.75rem !important;
+  width: 100% !important;
+}
+
+/* Ensure responsive behavior is consistent */
+@media (min-width: 576px) {
+  .modal-footer > div,
+  .modal-footer .d-flex {
+    flex-direction: row !important;
+  }
+}
+
+@media (max-width: 575.98px) {
+  .modal-footer > div,
+  .modal-footer .d-flex {
+    flex-direction: column !important;
+  }
+}
+
+/* Remove margins that might interfere with gap spacing */
+.modal-footer .btn,
+.modal-footer .AdaButton,
+.modal-footer button {
+  margin: 0 !important;
+}
+
+/* Override any utility classes that might affect spacing */
+.modal-footer .mb-2,
+.modal-footer .mb-3,
+.modal-footer .me-2,
+.modal-footer .ms-2,
+.modal-footer .mx-2,
+.modal-footer .my-2,
+.modal-footer .m-2,
+.modal-footer .me-sm-2,
+.modal-footer .ms-sm-2,
+.modal-footer .mb-sm-0,
+.modal-footer .mt-sm-0 {
+  margin: 0 !important;
+}
+
+/* Override any padding classes that might affect button appearance */
+.modal-footer .btn,
+.modal-footer .AdaButton,
+.modal-footer button {
+  padding: 0.5rem 1rem !important;
+  min-height: 44px !important;
+  min-width: 110px !important;
+  border-radius: 0 !important; /* Force sharp corners on all modal buttons */
+}
+
+/* 4. ENFORCE SHARP CORNERS ON ALL MODAL ELEMENTS */
+/* Override all border-radius properties within modals */
+.modal *,
+.modal .btn,
+.modal .AdaButton,
+.modal button,
+.modal .form-control,
+.modal .form-select,
+.modal .input-group,
+.modal .card,
+.modal .alert,
+.modal .badge,
+.modal .dropdown-menu,
+.modal .nav-tabs .nav-link,
+.modal .nav-pills .nav-link {
+  border-radius: 0 !important;
+}
+
+/* Specifically target common Bootstrap components that might have rounded corners */
+.modal .rounded,
+.modal .rounded-1,
+.modal .rounded-2,
+.modal .rounded-3,
+.modal .rounded-4,
+.modal .rounded-5,
+.modal .rounded-pill,
+.modal .rounded-circle {
+  border-radius: 0 !important;
+}
+
+/* Override button variants that might have specific border-radius */
+.modal .btn-primary,
+.modal .btn-secondary,
+.modal .btn-success,
+.modal .btn-danger,
+.modal .btn-warning,
+.modal .btn-info,
+.modal .btn-light,
+.modal .btn-dark,
+.modal .btn-outline-primary,
+.modal .btn-outline-secondary,
+.modal .btn-outline-success,
+.modal .btn-outline-danger,
+.modal .btn-outline-warning,
+.modal .btn-outline-info,
+.modal .btn-outline-light,
+.modal .btn-outline-dark {
+  border-radius: 0 !important;
+}
+
+/* Ensure consistent text and icon alignment */
+.modal-footer .btn,
+.modal-footer .AdaButton,
+.modal-footer button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* 3. Table Header Color Fixes */
+/* Target all table headers with high specificity */
+table thead th,
+.table thead th,
+table th,
+.table th,
+table.table thead th,
+div.table-responsive table th,
+.modal-body .table thead th,
+.table-responsive .table thead th {
+  background-color: var(--ada-primary) !important;
+  color: var(--ada-white) !important;
+  font-weight: 600 !important;
+}
