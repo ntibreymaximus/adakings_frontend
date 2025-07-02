@@ -14,7 +14,6 @@ import 'react-toastify/dist/ReactToastify.css';
 import Navbar from './components/Navbar';
 import MobileNavbar from './components/MobileNavbar';
 import PWADashboard from './components/PWADashboard';
-import PWAWrapper from './components/PWAWrapper';
 import PWALogin from './components/PWALogin';
 import PWAProfile from './components/PWAProfile';
 import PWAOrders from './components/PWAOrders';

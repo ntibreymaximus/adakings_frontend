@@ -1,6 +1,6 @@
 {
   "name": "adakings_frontend",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "dependencies": {
     "@testing-library/dom": "^10.4.0",
@@ -24,10 +24,10 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "deploy:feature": "node deploy.js feature",
-    "deploy:dev": "node deploy.js dev",
-    "deploy:production": "node deploy.js production",
-    "deploy:help": "node deploy.js"
+    "deploy:feature": "node smart-deploy.js feature",
+    "deploy:dev": "node smart-deploy.js dev",
+    "deploy:production": "node smart-deploy.js production",
+    "deploy:help": "node smart-deploy.js"
   },
   "eslintConfig": {
     "extends": [

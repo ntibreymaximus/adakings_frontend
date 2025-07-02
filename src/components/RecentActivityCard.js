@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Card, Spinner, Alert } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import { getRelativeTime } from '../services/activityService';
-import '../styles/dashboard.css';
 
 /**
  * Recent Activity Card Component

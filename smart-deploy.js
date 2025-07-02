@@ -16,21 +16,21 @@
  * - Branch Management: Creates, merges, and manages git branches with user confirmation
  * 
  * Usage:
- *     npm run deploy:production [major|minor|patch] ["commit message"]
- *     npm run deploy:dev [major|minor|patch] ["commit message"]
- *     npm run deploy:feature feature-name [major|minor|patch] ["commit message"]
+ *     node smart-deploy.js production [major|minor|patch] ["commit message"]
+ *     node smart-deploy.js dev [major|minor|patch] ["commit message"]
+ *     node smart-deploy.js feature/name [major|minor|patch] ["commit message"]
  *     
  * Examples:
  *     # Feature deployment - continuous versioning across all features
- *     npm run deploy:feature auth patch "Add authentication components"
+ *     node smart-deploy.js feature/auth patch "Add authentication components"
  *     # Result: feature/auth-1.0.0 (first feature)
  *     
  *     # Dev deployment - independent dev versioning with build
- *     npm run deploy:dev minor "New UI components"
+ *     node smart-deploy.js dev minor "New UI components"
  *     # Result: dev/1.1.0 (builds app for testing)
  *     
  *     # Production deployment - independent production versioning with optimized build
- *     npm run deploy:production major "Production release"
+ *     node smart-deploy.js production major "Production release"
  *     # Result: prod/2.0.0 (optimized production build)
  */
 
@@ -439,6 +439,36 @@ class ReactSmartDeployer {
         return true;
     }
 
+    hasExistingVersionedBranches(targetEnv, remoteBranches) {
+        // Check if there are any existing versioned branches for this environment type
+        const branches = remoteBranches.split('\n')
+            .map(branch => branch.trim())
+            .filter(branch => branch && !branch.includes('->'));
+        
+        if (targetEnv.startsWith('feature/')) {
+            // Look for any feature branches with versions
+            return branches.some(branch => 
+                branch.startsWith('origin/feature/') && 
+                branch.includes('-') && 
+                this.isValidVersion(branch.split('-').pop())
+            );
+        } else if (targetEnv === 'dev') {
+            // Look for dev branches with versions
+            return branches.some(branch => 
+                branch.startsWith('origin/dev/') && 
+                this.isValidVersion(branch.replace('origin/dev/', ''))
+            );
+        } else if (targetEnv === 'production') {
+            // Look for prod branches with versions
+            return branches.some(branch => 
+                branch.startsWith('origin/prod/') && 
+                this.isValidVersion(branch.replace('origin/prod/', ''))
+            );
+        }
+        
+        return false;
+    }
+
     bumpVersion(bumpType, currentVersion) {
         const parts = currentVersion.split('.').map(Number);
         let [major, minor, patch] = parts;
@@ -677,8 +707,62 @@ ${currentContent.replace('# Changelog', '').replace('All notable changes to this
         }
     }
 
+    checkWorkingDirectory() {
+        // Check if git working directory has uncommitted changes without committing them
+        try {
+            const result = this.runCommand('git status --porcelain', { silent: true });
+            if (result.trim()) {
+                this.logInfo('Working directory has uncommitted changes that will be included in deployment:');
+                console.log(result);
+                return true; // Has changes
+            }
+            return false; // No changes
+        } catch (error) {
+            this.logWarning('Could not check working directory status');
+            return false;
+        }
+    }
+
+    syncWithRemote() {
+        // Sync local repository with remote - fetch all branches
+        this.logInfo('Syncing with remote repository...');
+        
+        // Fetch all remote branches and tags
+        this.runCommand('git fetch --all');
+        
+        // Prune remote tracking branches that no longer exist
+        try {
+            this.runCommand('git remote prune origin');
+        } catch (error) {
+            this.logWarning('Could not prune remote branches');
+        }
+        
+        // Update current branch only if it exists remotely
+        const currentBranch = this.getCurrentBranch();
+        
+        // Check if current branch exists remotely
+        try {
+            const remoteBranches = this.runCommand('git branch -r', { silent: true });
+            if (remoteBranches.includes(`origin/${currentBranch}`)) {
+                try {
+                    this.runCommand(`git pull origin ${currentBranch}`);
+                    this.logInfo(`Updated ${currentBranch} from remote`);
+                } catch (error) {
+                    this.logWarning(`Could not pull from origin/${currentBranch}`);
+                }
+            } else {
+                this.logInfo(`Branch ${currentBranch} doesn't exist remotely - skipping pull`);
+            }
+        } catch (error) {
+            this.logWarning('Could not check remote branches');
+        }
+    }
+
     async deploy(targetEnv, bumpType = 'patch', commitMessage = '') {
         this.logInfo(`🚀 Starting React deployment to ${targetEnv} environment`);
+        
+        // Pre-deployment checks - just check for changes, don't commit them yet
+        const hasUncommittedChanges = this.checkWorkingDirectory();
         
         // Check Node dependencies
         this.checkNodeDependencies();
@@ -687,18 +771,26 @@ ${currentContent.replace('# Changelog', '').replace('All notable changes to this
         const backupPath = this.backupCurrentState();
 
         try {
-            // Sync with remote first
-            this.runCommand('git fetch --all');
+            // Sync with remote first to get latest remote branches
+            this.syncWithRemote();
             
             // Get the highest version for the specific branch type
             const currentVersion = this.getHighestBranchVersion(targetEnv);
             
-            // For first deployment, use 1.0.0, otherwise bump
+            // For first deployment of any branch type, use the found version as-is
+            // For subsequent deployments, bump the version
             let newVersion;
-            if (currentVersion === '1.0.0') {
-                this.logInfo(`First React deployment for ${targetEnv} - using version 1.0.0`);
+            
+            // Check if this is truly the first deployment (no remote versions found)
+            const remoteBranches = this.runCommand('git branch -r', { silent: true });
+            const hasAnyVersionedBranches = this.hasExistingVersionedBranches(targetEnv, remoteBranches);
+            
+            if (!hasAnyVersionedBranches) {
+                // This is the first deployment for this branch type
+                this.logInfo(`First deployment for ${targetEnv} - using version 1.0.0`);
                 newVersion = '1.0.0';
             } else {
+                // Branch type has existing versions, bump from the highest
                 this.logInfo(`Using highest version for ${targetEnv} as base: ${currentVersion}`);
                 newVersion = this.bumpVersion(bumpType, currentVersion);
             }
