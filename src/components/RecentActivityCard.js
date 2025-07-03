@@ -10,7 +10,7 @@ import { getRelativeTime } from '../services/activityService';
 const RecentActivityCard = ({ 
   maxItems = 5, 
   showFullHistory = true,
-  refreshInterval = 10000, // 10 seconds for faster detection
+  refreshInterval = 3000, // 3 seconds for instant updates
   className = "",
   style = {}
 }) => {
@@ -285,10 +285,10 @@ let allActivities = [];
       console.error('Error fetching recent activity:', err);
       setError(err.message);
       
-      // Auto-retry for network errors
-      if (retryCount < 3 && !err.message.includes('Session expired')) {
+      // Auto-retry for network errors with longer delays to prevent reload loops
+      if (retryCount < 2 && !err.message.includes('Session expired') && !err.message.includes('AUTHENTICATION')) {
         setRetryCount(prev => prev + 1);
-        setTimeout(() => fetchRecentActivity(), 2000 * (retryCount + 1));
+        setTimeout(() => fetchRecentActivity(), 10000 * (retryCount + 1)); // Longer retry delays
       }
     } finally {
       setLoading(false);

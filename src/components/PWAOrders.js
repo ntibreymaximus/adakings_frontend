@@ -1,41 +1,71 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { 
   getOrderStatusClass, 
   getOrderStatusIcon, 
   getOrderStatusColor,
-  getPaymentMethodIcon, 
-  getPaymentModeDisplay,
-  formatPrice,
-  formatActivityTime 
+  formatPrice
 } from '../utils/activityTypes';
 import { initiatePayment, formatPaymentError } from '../services/paymentService';
+import { useRealTimeUpdates } from '../hooks/useRealTimeUpdates';
 import '../styles/mobile-native.css';
 
 const PWAOrders = () => {
   const navigate = useNavigate();
   
-  // Enhanced state management with better loading and error handling
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [lastUpdated, setLastUpdated] = useState(null);
-  const [retryCount, setRetryCount] = useState(0);
+// Real-time orders with instant updates
+  const {
+    data: orders,
+    loading,
+    error,
+    lastUpdated,
+    isConnected: isRealTimeConnected,
+    updateCount,
+    refresh: refreshOrders,
+    optimisticUpdate,
+    optimisticCreate
+  } = useRealTimeUpdates({
+    endpoint: 'http://localhost:8000/api/orders/',
+    pollInterval: 5000, // 5 seconds to reduce backend load
+    enableWebSocket: false, // Disable WebSocket until backend supports it
+    onUpdate: (newOrders) => {
+      console.log('[PWAOrders] Real-time update received:', newOrders.length, 'orders');
+    },
+    onError: (err) => {
+      if (err.message.includes('AUTHENTICATION_EXPIRED')) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('userData');
+        window.location.href = '/login';
+      }
+    }
+  });
+  
+  // Additional state for retry functionality
   const [isRetrying, setIsRetrying] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  
+  // Retry handler
+  const handleRetry = useCallback(async () => {
+    setIsRetrying(true);
+    setRetryCount(prev => prev + 1);
+    
+    try {
+      await refreshOrders();
+    } catch (error) {
+      console.error('Retry failed:', error);
+    } finally {
+      setIsRetrying(false);
+    }
+  }, [refreshOrders]);
+  
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   
-  // Additional state for filtered data
-  const [filteredOrders, setFilteredOrders] = useState([]);
+  // Date selection state (keep this as it's user-controlled)
   const [selectedDate, setSelectedDate] = useState(() => {
     const today = new Date();
     return today.toISOString().split('T')[0];
-  });
-  const [orderStats, setOrderStats] = useState({
-    total: 0,
-    pending: 0,
-    fulfilled: 0,
-    cancelled: 0
   });
   
   // Modal and interaction states
@@ -58,113 +88,11 @@ const PWAOrders = () => {
     { value: 'PAYSTACK(USSD)', label: 'Paystack (USSD)', disabled: false },
     { value: 'PAYSTACK(API)', label: 'Paystack (API)', disabled: false }
   ]);
-  // Enhanced fetch function with better error handling and offline support
-  const fetchOrders = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      setIsRetrying(false);
-      
-      // Check if offline
-      if (!navigator.onLine) {
-        setIsOffline(true);
-        // Try to load cached data
-        const cachedOrders = localStorage.getItem('cachedOrders');
-        if (cachedOrders) {
-          setOrders(JSON.parse(cachedOrders));
-          setError('You are offline. Showing cached data.');
-        } else {
-          throw new Error('No internet connection and no cached data available');
-        }
-        return;
-      }
-      
-      setIsOffline(false);
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication token not found');
-      }
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
-
-      const response = await fetch('http://localhost:8000/api/orders/', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error('Session expired. Please login again.');
-        } else if (response.status === 500) {
-          throw new Error('Server error. Please try again later.');
-        } else {
-          throw new Error('Failed to fetch orders');
-        }
-      }
-
-      const data = await response.json();
-      console.log('PWAOrders: Raw API response:', data);
-      
-      // Extract the results array from the paginated response
-      const ordersArray = data.results || [];
-      console.log('PWAOrders: Extracted orders array:', ordersArray);
-      console.log('PWAOrders: Orders array length:', ordersArray.length);
-      
-      setOrders(ordersArray);
-      setLastUpdated(new Date());
-      setRetryCount(0);
-      
-      // Cache the data for offline use
-      localStorage.setItem('cachedOrders', JSON.stringify(ordersArray));
-      localStorage.setItem('cachedOrdersTimestamp', new Date().toISOString());
-      
-    } catch (err) {
-      console.error('Error fetching orders:', err);
-      
-      if (err.name === 'AbortError') {
-        setError('Request timed out. Please check your connection and try again.');
-      } else if (err.message.includes('Session expired')) {
-        setError(err.message);
-        // Auto-redirect to login after 3 seconds
-        setTimeout(() => {
-          localStorage.removeItem('userData');
-          localStorage.removeItem('token');
-          localStorage.removeItem('refreshToken');
-          window.location.href = '/login';
-        }, 3000);
-      } else {
-        setError(err.message || 'Failed to fetch data');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Auto-retry function
-  const handleRetry = async () => {
-    if (retryCount < 3) {
-      setIsRetrying(true);
-      setRetryCount(prev => prev + 1);
-      await new Promise(resolve => setTimeout(resolve, 500 * retryCount)); // Reduced progressive delay
-      await fetchOrders();
-      setIsRetrying(false);
-    } else {
-      toast.error('Maximum retry attempts reached. Please refresh the page.');
-    }
-  };
 
   // Network status monitoring
   useEffect(() => {
     const handleOnline = () => {
       setIsOffline(false);
-      if (error && error.includes('offline')) {
-        fetchOrders(); // Auto-fetch when back online
-      }
     };
     
     const handleOffline = () => {
@@ -177,52 +105,41 @@ const PWAOrders = () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [error]);
-
-  // Initial load
-  useEffect(() => {
-    fetchOrders();
   }, []);
 
-  // Refresh data function
-  const refreshData = () => {
-    fetchOrders();
-  };
+  // COMPLETELY REMOVE EVENT HANDLING TO PREVENT ERRATIC RELOADS
+  // The real-time polling system will handle updates automatically
+  // No need for complex event listeners that cause re-render cascades
 
-  // Handle error display
-  useEffect(() => {
-    if (error) {
-      toast.error(error);
-    }
-  }, [error]);
+  // REMOVED: All event handling code that was causing erratic reloads
+  // Real-time polling will handle updates automatically - no need for complex events
 
-  // Update filtered orders when main orders data changes
-  useEffect(() => {
-    console.log('PWAOrders: Filtering orders. Total orders:', orders?.length || 0);
+  // STABLE filtering logic using useMemo - directly return computed values
+  const { filteredOrders, orderStats } = useMemo(() => {
+    console.log('PWAOrders: Recomputing filtered orders. Total orders:', orders?.length || 0);
     console.log('PWAOrders: Selected date:', selectedDate);
-    console.log('PWAOrders: Orders array:', orders);
     
-    if (orders && orders.length > 0) {
-      const filtered = orders.filter(order => {
-        const orderDate = new Date(order.created_at).toISOString().split('T')[0];
-        console.log('PWAOrders: Order date:', orderDate, 'Selected date:', selectedDate, 'Match:', orderDate === selectedDate);
-        return orderDate === selectedDate;
-      });
-      console.log('PWAOrders: Filtered orders:', filtered);
-      setFilteredOrders(filtered);
-      
-      // Calculate stats
-      const stats = {
-        total: filtered.length,
-        pending: filtered.filter(order => ['Pending', 'Accepted'].includes(order.status)).length,
-        fulfilled: filtered.filter(order => order.status === 'Fulfilled').length,
-        cancelled: filtered.filter(order => order.status === 'Cancelled').length
+    if (!orders || orders.length === 0) {
+      return {
+        filteredOrders: [],
+        orderStats: { total: 0, pending: 0, fulfilled: 0, cancelled: 0 }
       };
-      setOrderStats(stats);
-    } else {
-      setFilteredOrders([]);
-      setOrderStats({ total: 0, pending: 0, fulfilled: 0, cancelled: 0 });
     }
+    
+    const filtered = orders.filter(order => {
+      const orderDate = new Date(order.created_at).toISOString().split('T')[0];
+      return orderDate === selectedDate;
+    });
+    
+    const stats = {
+      total: filtered.length,
+      pending: filtered.filter(order => ['Pending', 'Accepted'].includes(order.status)).length,
+      fulfilled: filtered.filter(order => order.status === 'Fulfilled').length,
+      cancelled: filtered.filter(order => order.status === 'Cancelled').length
+    };
+    
+    console.log('PWAOrders: Computed', filtered.length, 'filtered orders');
+    return { filteredOrders: filtered, orderStats: stats };
   }, [orders, selectedDate]);
 const handleUpdateStatus = () => {
   setShowOrderModal(false);
@@ -299,8 +216,8 @@ const performStatusUpdate = async () => {
     });
 
     if (response.ok) {
-      // Refresh orders data to get updated information
-      await refreshData();
+      // Apply optimistic update for instant feedback
+      optimisticUpdate(selectedOrder.id, { status: newStatus });
       
       // Update selected order
       setSelectedOrder({ ...selectedOrder, status: newStatus });
@@ -443,8 +360,8 @@ const getStatusOptions = (order) => {
           }
         }
         
-        // Payment/refund was successful, refresh order data
-        await refreshData();
+        // Payment/refund was successful, trigger instant refresh
+        refreshOrders();
         
         // Update selected order with fresh data
         const updatedOrder = await fetchOrderDetails(selectedOrder.id);
@@ -544,10 +461,57 @@ if (loading || isRetrying) {
       {/* Order Stats */}
       <div className="pwa-card">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-          <div className="pwa-card-title" style={{ margin: 0, fontSize: '1.1rem' }}>
-            {selectedDate === new Date().toISOString().split('T')[0] ? "Today's" : "Selected Day's"} Orders
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div className="pwa-card-title" style={{ margin: 0, fontSize: '1.1rem' }}>
+              {selectedDate === new Date().toISOString().split('T')[0] ? "Today's" : "Selected Day's"} Orders
+            </div>
+            {isRealTimeConnected && (
+              <div style={{ 
+                background: '#4CAF50', 
+                color: 'white', 
+                padding: '2px 6px', 
+                borderRadius: '10px', 
+                fontSize: '0.7rem',
+                fontWeight: '500'
+              }}>
+                LIVE
+              </div>
+            )}
+            {updateCount > 0 && (
+              <div style={{ 
+                background: '#2196F3', 
+                color: 'white', 
+                padding: '2px 6px', 
+                borderRadius: '8px', 
+                fontSize: '0.7rem',
+                animation: 'pulse 2s infinite'
+              }}>
+                Updated {updateCount}x
+              </div>
+            )}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              className="pwa-btn pwa-btn-primary"
+              onClick={() => {
+                console.log('[PWAOrders] Manual refresh triggered');
+                refreshOrders();
+                toast.success('📋 Orders refreshed!', {
+                  position: 'top-center',
+                  autoClose: 1000
+                });
+              }}
+              style={{ 
+                width: 'auto',
+                minWidth: '32px',
+                height: '32px',
+                padding: '4px 8px',
+                fontSize: '0.8rem'
+              }}
+              title="Refresh orders"
+            >
+              <i className="bi bi-arrow-clockwise"></i>
+            </button>
             <input
               type="date"
               className="pwa-form-input"
@@ -643,9 +607,27 @@ if (loading || isRetrying) {
                 <div className="pwa-list-content">
                   <div className="pwa-list-title">
                     Order #{order.order_number || order.id}
+                    {order.is_offline && (
+                      <span style={{ 
+                        marginLeft: '8px', 
+                        background: '#ff6b6b', 
+                        color: 'white', 
+                        padding: '2px 6px', 
+                        borderRadius: '4px', 
+                        fontSize: '0.7rem',
+                        fontWeight: '500'
+                      }}>
+                        OFFLINE
+                      </span>
+                    )}
                   </div>
                   <div className="pwa-list-subtitle">
                     {order.customer_phone || 'No customer info'} • {order.time_ago || formatTime(order.created_at)}
+                    {order.is_offline && (
+                      <span style={{ color: '#ff6b6b', marginLeft: '8px', fontSize: '0.75rem' }}>
+                        (Will sync when online)
+                      </span>
+                    )}
                   </div>
                   <div style={{ 
                     display: 'flex', 

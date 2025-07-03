@@ -12,10 +12,9 @@ const PWACreateOrder = () => {
   const [deliveryLocation, setDeliveryLocation] = useState('');
   const [notes, setNotes] = useState('');
   const [selectedItems, setSelectedItems] = useState({});
-  const [selectedExtras, setSelectedExtras] = useState({});
   const [errors, setErrors] = useState({});
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [nextOrderNumber, setNextOrderNumber] = useState('Loading...');
+  const [, setNextOrderNumber] = useState('Loading...');
   const [deliveryLocations, setDeliveryLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -23,13 +22,15 @@ const PWACreateOrder = () => {
   const [showItemSelector, setShowItemSelector] = useState(false);
   const [showNotesModal, setShowNotesModal] = useState(false);
 
-  // Filter menu items
-  const mainMenuItems = (allMenuItems || []).filter(item => item.type?.toLowerCase() !== 'extra' && item.is_available);
-  const extraMenuItems = (allMenuItems || []).filter(item => item.type?.toLowerCase() === 'extra' && item.is_available);
+  // Ensure allMenuItems is always an array before filtering
+  const safeMenuItems = Array.isArray(allMenuItems) ? allMenuItems : [];
   
-  // Filter items by search term (including both regular and extra items)
-  const filteredMainItems = (allMenuItems || []).filter(item =>
-    item.is_available && item.name.toLowerCase().includes(searchTerm.toLowerCase())
+  // Filter menu items
+  const mainMenuItems = safeMenuItems.filter(item => item.type?.toLowerCase() !== 'extra' && item.is_available);
+  
+  // Filter main menu items by search term (excludes extras)
+  const filteredMainItems = mainMenuItems.filter(item =>
+    item.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const fetchInitialData = useCallback(async () => {
@@ -37,28 +38,83 @@ const PWACreateOrder = () => {
       setLoading(true);
       
       // Fetch next order number
-      const orderResponse = await authenticatedFetch(API_ENDPOINTS.NEXT_ORDER_NUMBER);
-      if (orderResponse.ok) {
-        const orderData = await orderResponse.json();
-        setNextOrderNumber(orderData.next_order_number);
+      try {
+        const orderResponse = await authenticatedFetch(API_ENDPOINTS.NEXT_ORDER_NUMBER);
+        if (orderResponse.ok) {
+          const orderData = await orderResponse.json();
+          setNextOrderNumber(orderData.next_order_number || 'AUTO');
+        } else {
+          setNextOrderNumber('AUTO');
+        }
+      } catch (error) {
+        console.warn('Failed to fetch next order number:', error);
+        setNextOrderNumber('AUTO');
       }
 
-      // Fetch menu items
-      const menuResponse = await authenticatedFetch(API_ENDPOINTS.MENU_ITEMS);
-      if (menuResponse.ok) {
-        const menuData = await menuResponse.json();
-        setAllMenuItems(menuData);
+      // Fetch menu items with robust error handling
+      try {
+        console.log('[PWACreateOrder] Fetching menu items from:', API_ENDPOINTS.MENU_ITEMS);
+        const menuResponse = await authenticatedFetch(API_ENDPOINTS.MENU_ITEMS);
+        console.log('[PWACreateOrder] Menu fetch response status:', menuResponse.status);
+        
+        if (menuResponse.ok) {
+          const menuData = await menuResponse.json();
+          console.log('[PWACreateOrder] Raw menu data received:', menuData);
+          console.log('[PWACreateOrder] Menu data type:', typeof menuData, 'Is array:', Array.isArray(menuData));
+          
+          // Ensure menuData is an array
+          const safeMenuData = Array.isArray(menuData) ? menuData : [];
+          console.log('[PWACreateOrder] Safe menu data length:', safeMenuData.length);
+          console.log('[PWACreateOrder] Available items count:', safeMenuData.filter(item => item.is_available).length);
+          console.log('[PWACreateOrder] Sample menu items:', safeMenuData.slice(0, 3));
+          
+          setAllMenuItems(safeMenuData);
+          // Cache menu items for offline access
+          localStorage.setItem('cachedMenuItems', JSON.stringify(safeMenuData));
+        } else {
+          console.warn('Menu fetch failed with status:', menuResponse.status);
+          setAllMenuItems([]);
+        }
+      } catch (error) {
+        console.warn('Failed to fetch menu items:', error);
+        // Try to load cached menu items from localStorage as fallback
+        try {
+          const cachedMenu = localStorage.getItem('cachedMenuItems');
+          if (cachedMenu) {
+            const parsedMenu = JSON.parse(cachedMenu);
+            const safeParsedMenu = Array.isArray(parsedMenu) ? parsedMenu : [];
+            setAllMenuItems(safeParsedMenu);
+            toast.info('Loaded cached menu items (offline mode)');
+          } else {
+            setAllMenuItems([]);
+          }
+        } catch (cacheError) {
+          console.error('Failed to load cached menu:', cacheError);
+          setAllMenuItems([]);
+        }
       }
 
       // Fetch delivery locations
-      const locationsResponse = await authenticatedFetch(`${API_ENDPOINTS.ORDERS}delivery-locations/`);
-      if (locationsResponse.ok) {
-        const locationsData = await locationsResponse.json();
-        setDeliveryLocations(locationsData);
+      try {
+        const locationsResponse = await authenticatedFetch(`${API_ENDPOINTS.ORDERS}delivery-locations/`);
+        if (locationsResponse.ok) {
+          const locationsData = await locationsResponse.json();
+          const safeLocationsData = Array.isArray(locationsData) ? locationsData : [];
+          setDeliveryLocations(safeLocationsData);
+        } else {
+          setDeliveryLocations([]);
+        }
+      } catch (error) {
+        console.warn('Failed to fetch delivery locations:', error);
+        setDeliveryLocations([]);
       }
     } catch (error) {
       console.error('Error fetching initial data:', error);
-      toast.error('Failed to load order data');
+      toast.error('Failed to load order data. Some features may be limited.');
+      // Ensure we have safe default values
+      setAllMenuItems([]);
+      setDeliveryLocations([]);
+      setNextOrderNumber('AUTO');
     } finally {
       setLoading(false);
     }
@@ -93,18 +149,6 @@ const PWACreateOrder = () => {
     setShowItemSelector(false);
   };
 
-  const handleExtraQuantityChange = (extraId, quantity) => {
-    const numQuantity = parseInt(quantity, 10);
-    if (numQuantity <= 0) {
-      setSelectedExtras(prev => {
-        const newExtras = { ...prev };
-        delete newExtras[extraId];
-        return newExtras;
-      });
-    } else {
-      setSelectedExtras(prev => ({ ...prev, [extraId]: numQuantity }));
-    }
-  };
 
   const validateForm = () => {
     let formErrors = {};
@@ -148,11 +192,7 @@ const PWACreateOrder = () => {
         .filter(([, quantity]) => quantity > 0)
         .map(([itemId, quantity]) => ({ menu_item_id: parseInt(itemId), quantity }));
 
-      const payloadExtras = Object.entries(selectedExtras)
-        .filter(([, quantity]) => quantity > 0)
-        .map(([extraId, quantity]) => ({ menu_item_id: parseInt(extraId), quantity }));
-
-      const allItems = [...payloadItems, ...payloadExtras];
+      const allItems = [...payloadItems];
 
       const payload = {
         customer_phone: customerPhone || null,
@@ -194,6 +234,47 @@ const PWACreateOrder = () => {
         const data = await response.json();
         console.log('Order created successfully:', data);
         toast.success(`Order ${data.order_number} created successfully!`);
+        
+        // Multiple approaches for instant updates
+        // 1. Trigger global refresh event
+        console.log('[PWACreateOrder] Dispatching orderCreated event:', data);
+        window.dispatchEvent(new CustomEvent('orderCreated', { 
+          detail: data,
+          bubbles: true
+        }));
+        
+        // 2. Trigger PWA-specific event
+        window.dispatchEvent(new CustomEvent('pwa-order-created', { 
+          detail: data,
+          bubbles: true
+        }));
+        
+        // 3. Store in localStorage for instant access
+        try {
+          const timestamp = Date.now();
+          localStorage.setItem('lastCreatedOrder', JSON.stringify({
+            ...data,
+            _created_at: timestamp
+          }));
+          localStorage.setItem('orderCreatedFlag', timestamp.toString());
+        } catch (e) {
+          console.warn('[PWACreateOrder] Failed to store order flag:', e);
+        }
+        
+        // 4. Post message for cross-tab communication
+        if (window.BroadcastChannel) {
+          try {
+            const channel = new BroadcastChannel('adakings-orders');
+            channel.postMessage({
+              type: 'ORDER_CREATED',
+              data: data,
+              timestamp: Date.now()
+            });
+            channel.close();
+          } catch (e) {
+            console.warn('[PWACreateOrder] BroadcastChannel not available:', e);
+          }
+        }
         
         // Always redirect to orders page after successful creation
         navigate('/view-orders');
@@ -237,7 +318,43 @@ const PWACreateOrder = () => {
         toast.error('Authentication failed. Please log in again.');
         navigate('/login');
       } else {
-        toast.error('Failed to create order. Please check your connection and try again.');
+        // Store order offline for later sync
+        const payloadItems = Object.entries(selectedItems)
+          .filter(([, quantity]) => quantity > 0)
+          .map(([itemId, quantity]) => ({ menu_item_id: parseInt(itemId), quantity }));
+
+        const allItems = [...payloadItems];
+        
+        const offlineOrder = {
+          id: `offline-${Date.now()}`,
+          customer_phone: customerPhone || null,
+          delivery_type: deliveryType,
+          delivery_location: deliveryType === 'Delivery' ? deliveryLocation : null,
+          notes: notes || '',
+          items: allItems,
+          created_at: new Date().toISOString(),
+          status: 'pending_sync',
+          total: grandTotal
+        };
+        
+        try {
+          const existingOfflineOrders = JSON.parse(localStorage.getItem('offlineOrders') || '[]');
+          existingOfflineOrders.push(offlineOrder);
+          localStorage.setItem('offlineOrders', JSON.stringify(existingOfflineOrders));
+          
+          toast.success(`Order saved offline! Will sync when connection is restored.`);
+          console.log('Order stored offline:', offlineOrder);
+          
+          // Clear form and navigate
+          setSelectedItems({});
+          setCustomerPhone('');
+          setDeliveryLocation('');
+          setNotes('');
+          navigate('/view-orders');
+        } catch (storageError) {
+          console.error('Failed to store offline order:', storageError);
+          toast.error('Failed to create order. Please check your connection and try again.');
+        }
       }
     } finally {
       setSubmitting(false);
@@ -247,20 +364,17 @@ const PWACreateOrder = () => {
 
   // Calculate totals
   const currentOrderSubTotal = Object.entries(selectedItems).reduce((total, [itemId, quantity]) => {
-    const item = allMenuItems.find(mi => mi.id.toString() === itemId);
+    const item = safeMenuItems.find(mi => mi.id.toString() === itemId);
     return total + (item && item.price && quantity > 0 ? parseFloat(item.price) * quantity : 0);
   }, 0);
   
-  const extrasSubTotal = Object.entries(selectedExtras).reduce((total, [extraId, quantity]) => {
-    const extra = extraMenuItems.find(e => e.id.toString() === extraId);
-    return total + (extra && extra.price && quantity > 0 ? parseFloat(extra.price) * quantity : 0);
-  }, 0);
+  const extrasSubTotal = 0;
 
   const currentDeliveryFee = deliveryType === 'Delivery' && deliveryLocation
     ? parseFloat(deliveryLocations.find(loc => loc.name === deliveryLocation)?.fee || 0)
     : 0;
     
-  const grandTotal = currentOrderSubTotal + extrasSubTotal + currentDeliveryFee;
+  const grandTotal = currentOrderSubTotal + currentDeliveryFee;
 
   const formatPrice = (price) => `GH₵ ${parseFloat(price).toFixed(2)}`;
 
@@ -390,111 +504,6 @@ const PWACreateOrder = () => {
           </button>
         </div>
 
-        {/* Extras Section */}
-        <div className="pwa-card">
-          <div className="pwa-card-title" style={{ marginBottom: '16px', fontSize: '1rem' }}>Extras</div>
-
-          {Object.keys(selectedExtras).length === 0 ? (
-            <div className="pwa-empty">
-              <div className="pwa-empty-icon">
-                <i className="bi bi-plus-square"></i>
-              </div>
-              <div className="pwa-empty-title">No Extras Selected</div>
-              <div className="pwa-empty-subtitle">Add extras to enhance your order</div>
-            </div>
-          ) : (
-            <div className="pwa-list">
-              {Object.entries(selectedExtras).map(([extraId, quantity]) => {
-                const extra = extraMenuItems.find(e => e.id.toString() === extraId);
-                if (!extra) return null;
-                
-                return (
-                  <div key={extraId} className="pwa-list-item">
-                    <div className="pwa-list-icon" style={{ background: '#FF9800', color: 'white' }}>
-                      <i className="bi bi-plus-square"></i>
-                    </div>
-                    <div className="pwa-list-content">
-                      <div className="pwa-list-title">{extra.name}</div>
-                      <div className="pwa-list-subtitle">
-                        {formatPrice(extra.price)} each
-                      </div>
-                      <div style={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        gap: '6px',
-                        marginTop: '6px'
-                      }}>
-                        <button
-                          type="button"
-                          className="pwa-btn pwa-btn-secondary"
-                          onClick={() => handleExtraQuantityChange(extraId, quantity - 1)}
-                          style={{ width: '28px', height: '28px', padding: '0', fontSize: '0.85rem' }}
-                        >
-                          -
-                        </button>
-                        <span style={{ 
-                          minWidth: '35px', 
-                          textAlign: 'center',
-                          fontWeight: '600',
-                          fontSize: '0.85rem'
-                        }}>
-                          {quantity}
-                        </span>
-                        <button
-                          type="button"
-                          className="pwa-btn pwa-btn-primary"
-                          onClick={() => handleExtraQuantityChange(extraId, quantity + 1)}
-                          style={{ width: '28px', height: '28px', padding: '0', fontSize: '0.85rem' }}
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-                    <div style={{ 
-                      fontWeight: '600', 
-                      color: '#1a1a1a',
-                      fontSize: '0.8rem'
-                    }}>
-                      {formatPrice(parseFloat(extra.price) * quantity)}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          
-          {/* Add Extras Button */}
-          {extraMenuItems.length > 0 && (
-            <div className="pwa-list" style={{ marginTop: '12px' }}>
-              {extraMenuItems.map(extra => (
-                <button
-                  key={extra.id}
-                  type="button"
-                  className="pwa-list-item"
-                  onClick={() => handleExtraQuantityChange(extra.id, (selectedExtras[extra.id] || 0) + 1)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    width: '100%',
-                    textAlign: 'left',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <div className="pwa-list-icon" style={{ background: '#FF9800', color: 'white' }}>
-                    <i className="bi bi-plus-square"></i>
-                  </div>
-                  <div className="pwa-list-content">
-                    <div className="pwa-list-title">{extra.name}</div>
-                    <div className="pwa-list-subtitle">{formatPrice(extra.price)}</div>
-                  </div>
-                  <div className="pwa-list-action">
-                    <i className="bi bi-plus-circle"></i>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
 
         {/* Delivery Type */}
         <div className="pwa-card">
@@ -581,14 +590,6 @@ const PWACreateOrder = () => {
               <div style={{ fontWeight: '600' }}>{formatPrice(currentOrderSubTotal)}</div>
             </div>
             
-            {extrasSubTotal > 0 && (
-              <div className="pwa-list-item">
-                <div className="pwa-list-content">
-                  <div className="pwa-list-title">Extras Subtotal</div>
-                </div>
-                <div style={{ fontWeight: '600' }}>{formatPrice(extrasSubTotal)}</div>
-              </div>
-            )}
             
             {deliveryType === 'Delivery' && currentDeliveryFee > 0 && (
               <div className="pwa-list-item">
@@ -733,7 +734,26 @@ const PWACreateOrder = () => {
               </div>
               
               <div className="pwa-list" style={{ maxHeight: '300px', overflow: 'auto' }}>
-                {filteredMainItems.map(item => (
+                {console.log('[PWACreateOrder] Rendering modal with items:', {
+                  allMenuItems: safeMenuItems.length,
+                  mainMenuItems: mainMenuItems.length,
+                  filteredMainItems: filteredMainItems.length,
+                  searchTerm: searchTerm
+                }) || ''}
+                
+                {filteredMainItems.length === 0 ? (
+                  <div style={{ 
+                    textAlign: 'center', 
+                    padding: '20px', 
+                    color: '#666',
+                    fontSize: '0.9rem'
+                  }}>
+                    {safeMenuItems.length === 0 ? 'No menu items loaded' : 
+                     mainMenuItems.length === 0 ? 'No available menu items' :
+                     'No items match your search'}
+                  </div>
+                ) : (
+                  filteredMainItems.map(item => (
                   <button
                     key={item.id}
                     className="pwa-list-item"
@@ -764,7 +784,8 @@ const PWACreateOrder = () => {
                       <i className="bi bi-plus-circle"></i>
                     </div>
                   </button>
-                ))}
+                  ))
+                )}
               </div>
             </div>
             
@@ -878,17 +899,6 @@ const PWACreateOrder = () => {
                 <span>{formatPrice(currentOrderSubTotal)}</span>
               </div>
               
-              {extrasSubTotal > 0 && (
-                <div style={{ 
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  fontSize: '0.85rem',
-                  marginBottom: '4px'
-                }}>
-                  <span>Extras Subtotal:</span>
-                  <span>{formatPrice(extrasSubTotal)}</span>
-                </div>
-              )}
                   
                   {deliveryType === 'Delivery' && currentDeliveryFee > 0 && (
                     <div style={{ 

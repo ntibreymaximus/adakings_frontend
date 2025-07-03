@@ -12,6 +12,7 @@ import {
     initiatePayment,
     formatPaymentError
 } from '../services/paymentService';
+import { useRealTimeUpdates } from '../hooks/useRealTimeUpdates';
 
 const ViewOrdersPage = () => {
     const { logout } = useAuth();
@@ -49,46 +50,27 @@ const ViewOrdersPage = () => {
         outForDelivery: 0
     });
 
+    // Initialize real-time updates
+    const {
+        isLive,
+        updateCount,
+        manualRefresh,
+        lastUpdate
+    } = useRealTimeUpdates({
+        endpoint: 'http://localhost:8000/api/orders/',
+        enableWebSocket: false, // Disable WebSocket until backend supports it
+        onUpdate: (newData) => {
+            console.log('ViewOrdersPage: Real-time update received:', newData);
+            if (newData && newData.results) {
+                setAllOrders(newData.results);
+                console.log('ViewOrdersPage: Orders updated via real-time');
+            }
+        },
+        pollInterval: 5000,
+        enabled: true
+    });
+
     useEffect(() => {
-        const fetchOrders = async () => {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                setError('Authentication token not found. Please log in.');
-                setLoading(false);
-                logout();
-                return;
-            }
-
-            try {
-                const response = await fetch('http://localhost:8000/api/orders/', {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                    },
-                });
-
-                if (!response.ok) {
-                    if (response.status === 401) {
-                        logout();
-                    }
-                    throw new Error('Failed to fetch orders');
-                }
-
-                const data = await response.json();
-                console.log('ViewOrdersPage: Raw API response:', data);
-                
-                // Extract the results array from the paginated response
-                const ordersArray = data.results || [];
-                console.log('ViewOrdersPage: Extracted orders array:', ordersArray);
-                console.log('ViewOrdersPage: Orders array length:', ordersArray.length);
-                
-                setAllOrders(ordersArray);
-            } catch (err) {
-                setError(err.message);
-            } finally {
-                setLoading(false);
-            }
-        };
-
         const fetchPaymentModes = async () => {
             const token = localStorage.getItem('token');
             if (!token) return;
@@ -133,8 +115,11 @@ const ViewOrdersPage = () => {
             }
         };
 
-        fetchOrders();
+        // Only fetch payment modes, orders are now handled by real-time updates
         fetchPaymentModes();
+        
+        // Set loading to false since real-time updates will handle data loading
+        setLoading(false);
     }, [logout]);
 
     // Handle window resize for mobile/desktop view
@@ -281,6 +266,11 @@ const ViewOrdersPage = () => {
                 );
                 setFilteredOrders(updatedFilteredOrders);
                 
+                // Dispatch order update event for real-time sync
+                window.dispatchEvent(new CustomEvent('orderUpdated', {
+                    detail: { orderId: selectedOrder.id, newStatus }
+                }));
+                
                 toast.success(`Order status updated to ${newStatus}`);
                 
                 setShowStatusModal(false);
@@ -400,6 +390,11 @@ const ViewOrdersPage = () => {
                 
                 // Payment/refund was successful, refresh order data from backend to get updated status
                 await refreshOrderData();
+                
+                // Dispatch payment update event for real-time sync
+                window.dispatchEvent(new CustomEvent('paymentUpdated', {
+                    detail: { orderId: selectedOrder.id, paymentMode: newPaymentMode, amount: amount }
+                }));
             }
                 
                 setShowPaymentModal(false);
@@ -489,31 +484,14 @@ const ViewOrdersPage = () => {
     
     const refreshOrderData = async () => {
         try {
-            const token = localStorage.getItem('token');
-            if (!token) return;
+            // Use the real-time refresh instead of manual fetch
+            manualRefresh();
             
-            const response = await fetch('http://localhost:8000/api/orders/', {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                },
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                console.log('ViewOrdersPage: Refresh API response:', data);
-                
-                // Extract the results array from the paginated response
-                const ordersArray = data.results || [];
-                console.log('ViewOrdersPage: Refresh extracted orders array:', ordersArray);
-                
-                setAllOrders(ordersArray);
-                
-                // If a specific order was selected, update it with fresh data
-                if (selectedOrder) {
-                    const updatedOrder = data.find(order => order.id === selectedOrder.id);
-                    if (updatedOrder) {
-                        setSelectedOrder(updatedOrder);
-                    }
+            // If a specific order was selected, update it with fresh data from the current orders
+            if (selectedOrder) {
+                const updatedOrder = allOrders.find(order => order.id === selectedOrder.id);
+                if (updatedOrder) {
+                    setSelectedOrder(updatedOrder);
                 }
             }
         } catch (error) {
@@ -803,6 +781,17 @@ const ViewOrdersPage = () => {
               <h5 className="mb-0 me-2">
                 <i className="bi bi-list-ul me-2"></i>
                 Orders List ({filteredOrders.length})
+                {isLive && (
+                  <span className="badge bg-success ms-2 animate-pulse">
+                    <i className="bi bi-broadcast me-1"></i>
+                    LIVE
+                  </span>
+                )}
+                {updateCount > 0 && (
+                  <span className="badge bg-info ms-2">
+                    {updateCount} updates
+                  </span>
+                )}
               </h5>
             </div>
             <div className="d-flex align-items-center mt-2 mt-sm-0">
@@ -824,6 +813,15 @@ const ViewOrdersPage = () => {
                   <i className="bi bi-calendar-check"></i>
                 </Button>
               )}
+              <Button
+                variant="outline-secondary"
+                size="sm"
+                onClick={manualRefresh}
+                className="ms-2"
+                title="Manual refresh"
+              >
+                <i className="bi bi-arrow-clockwise"></i>
+              </Button>
             </div>
           </div>
         </Card.Header>

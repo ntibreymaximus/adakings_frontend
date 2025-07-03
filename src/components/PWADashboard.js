@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 // Use unified transaction data service for consistency
 import { useTransactionData } from '../hooks/useTransactionData';
@@ -284,8 +284,8 @@ const PWADashboard = ({ userData, onLogout }) => {
           console.log('DEBUG: Parsed recent transactions:', recentTransactions);
           console.log('DEBUG: Recent transactions count:', recentTransactions.length);
           
-          const transactionActivities = recentTransactions.map(transaction => ({
-            id: `transaction-${transaction.id}`,
+          const transactionActivities = recentTransactions.map((transaction, index) => ({
+            id: `transaction-${transaction.id || `temp-${Date.now()}-${index}`}`,
             title: `${getTransactionActivityTitle(transaction)} ₵${parseFloat(transaction.amount || 0).toFixed(2)}`,
             timeAgo: transaction.time_ago || 'Recently',
             icon: getTransactionIcon(transaction),
@@ -379,18 +379,25 @@ const PWADashboard = ({ userData, onLogout }) => {
     }
   };
 
-  // Network status monitoring
+  // Network status monitoring with stable dependencies
+  const handleOnlineRef = useRef();
+  const handleOfflineRef = useRef();
+  
+  handleOnlineRef.current = () => {
+    setIsOffline(false);
+    // Only fetch if we have an offline error
+    if (error && error.includes('offline')) {
+      fetchDashboardData();
+    }
+  };
+  
+  handleOfflineRef.current = () => {
+    setIsOffline(true);
+  };
+  
   useEffect(() => {
-    const handleOnline = () => {
-      setIsOffline(false);
-      if (error && error.includes('offline')) {
-        fetchDashboardData(); // Auto-fetch when back online
-      }
-    };
-    
-    const handleOffline = () => {
-      setIsOffline(true);
-    };
+    const handleOnline = () => handleOnlineRef.current();
+    const handleOffline = () => handleOfflineRef.current();
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
@@ -399,7 +406,7 @@ const PWADashboard = ({ userData, onLogout }) => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [error]);
+  }, []); // Remove error dependency
 
   // Initial load
   useEffect(() => {

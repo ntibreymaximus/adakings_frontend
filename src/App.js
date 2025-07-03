@@ -23,12 +23,15 @@ import PWATransactions from './components/PWATransactions';
 import PWACreateOrder from './components/PWACreateOrder';
 import PWAEditOrder from './components/PWAEditOrder';
 import AuthTest from './components/AuthTest';
+import InstantReloadTest from './components/InstantReloadTest';
+import OfflineIndicator from './components/OfflineIndicator';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './styles/theme.css';
 import './App.css';
 import { usePWA } from './hooks/usePWA';
+import { useOfflineHandler } from './utils/offlineHandler';
 
 // Create a separate component for the main app logic
 function AppContent() {
@@ -46,6 +49,7 @@ function AppContent() {
     return null;
   });
   const { isPWA, isInstallable, installPWA } = usePWA();
+  const { isOnline } = useOfflineHandler();
   const navigate = useNavigate();
 
   // Dynamic CSS import for PWA mode
@@ -87,6 +91,9 @@ function AppContent() {
 
   return (
     <div className={isPWA ? "pwa-app" : "App"}>
+      {/* Global offline indicator */}
+      <OfflineIndicator />
+      
       {isPWA ? (
         // PWA Mode - Native Mobile Layout
         <>
@@ -173,6 +180,10 @@ function AppContent() {
         <Route 
           path="/auth-test" 
           element={<AuthTest />} 
+        />
+        <Route 
+          path="/instant-reload-test" 
+          element={<InstantReloadTest />} 
         />
         <Route path="*" element={<Navigate to={userData ? "/dashboard" : "/login"} />} /> 
       </Routes>

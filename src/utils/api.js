@@ -45,8 +45,9 @@ async function refreshAccessToken() {
     localStorage.removeItem('token');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('userData');
-    window.location.href = '/login';
-    throw error;
+    // Don't use window.location.href as it causes hard reload
+    // Let the App component handle authentication state
+    throw new Error('AUTHENTICATION_EXPIRED');
   }
 }
 
@@ -55,11 +56,10 @@ async function getAuthHeaders() {
   let token = localStorage.getItem('token');
   
   if (!token) {
-    // No token, redirect to login
+    // No token, clear data and throw error to let App handle it
     localStorage.removeItem('userData');
     localStorage.removeItem('refreshToken');
-    window.location.href = '/login';
-    return null;
+    throw new Error('AUTHENTICATION_REQUIRED');
   }
   
   // Check if token is expired and try to refresh if needed
@@ -100,8 +100,8 @@ export async function authenticatedFetch(url, options = {}) {
     localStorage.removeItem('token');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('userData');
-    window.location.href = '/login';
-    throw new Error('Authentication failed');
+    // Don't use hard redirect, let React Router handle navigation
+    throw new Error('AUTHENTICATION_EXPIRED');
   }
   
   return response;

@@ -229,7 +229,7 @@ const PWATransactionsSimple = () => {
           <div style={{ marginTop: '16px' }}>
             <button 
               className="pwa-btn pwa-btn-secondary"
-              onClick={() => window.location.reload()}
+              onClick={() => fetchTransactions(false)}
               style={{ fontSize: '0.8rem' }}
             >
               Taking too long? Refresh page
@@ -267,7 +267,7 @@ const PWATransactionsSimple = () => {
               
               <button 
                 className="pwa-btn pwa-btn-secondary"
-                onClick={() => window.location.reload()}
+                onClick={() => fetchTransactions(false)}
                 style={{ minWidth: '120px' }}
               >
                 <i className="bi bi-arrow-counterclockwise"></i>

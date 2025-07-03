@@ -1552,3 +1552,51 @@
 .pwa-time-old {
   color: #666 !important;
 }
+
+/* Offline Indicator */
+.pwa-offline-indicator {
+  position: fixed;
+  top: var(--safe-area-inset-top, 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  animation: pwa-slide-down 0.3s ease-out;
+}
+
+.pwa-offline-badge {
+  background: #ff6b6b;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
+  backdrop-filter: blur(10px);
+}
+
+.pwa-offline-badge i {
+  font-size: 1rem;
+}
+
+@keyframes pwa-slide-down {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Offline mode adjustments */
+.pwa-app.offline {
+  filter: grayscale(10%);
+}
+
+.pwa-app.offline .pwa-content {
+  border-top: 2px solid #ff6b6b;
+}

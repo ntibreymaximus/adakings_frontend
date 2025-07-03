@@ -24,13 +24,16 @@ const PWAEditOrder = () => {
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [originalOrder, setOriginalOrder] = useState(null);
 
+  // Ensure allMenuItems is always an array before filtering
+  const safeMenuItems = Array.isArray(allMenuItems) ? allMenuItems : [];
+  
   // Filter menu items
-  const mainMenuItems = (allMenuItems || []).filter(item => !item.is_extra && item.is_available);
-  const extraMenuItems = (allMenuItems || []).filter(item => item.is_extra && item.is_available);
+  const mainMenuItems = safeMenuItems.filter(item => !item.is_extra && item.is_available);
+  const extraMenuItems = safeMenuItems.filter(item => item.is_extra && item.is_available);
   
   // Filter items by search term
   const filteredMainItems = mainMenuItems.filter(item =>
-    item.name.toLowerCase().includes(searchTerm.toLowerCase())
+    item.name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const fetchInitialData = useCallback(async () => {
@@ -106,7 +109,7 @@ const PWAEditOrder = () => {
       originalOrder.items.forEach(item => {
         const menuItemId = item.menu_item_id || item.id;
         if (menuItemId) {
-          const menuItem = allMenuItems.find(mi => mi.id === menuItemId);
+          const menuItem = safeMenuItems.find(mi => mi.id === menuItemId);
           if (menuItem) {
             if (menuItem.is_extra) {
               extrasMap[menuItemId] = item.quantity;
@@ -304,7 +307,7 @@ const PWAEditOrder = () => {
 
   // Calculate totals
   const currentOrderSubTotal = Object.entries(selectedItems).reduce((total, [itemId, quantity]) => {
-    const item = allMenuItems.find(mi => mi.id.toString() === itemId);
+    const item = safeMenuItems.find(mi => mi.id.toString() === itemId);
     return total + (item && item.price && quantity > 0 ? parseFloat(item.price) * quantity : 0);
   }, 0);
   
