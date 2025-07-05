@@ -62,7 +62,7 @@ const ActivityListItem = ({
 
   return (
     <div 
-      className={`pwa-list-item ${className}`}
+      className={`list-group-item d-flex align-items-center ${className}`}
       onClick={showNavigation ? handleClick : undefined}
       style={itemStyle}
       onMouseEnter={handleMouseEnter}
@@ -70,7 +70,7 @@ const ActivityListItem = ({
       title={showNavigation ? getNavigationTitle(activity) : undefined}
     >
       <div 
-        className="pwa-list-icon" 
+        className="me-3 d-flex align-items-center justify-content-center rounded-circle"
         style={{ 
           background: activity.colorTag || activity.color || '#666',
           color: '#fff'
@@ -79,22 +79,22 @@ const ActivityListItem = ({
         <i className={activity.iconType || activity.icon || 'bi bi-circle'}></i>
       </div>
       
-      <div className="pwa-list-content">
-        <div className="pwa-list-title">
+      <div className="flex-grow-1">
+        <div className="fw-semibold text-dark">
           {activity.title}
         </div>
-        <div className="pwa-list-subtitle">
+        <div className="text-muted small">
           {activity.description || formatActivitySubtitle(activity)}
         </div>
         {activity.metadata && (
-          <div className="pwa-list-meta" style={{ fontSize: '0.75rem', color: '#999', marginTop: '2px' }}>
+          <div className="text-muted" style={{ fontSize: '0.75rem', marginTop: '2px' }}>
             {formatActivityMeta(activity)}
           </div>
         )}
       </div>
       
       {activity.amount && (
-        <div className="pwa-activity-amount" style={{ 
+        <div className="text-end me-2" style={{
           fontWeight: '600', 
           color: getAmountColor(activity),
           fontSize: '0.9rem',
@@ -106,7 +106,7 @@ const ActivityListItem = ({
       
       {activity.status && (
         <div 
-          className={`pwa-status ${getStatusClass(activity.status)}`}
+          className={`badge ${getStatusClass(activity.status)}`}
           style={{ marginRight: showNavigation ? '8px' : '0' }}
         >
           {activity.status}
@@ -114,7 +114,7 @@ const ActivityListItem = ({
       )}
       
       {showNavigation && (
-        <div className="pwa-list-action" style={{ color: '#666' }}>
+        <div className="text-muted" style={{ color: '#666' }}>
           <i className="bi bi-chevron-right"></i>
         </div>
       )}
@@ -205,16 +205,16 @@ const getStatusClass = (status) => {
   const statusLower = status?.toLowerCase() || '';
   
   if (['paid', 'overpaid', 'fulfilled', 'completed'].includes(statusLower)) {
-    return 'pwa-status-success';
+    return 'bg-success';
   } else if (['pending', 'pending payment', 'accepted'].includes(statusLower)) {
-    return 'pwa-status-warning';
+    return 'bg-warning text-dark';
   } else if (['failed', 'cancelled', 'canceled'].includes(statusLower)) {
-    return 'pwa-status-danger';
+    return 'bg-danger';
   } else if (['out for delivery', 'processing'].includes(statusLower)) {
-    return 'pwa-status-info';
+    return 'bg-info';
   }
   
-  return 'pwa-status-secondary';
+  return 'bg-secondary';
 };
 
 /**

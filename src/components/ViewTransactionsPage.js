@@ -2,20 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { Container, Table, Card, Alert, Spinner, Button, Badge, Row, Col, Modal, Form } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import useAuth from '../hooks/useAuth';
-import { useTransactionData } from '../hooks/useTransactionData';
 import { 
   formatTransactionId, 
-  getShortTransactionId, 
-  parseTransactionId,
-  isRefundTransaction 
+  getShortTransactionId
 } from '../utils/transactionUtils';
-
 const ViewTransactionsPage = () => {
     const { logout } = useAuth();
     const navigate = useNavigate();
     const [allTransactions, setAllTransactions] = useState([]);
     const [filteredTransactions, setFilteredTransactions] = useState([]);
-    const [summary, setSummary] = useState({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [selectedTransaction, setSelectedTransaction] = useState(null);
@@ -114,7 +109,6 @@ const ViewTransactionsPage = () => {
                 }
                 
                 setAllTransactions(transactionsArray);
-                setSummary(data.summary || {});
             } catch (err) {
                 setError(err.message);
             } finally {
@@ -380,7 +374,6 @@ const ViewTransactionsPage = () => {
                     }
                     
                     const isCustomFormat = primaryId && primaryId.startsWith('TXN-');
-                    const isRefund = possibleRefs.some(ref => isRefundTransaction(ref || ''));
                     
                     // Generate a fallback custom transaction ID if none exists
                     if (!primaryId || !primaryId.startsWith('TXN-')) {

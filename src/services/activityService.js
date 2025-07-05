@@ -497,7 +497,7 @@ export const formatDate = (timestamp) => {
   }
 };
 
-export default {
+const activityService = {
   ACTIVITY_TYPES,
   generateOrderActivities,
   generateTransactionActivities,
@@ -508,3 +508,5 @@ export default {
   formatTime,
   formatDate
 };
+
+export default activityService;

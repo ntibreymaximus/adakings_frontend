@@ -12,9 +12,6 @@ const InstantReloadTest = () => {
       orderCreated: (event) => {
         addTestResult('orderCreated', event.detail, 'SUCCESS');
       },
-      'pwa-order-created': (event) => {
-        addTestResult('pwa-order-created', event.detail, 'SUCCESS');
-      },
       storage: (event) => {
         if (event.key === 'orderCreatedFlag') {
           addTestResult('localStorage change', event.newValue, 'SUCCESS');
@@ -86,15 +83,10 @@ const InstantReloadTest = () => {
 
     console.log('[InstantReloadTest] Simulating order creation:', mockOrder);
 
-    // Trigger all the events that PWACreateOrder would trigger
+    // Trigger all the events that CreateOrder would trigger
     
     // 1. Custom events
     window.dispatchEvent(new CustomEvent('orderCreated', {
-      detail: mockOrder,
-      bubbles: true
-    }));
-    
-    window.dispatchEvent(new CustomEvent('pwa-order-created', {
       detail: mockOrder,
       bubbles: true
     }));
@@ -279,7 +271,7 @@ const InstantReloadTest = () => {
         </ol>
         
         <p style={{ marginTop: '12px', fontSize: '0.9rem', color: '#666' }}>
-          If events are captured here but orders page doesn't update, there may be an issue with the PWAOrders event listeners.
+          If events are captured here but orders page doesn't update, there may be an issue with the Orders page event listeners.
         </p>
       </div>
     </div>

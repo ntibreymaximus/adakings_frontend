@@ -121,6 +121,10 @@ export const useTransactionData = (options = {}) => {
             }
           }
           break;
+          
+        default:
+          console.log('[useTransactionData] Unknown event type:', event.type);
+          break;
       }
     };
 
@@ -137,7 +141,7 @@ export const useTransactionData = (options = {}) => {
   useEffect(() => {
     console.log('[useTransactionData] Initial data fetch');
     refreshData(false);
-  }, []); // Empty dependency array for initial fetch only
+  }, [refreshData]); // Include refreshData in dependencies
 
   // Auto-refresh setup
   useEffect(() => {
@@ -167,7 +171,7 @@ export const useTransactionData = (options = {}) => {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [autoRefresh, refreshInterval]);
+  }, [autoRefresh, refreshInterval, refreshData]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -181,7 +185,7 @@ export const useTransactionData = (options = {}) => {
     console.log('[useTransactionData] Force refresh requested');
     transactionDataService.clearCache();
     refreshData(true);
-  }, []); // Empty dependency array to prevent infinite loop
+  }, [refreshData]);
 
   // Get filtered transactions by date
   const getTransactionsByDate = useCallback((dateString) => {

@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button, Badge, Alert } from 'react-bootstrap';
 import { useTransactionData } from '../hooks/useTransactionData';
-import { usePWA } from '../hooks/usePWA';
 
 /**
  * Debug component to help identify differences between PWA and webview data
  */
 const TransactionDebugger = () => {
-  const { isPWA } = usePWA();
+  const isPWA = false; // PWA functionality removed
   const { 
     transactions, 
     loading, 

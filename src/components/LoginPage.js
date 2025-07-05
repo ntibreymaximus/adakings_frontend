@@ -8,6 +8,7 @@ const LoginPage = ({ onLoginSuccess }) => {
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = async (event) => {
     event.preventDefault();
@@ -91,16 +92,32 @@ const LoginPage = ({ onLoginSuccess }) => {
 
                   <Form.Group className="mb-4" controlId="password">
                     <Form.Label className="fw-medium" style={{ color: 'var(--ada-dark-gray)' }}>Password</Form.Label>
-                    <Form.Control
-                      type="password"
-                      placeholder="Enter your password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      style={{ minHeight: '44px' }}
-                      className="mb-1"
-                      autoComplete="current-password"
-                    />
+                    <div className="position-relative">
+                      <Form.Control
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Enter your password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        style={{ minHeight: '44px', paddingRight: '40px' }}
+                        className="mb-1"
+                        autoComplete="current-password"
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-link position-absolute end-0 top-0 h-100 d-flex align-items-center px-3"
+                        style={{ 
+                          border: 'none', 
+                          background: 'none', 
+                          color: 'var(--ada-dark-gray)',
+                          zIndex: 10
+                        }}
+                        onClick={() => setShowPassword(!showPassword)}
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                      >
+                        <i className={`bi ${showPassword ? 'bi-eye-slash' : 'bi-eye'}`}></i>
+                      </button>
+                    </div>
                   </Form.Group>
 
                   <Button 

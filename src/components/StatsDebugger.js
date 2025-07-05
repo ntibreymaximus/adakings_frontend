@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useTransactionData } from '../hooks/useTransactionData';
-import transactionDataService from '../services/transactionDataService';
 
 const StatsDebugger = () => {
   const [debugData, setDebugData] = useState(null);
@@ -107,7 +106,7 @@ const StatsDebugger = () => {
     } else if (!loading) {
       setLoading(false);
     }
-  }, [allTransactions, getTransactionsByDate, getTransactionStats]);
+  }, [allTransactions, getTransactionsByDate, getTransactionStats, loading]);
 
   if (loading) {
     return <div style={{ padding: '20px' }}>Loading diagnostics...</div>;

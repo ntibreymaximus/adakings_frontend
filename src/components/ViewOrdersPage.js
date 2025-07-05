@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Container, Table, Card, Modal, Form, Row, Col, Badge, Alert, Button } from 'react-bootstrap';
+import React, { useState, useEffect, memo, useMemo, useCallback } from 'react';
+import { Container, Table, Card, Modal, Form, Button, Row, Col } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import useAuth from '../hooks/useAuth';
@@ -13,12 +13,12 @@ import {
     formatPaymentError
 } from '../services/paymentService';
 import { useRealTimeUpdates } from '../hooks/useRealTimeUpdates';
+import { API_BASE_URL } from '../utils/api';
 
-const ViewOrdersPage = () => {
+const ViewOrdersPage = memo(() => {
     const { logout } = useAuth();
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
     const [showStatusModal, setShowStatusModal] = useState(false);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
@@ -43,30 +43,37 @@ const ViewOrdersPage = () => {
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
     const [showStats, setShowStats] = useState(!isMobile); // Stats visible by default on desktop
     const [showStatsModal, setShowStatsModal] = useState(false);
-    const [orderStats, setOrderStats] = useState({
-        total: 0,
-        pending: 0,
-        fulfilled: 0,
-        outForDelivery: 0
-    });
+  const [orderStats, setOrderStats] = useState({
+    total: 0,
+    pending: 0,
+    fulfilled: 0,
+    outForDelivery: 0
+  });
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const ordersPerPage = 10;
+  const [paginatedOrders, setPaginatedOrders] = useState([]);
 
     // Initialize real-time updates
     const {
         isLive,
-        updateCount,
-        manualRefresh,
-        lastUpdate
+        refresh: manualRefresh,
     } = useRealTimeUpdates({
-        endpoint: 'http://localhost:8000/api/orders/',
+        endpoint: `${API_BASE_URL}/orders/`,
         enableWebSocket: false, // Disable WebSocket until backend supports it
         onUpdate: (newData) => {
             console.log('ViewOrdersPage: Real-time update received:', newData);
-            if (newData && newData.results) {
-                setAllOrders(newData.results);
-                console.log('ViewOrdersPage: Orders updated via real-time');
+            // newData is already an array from the hook, not an object with results
+            if (Array.isArray(newData)) {
+                setAllOrders(newData);
+                console.log('ViewOrdersPage: Orders updated via real-time, count:', newData.length);
+            } else {
+                console.warn('ViewOrdersPage: Unexpected data format:', newData);
             }
         },
-        pollInterval: 5000,
+        pollInterval: 2000, // Faster updates for better responsiveness
         enabled: true
     });
 
@@ -76,7 +83,7 @@ const ViewOrdersPage = () => {
             if (!token) return;
 
             try {
-                const response = await fetch('http://localhost:8000/api/payments/payment-modes/', {
+                const response = await fetch(`${API_BASE_URL}/payments/payment-modes/`, {
                     headers: {
                         'Authorization': `Bearer ${token}`,
                     },
@@ -138,30 +145,49 @@ const ViewOrdersPage = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
     
-    // Filter orders by selected date and calculate stats
-    useEffect(() => {
-        if (allOrders.length > 0) {
-            const filtered = allOrders.filter(order => {
-                const orderDate = new Date(order.created_at).toISOString().split('T')[0];
-                return orderDate === selectedDate;
-            });
-            setFilteredOrders(filtered);
-            
-            // Calculate order stats
-            const stats = {
-                total: filtered.length,
-                pending: filtered.filter(order => order.status === 'Pending' || order.status === 'Accepted').length, // Pending & Accepted combined
-                accepted: filtered.filter(order => order.status === 'Accepted').length, // Delivery orders start here
-                fulfilled: filtered.filter(order => order.status === 'Fulfilled').length,
-                outForDelivery: filtered.filter(order => order.status === 'Out for Delivery').length
+    // Memoized filtered orders and stats calculation for better performance
+    const { filteredOrdersMemo, orderStatsMemo } = useMemo(() => {
+        if (allOrders.length === 0) {
+            return {
+                filteredOrdersMemo: [],
+                orderStatsMemo: { total: 0, pending: 0, accepted: 0, fulfilled: 0, outForDelivery: 0 }
             };
-            setOrderStats(stats);
         }
+        
+        const filtered = allOrders.filter(order => {
+            const orderDate = new Date(order.created_at).toISOString().split('T')[0];
+            return orderDate === selectedDate;
+        });
+        
+        const stats = {
+            total: filtered.length,
+            pending: filtered.filter(order => order.status === 'Pending' || order.status === 'Accepted').length,
+            accepted: filtered.filter(order => order.status === 'Accepted').length,
+            fulfilled: filtered.filter(order => order.status === 'Fulfilled').length,
+            outForDelivery: filtered.filter(order => order.status === 'Out for Delivery').length
+        };
+        
+        return { filteredOrdersMemo: filtered, orderStatsMemo: stats };
     }, [allOrders, selectedDate]);
+    
+    // Update state when memoized values change
+    useEffect(() => {
+        setFilteredOrders(filteredOrdersMemo);
+        setOrderStats(orderStatsMemo);
+        setCurrentPage(1); // Reset to first page when filtered orders change
+    }, [filteredOrdersMemo, orderStatsMemo]);
+    
+    // Update paginated orders when filteredOrders or currentPage changes
+    useEffect(() => {
+        const startIndex = (currentPage - 1) * ordersPerPage;
+        const endIndex = startIndex + ordersPerPage;
+        const paginatedData = filteredOrders.slice(startIndex, endIndex);
+        setPaginatedOrders(paginatedData);
+    }, [filteredOrders, currentPage, ordersPerPage]);
 
-    const handleDateChange = (e) => {
+    const handleDateChange = useCallback((e) => {
         setSelectedDate(e.target.value);
-    };
+    }, []);
 
     const getTodayDate = () => {
         return new Date().toISOString().split('T')[0];
@@ -185,126 +211,129 @@ const ViewOrdersPage = () => {
         await performStatusUpdate();
     };
     
-    const performStatusUpdate = async () => {
+  const performStatusUpdate = async () => {
+    // Prevent multiple status updates
+    if (isUpdatingStatus) {
+      toast.warning('Status update is in progress, please wait...');
+      return;
+    }
 
-        // Enhanced payment status validation
-        const paymentStatus = selectedOrder.payment_status?.toUpperCase();
-        const isPaymentConfirmed = paymentStatus === 'PAID' || paymentStatus === 'OVERPAID';
-        const isPartiallyPaid = paymentStatus === 'PARTIALLY PAID';
-        const hasNoPayment = !paymentStatus || paymentStatus === 'UNPAID';
-        const hasPendingPayment = paymentStatus === 'PENDING PAYMENT';
-        const isDeliveryOrder = selectedOrder.delivery_type === 'Delivery';
+    setIsUpdatingStatus(true);
+
+    try {
+      // Enhanced payment status validation
+      const paymentStatus = selectedOrder.payment_status?.toUpperCase();
+      const isPaymentConfirmed = paymentStatus === 'PAID' || paymentStatus === 'OVERPAID';
+      const isPartiallyPaid = paymentStatus === 'PARTIALLY PAID';
+      const hasNoPayment = !paymentStatus || paymentStatus === 'UNPAID';
+      const hasPendingPayment = paymentStatus === 'PENDING PAYMENT';
+      const isDeliveryOrder = selectedOrder.delivery_type === 'Delivery';
+      
+      // Different validation logic for delivery vs pickup orders
+      if (isDeliveryOrder) {
+        // For delivery orders: payment only required for "Fulfilled" status
+        if (newStatus === 'Fulfilled' && !isPaymentConfirmed) {
+          toast.error('Cannot mark delivery order as "Fulfilled" - Payment must be fully confirmed first.');
+          return;
+        }
+      } else {
+        // For pickup orders: payment required for Accepted and Fulfilled statuses
+        const restrictedStatuses = ['Accepted', 'Fulfilled'];
+        const isRestrictedStatus = restrictedStatuses.includes(newStatus);
         
-        // Different validation logic for delivery vs pickup orders
-        if (isDeliveryOrder) {
-            // For delivery orders: payment only required for "Fulfilled" status
-            if (newStatus === 'Fulfilled' && !isPaymentConfirmed) {
-                toast.error('Cannot mark delivery order as "Fulfilled" - Payment must be fully confirmed first.');
-                return;
-            }
-            
-            // For "Out for Delivery" - only check if it's a delivery order (no payment required)
-            if (newStatus === 'Out for Delivery') {
-                // This check is already handled by the conditional display logic
-                // No additional validation needed here
-            }
-        } else {
-            // For pickup orders: payment required for Accepted and Fulfilled statuses
-            const restrictedStatuses = ['Accepted', 'Fulfilled'];
-            const isRestrictedStatus = restrictedStatuses.includes(newStatus);
-            
-            if (isRestrictedStatus) {
-                if (hasNoPayment) {
-                    toast.error(`Cannot update pickup order to "${newStatus}" - Payment required. Please process payment first.`);
-                    return;
-                }
-                if (hasPendingPayment) {
-                    toast.error(`Cannot update pickup order to "${newStatus}" - Payment is still pending. Please wait for payment confirmation.`);
-                    return;
-                }
-                if (isPartiallyPaid && newStatus === 'Fulfilled') {
-                    toast.error('Cannot mark pickup order as "Fulfilled" - Full payment required.');
-                    return;
-                }
-                if (isPartiallyPaid) {
-                    toast.warning(`Pickup order is only partially paid. Proceeding to "${newStatus}".`);
-                    // Allow but warn for partially paid orders (except Fulfilled)
-                }
-            }
+        if (isRestrictedStatus) {
+          if (hasNoPayment) {
+            toast.error(`Cannot update pickup order to "${newStatus}" - Payment required. Please process payment first.`);
+            return;
+          }
+          if (hasPendingPayment) {
+            toast.error(`Cannot update pickup order to "${newStatus}" - Payment is still pending. Please wait for payment confirmation.`);
+            return;
+          }
+          if (isPartiallyPaid && newStatus === 'Fulfilled') {
+            toast.error('Cannot mark pickup order as "Fulfilled" - Full payment required.');
+            return;
+          }
+          if (isPartiallyPaid) {
+            toast.warning(`Pickup order is only partially paid. Proceeding to "${newStatus}".`);
+            // Allow but warn for partially paid orders (except Fulfilled)
+          }
         }
+      }
+      
+      // Note: Refund processing for cancelled orders is handled in the payment modal
+
+      // Use the direct API endpoint with proper authentication
+      const token = localStorage.getItem('token');
+      const orderNumber = selectedOrder.order_number || selectedOrder.id;
+      const response = await fetch(`${API_BASE_URL}/orders/${orderNumber}/`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (response.ok) {
+        // Update the order in all orders, filtered orders, and orders state
+        // Update allOrders first - this will trigger the useEffect to update filteredOrders
+        const updatedAllOrders = allOrders.map(order => 
+          order.id === selectedOrder.id 
+            ? { ...order, status: newStatus }
+            : order
+        );
+        setAllOrders(updatedAllOrders);
         
-        // Note: Refund processing for cancelled orders is handled in the payment modal
+        // Also update filteredOrders directly for immediate UI update
+        const updatedFilteredOrders = filteredOrders.map(order => 
+          order.id === selectedOrder.id 
+            ? { ...order, status: newStatus }
+            : order
+        );
+        setFilteredOrders(updatedFilteredOrders);
+        
+        // Dispatch order update event for real-time sync
+        window.dispatchEvent(new CustomEvent('orderUpdated', {
+          detail: { orderId: selectedOrder.id, newStatus }
+        }));
+        
+        toast.success(`Order status updated to ${newStatus}`);
+        
+        setShowStatusModal(false);
+        setSelectedOrder(null);
+        setNewStatus('');
+      } else {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        console.error('Update failed:', errorData);
+        toast.error(errorData.detail || errorData.message || 'Failed to update order status');
+      }
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      toast.error('Network error: Could not update order status');
+    } finally {
+      // Always re-enable status updates
+      setIsUpdatingStatus(false);
+    }
+  };
 
-        try {
-            // Use the direct API endpoint with proper authentication
-            const token = localStorage.getItem('token');
-            const orderNumber = selectedOrder.order_number || selectedOrder.id;
-            const response = await fetch(`http://localhost:8000/api/orders/${orderNumber}/`, {
-                method: 'PATCH',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ status: newStatus }),
-            });
+  const handleUpdatePayment = async () => {
+    if (!selectedOrder || !newPaymentMode || !paymentAmount) {
+      toast.error('Please select payment mode and enter amount');
+      return;
+    }
 
-            if (response.ok) {
-                // Update the order in all orders, filtered orders, and orders state
-                // Update allOrders first - this will trigger the useEffect to update filteredOrders
-                const updatedAllOrders = allOrders.map(order => 
-                    order.id === selectedOrder.id 
-                        ? { ...order, status: newStatus }
-                        : order
-                );
-                setAllOrders(updatedAllOrders);
-                
-                // Also update filteredOrders directly for immediate UI update
-                const updatedFilteredOrders = filteredOrders.map(order => 
-                    order.id === selectedOrder.id 
-                        ? { ...order, status: newStatus }
-                        : order
-                );
-                setFilteredOrders(updatedFilteredOrders);
-                
-                // Dispatch order update event for real-time sync
-                window.dispatchEvent(new CustomEvent('orderUpdated', {
-                    detail: { orderId: selectedOrder.id, newStatus }
-                }));
-                
-                toast.success(`Order status updated to ${newStatus}`);
-                
-                setShowStatusModal(false);
-                setSelectedOrder(null);
-                setNewStatus('');
-            } else {
-                const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-                console.error('Update failed:', errorData);
-                toast.error(errorData.detail || errorData.message || 'Failed to update order status');
-            }
-        } catch (error) {
-            console.error('Error updating order status:', error);
-            toast.error('Network error: Could not update order status');
-        }
-    };
+    const amount = parseFloat(paymentAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast.error('Please enter a valid payment amount');
+      return;
+    }
 
-    const handleUpdatePayment = async () => {
-        if (!selectedOrder || !newPaymentMode || !paymentAmount) {
-            toast.error('Please select payment mode and enter amount');
-            return;
-        }
-
-        const amount = parseFloat(paymentAmount);
-        if (isNaN(amount) || amount <= 0) {
-            toast.error('Please enter a valid payment amount');
-            return;
-        }
-
-        setShowPaymentConfirmation(true);
-    };
+    setShowPaymentConfirmation(true);
+  };
 
     const confirmPayment = async () => {
         try {
-            const token = localStorage.getItem('token');
             const amount = parseFloat(paymentAmount);
             
             // Prepare payment data for backend payment API
@@ -482,7 +511,7 @@ const ViewOrdersPage = () => {
         setSelectedOrder(null);
     };
     
-    const refreshOrderData = async () => {
+    const refreshOrderData = useCallback(async () => {
         try {
             // Use the real-time refresh instead of manual fetch
             manualRefresh();
@@ -498,38 +527,8 @@ const ViewOrdersPage = () => {
             console.error('Error refreshing order data:', error);
             // Don't show error toast for this background operation
         }
-    };
+    }, [manualRefresh, selectedOrder, allOrders]);
     
-            const processAutomaticRefund = async (order) => {
-        try {
-            const amountPaid = parseFloat(order.amount_paid);
-            
-            // Prepare refund data
-            const refundData = {
-                order_number: order.order_number || order.id,
-                amount: amountPaid,
-                payment_method: 'CASH', // All refunds are cash only
-                payment_type: 'refund'
-            };
-            
-            console.log('Processing automatic refund:', refundData);
-            
-            // Use the payment service to process refund
-            await initiatePayment(refundData);
-            
-            toast.success(`Automatic refund of ₵${amountPaid.toFixed(2)} processed for cancelled order`);
-            toast.info('Cash refund completed. Please provide the refund amount to the customer.');
-            
-            // Refresh order data to show updated payment status
-            await refreshOrderData();
-            
-        } catch (error) {
-            console.error('Error processing automatic refund:', error);
-            const errorMessage = formatPaymentError(error);
-            toast.error(`Failed to process automatic refund: ${errorMessage}`);
-            toast.warning('Please manually process the refund for this cancelled order.');
-        }
-    };
 
     // Function to get status options based on order type
     const getStatusOptions = (order) => {
@@ -544,21 +543,6 @@ const ViewOrdersPage = () => {
         }
     };
 
-    const paymentStatusOptions = [
-        'Paid',
-        'Unpaid',
-        'Partially Paid',
-        'Overpaid',
-        'Pending Payment'
-    ];
-
-    const paymentModeOptions = [
-        'CASH',
-        'TELECEL CASH',
-        'MTN MOMO',
-        'PAYSTACK(USSD)',
-        'PAYSTACK(API)'
-    ];
 
     const getStatusBadgeVariant = (status) => {
         switch (status?.toLowerCase()) {
@@ -708,13 +692,6 @@ const ViewOrdersPage = () => {
         );
     }
 
-    if (error) {
-        return (
-            <Container className="mt-4">
-                <Alert variant="danger">{error}</Alert>
-            </Container>
-        );
-    }
 
   return (
     <Container className="my-3 my-md-4 px-3 px-md-4">
@@ -787,11 +764,6 @@ const ViewOrdersPage = () => {
                     LIVE
                   </span>
                 )}
-                {updateCount > 0 && (
-                  <span className="badge bg-info ms-2">
-                    {updateCount} updates
-                  </span>
-                )}
               </h5>
             </div>
             <div className="d-flex align-items-center mt-2 mt-sm-0">
@@ -860,7 +832,7 @@ const ViewOrdersPage = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredOrders.map((order) => (
+                  {paginatedOrders.map((order) => (
                     <tr 
                       key={order.id}
                       onClick={() => openOrderDetailsModal(order)}
@@ -917,11 +889,96 @@ const ViewOrdersPage = () => {
                   ))}
                 </tbody>
               </Table>
+              
+              {filteredOrders.length > ordersPerPage && (
+                <div className="d-flex justify-content-between align-items-center mt-3 px-2">
+                  <small className="text-muted">
+                    Showing {((currentPage - 1) * ordersPerPage) + 1} to {Math.min(currentPage * ordersPerPage, filteredOrders.length)} of {filteredOrders.length} orders
+                  </small>
+                  <div className="d-flex gap-1">
+                    <Button
+                      variant="outline-primary"
+                      size="sm"
+                      onClick={() => setCurrentPage(currentPage - 1)}
+                      disabled={currentPage === 1}
+                      style={{ minWidth: '35px' }}
+                    >
+                      <i className="bi bi-chevron-left"></i>
+                    </Button>
+                    
+                    {(() => {
+                      const totalPages = Math.ceil(filteredOrders.length / ordersPerPage);
+                      const pages = [];
+                      const showPages = 5; // Show max 5 page numbers
+                      
+                      let startPage = Math.max(1, currentPage - Math.floor(showPages / 2));
+                      let endPage = Math.min(totalPages, startPage + showPages - 1);
+                      
+                      // Adjust start page if we're near the end
+                      if (endPage - startPage + 1 < showPages) {
+                        startPage = Math.max(1, endPage - showPages + 1);
+                      }
+                      
+                      // Add first page and ellipsis if needed
+                      if (startPage > 1) {
+                        pages.push(
+                          <Button key={1} variant={1 === currentPage ? "primary" : "outline-primary"} size="sm" onClick={() => setCurrentPage(1)} style={{ minWidth: '35px' }}>
+                            1
+                          </Button>
+                        );
+                        if (startPage > 2) {
+                          pages.push(<span key="ellipsis1" className="px-2">...</span>);
+                        }
+                      }
+                      
+                      // Add page numbers
+                      for (let i = startPage; i <= endPage; i++) {
+                        pages.push(
+                          <Button
+                            key={i}
+                            variant={i === currentPage ? "primary" : "outline-primary"}
+                            size="sm"
+                            onClick={() => setCurrentPage(i)}
+                            style={{ minWidth: '35px' }}
+                          >
+                            {i}
+                          </Button>
+                        );
+                      }
+                      
+                      // Add last page and ellipsis if needed
+                      if (endPage < totalPages) {
+                        if (endPage < totalPages - 1) {
+                          pages.push(<span key="ellipsis2" className="px-2">...</span>);
+                        }
+                        pages.push(
+                          <Button key={totalPages} variant={totalPages === currentPage ? "primary" : "outline-primary"} size="sm" onClick={() => setCurrentPage(totalPages)} style={{ minWidth: '35px' }}>
+                            {totalPages}
+                          </Button>
+                        );
+                      }
+                      
+                      return pages;
+                    })()} 
+                    
+                    <Button
+                      variant="outline-primary"
+                      size="sm"
+                      onClick={() => setCurrentPage(currentPage + 1)}
+                      disabled={currentPage === Math.ceil(filteredOrders.length / ordersPerPage)}
+                      style={{ minWidth: '35px' }}
+                    >
+                      <i className="bi bi-chevron-right"></i>
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
-            // Minimalist card view for mobile devices
-            <Row className="g-2 px-1">
-              {filteredOrders.map((order) => (
+            <>
+              {/* Minimalist card view for mobile devices */}
+              <Row className="g-2 px-1">
+              {paginatedOrders.map((order) => (
                 <Col xs={12} key={order.id}>
                   <Card 
                     className="mobile-friendly-card border-0" 
@@ -1004,6 +1061,41 @@ const ViewOrdersPage = () => {
                 </Col>
               ))}
             </Row>
+            
+            {/* Pagination Controls for Mobile */}
+            {filteredOrders.length > ordersPerPage && (
+              <div className="d-flex justify-content-between align-items-center mt-3 px-2">
+                <small className="text-muted">
+                  {((currentPage - 1) * ordersPerPage) + 1}-{Math.min(currentPage * ordersPerPage, filteredOrders.length)} of {filteredOrders.length}
+                </small>
+                <div className="d-flex gap-1">
+                  <Button
+                    variant="outline-primary"
+                    size="sm"
+                    onClick={() => setCurrentPage(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    style={{ minWidth: '32px', fontSize: '0.8rem' }}
+                  >
+                    <i className="bi bi-chevron-left"></i>
+                  </Button>
+                  
+                  <span className="px-2 d-flex align-items-center" style={{ fontSize: '0.85rem' }}>
+                    {currentPage} / {Math.ceil(filteredOrders.length / ordersPerPage)}
+                  </span>
+                  
+                  <Button
+                    variant="outline-primary"
+                    size="sm"
+                    onClick={() => setCurrentPage(currentPage + 1)}
+                    disabled={currentPage === Math.ceil(filteredOrders.length / ordersPerPage)}
+                    style={{ minWidth: '32px', fontSize: '0.8rem' }}
+                  >
+                    <i className="bi bi-chevron-right"></i>
+                  </Button>
+                </div>
+              </div>
+            )}
+            </>
           )}
         </Card.Body>
       </Card>
@@ -1129,11 +1221,22 @@ const ViewOrdersPage = () => {
             <Button 
               variant="primary" 
               onClick={handleUpdateStatus}
-              disabled={!newStatus || newStatus === selectedOrder?.status}
+              disabled={!newStatus || newStatus === selectedOrder?.status || isUpdatingStatus}
               className="flex-fill"
             >
-              <i className="bi bi-check-circle me-2"></i>
-              Update Status
+              {isUpdatingStatus ? (
+                <>
+                  <div className="spinner-border spinner-border-sm me-2" role="status">
+                    <span className="visually-hidden">Updating...</span>
+                  </div>
+                  Updating...
+                </>
+              ) : (
+                <>
+                  <i className="bi bi-check-circle me-2"></i>
+                  Update Status
+                </>
+              )}
             </Button>
           </div>
         </Modal.Footer>
@@ -1974,6 +2077,8 @@ const ViewOrdersPage = () => {
       </Modal>
     </Container>
   );
-};
+});
+
+ViewOrdersPage.displayName = 'ViewOrdersPage';
 
 export default ViewOrdersPage;

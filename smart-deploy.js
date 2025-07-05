@@ -6,7 +6,8 @@
  * Features:
  * - Branch-Specific Versioning: Independent version sequences for each branch type
  * - Multi-Version Tracking: VERSION file maintains separate versions for feature/dev/production
- * - Smart First Deployment: Automatically uses 1.0.0 for first deployment of each branch type
+ * - Smart Git Workflow: Feature→main merge, dev→dev only, production→dev+prod with tags
+ * - Production Tagging: Tags production versions on dev branch for tracking
  * - Remote Version Detection: Scans branch-specific remote versions for highest version
  * - Intelligent Version Bumping: Automatic major.minor.patch increments per branch type
  * - React Build Integration: Automatic npm run build for production deployments
@@ -31,7 +32,7 @@
  *     
  *     # Production deployment - independent production versioning with optimized build
  *     node smart-deploy.js production major "Production release"
- *     # Result: prod/2.0.0 (optimized production build)
+ *     # Result: pushes to dev with prod-x.x.x tag, then pushes to prod branch
  */
 
 const fs = require('fs');
@@ -58,18 +59,22 @@ class ReactSmartDeployer {
         this.gitConfig = {
             'production': {
                 targetBranch: 'prod',
-                mergeWith: 'main',
-                description: 'Production release with optimized build'
+                mergeWith: null, // Production pushes to dev with tag, then to prod
+                pushToDev: true, // Special case: also push to dev with production tag
+                description: 'Production release with optimized build',
+                useVersionedBranch: false // Push directly to prod
             },
             'dev': {
                 targetBranch: 'dev',
-                mergeWith: 'main',
-                description: 'Development release with test build'
+                mergeWith: null, // Dev only pushes to dev branch
+                description: 'Development release with test build',
+                useVersionedBranch: true // Keep versioned branches for dev
             },
             'feature': {
                 targetBranch: null, // Will be set dynamically
-                mergeWith: 'main',
-                description: 'Feature branch development'
+                mergeWith: 'main', // Feature branches merge with main after push
+                description: 'Feature branch development',
+                useVersionedBranch: true // Keep versioned branches for features
             }
         };
     }
@@ -605,7 +610,7 @@ class ReactSmartDeployer {
         } else if (targetEnv === 'production') {
             releaseType = '🎯 Production Release';
             releaseDescription = 'React production deployment with optimized build';
-            branchInfo = 'prod';
+            branchInfo = branchName; // Use actual branch name
             buildInfo = 'Optimized production build (minified, no source maps)';
         }
         
@@ -694,6 +699,48 @@ ${currentContent.replace('# Changelog', '').replace('All notable changes to this
         }
     }
 
+    pushProductionToDev(version) {
+        this.logInfo(`Pushing production version ${version} to dev branch with tag...`);
+        
+        // Checkout dev branch
+        this.runCommand('git checkout dev');
+        
+        // Pull latest dev to avoid conflicts
+        try {
+            this.runCommand('git pull origin dev');
+        } catch (error) {
+            this.logWarning('Could not pull from origin/dev - continuing...');
+        }
+        
+        // Merge prod branch into dev
+        try {
+            this.runCommand('git merge prod');
+        } catch (error) {
+            // If there are conflicts, resolve them by taking the prod version
+            this.logWarning('Merge conflicts detected. Resolving by taking prod changes...');
+            this.runCommand('git merge -X theirs prod');
+        }
+        
+        // Create production tag on dev to mark this as a production version
+        const productionTag = `prod-${version}`;
+        try {
+            // Delete tag if it already exists
+            this.runCommand(`git tag -d ${productionTag}`, { silent: true });
+            this.runCommand(`git push origin --delete ${productionTag}`, { silent: true });
+        } catch (error) {
+            // Tag might not exist, that's fine
+        }
+        
+        // Create new production tag
+        this.runCommand(`git tag -a ${productionTag} -m "Production version ${version} deployed to dev"`);
+        
+        // Push dev branch and tag
+        this.runCommand('git push origin dev');
+        this.runCommand(`git push origin ${productionTag}`);
+        
+        this.logSuccess(`Pushed production version ${version} to dev branch with tag ${productionTag}`);
+    }
+
     syncWithRemote() {
         // Sync local repository with remote - fetch all branches
         this.logInfo('Syncing with remote repository...');
@@ -762,18 +809,22 @@ ${currentContent.replace('# Changelog', '').replace('All notable changes to this
                 newVersion = this.bumpVersion(bumpType, currentVersion);
             }
             
-            // Parse target environment and create versioned branch names
+            // Parse target environment and create branch names
             let envType, branchName;
+            
             if (targetEnv.startsWith('feature/')) {
                 envType = 'feature';
                 const featureName = targetEnv.replace('feature/', '');
-                branchName = `feature/${featureName}-${newVersion}`;
+                const config = this.gitConfig['feature'] || {};
+                branchName = config.useVersionedBranch ? `feature/${featureName}-${newVersion}` : `feature/${featureName}`;
             } else if (targetEnv === 'dev') {
                 envType = 'dev';
-                branchName = `dev/${newVersion}`;
+                const config = this.gitConfig['dev'] || {};
+                branchName = config.useVersionedBranch ? `dev/${newVersion}` : 'dev';
             } else if (targetEnv === 'production') {
                 envType = 'production';
-                branchName = `prod/${newVersion}`;
+                const config = this.gitConfig['production'] || {};
+                branchName = config.useVersionedBranch ? `prod/${newVersion}` : 'prod';
             } else {
                 this.logError(`Invalid target environment: ${targetEnv}`);
                 return false;
@@ -816,7 +867,14 @@ ${currentContent.replace('# Changelog', '').replace('All notable changes to this
                 this.logSuccess(`Pushed React changes to ${branchName}`);
             }
 
-            // Merge with main
+            // Handle special production workflow
+            if (targetEnv === 'production') {
+                // Push production to dev with tag, then continue with prod
+                this.pushProductionToDev(newVersion);
+                this.logSuccess(`🏷️  Tagged production version ${newVersion} on dev branch`);
+            }
+
+            // Merge with main if configured (only for features now)
             const mergeTarget = this.gitConfig[envType].mergeWith;
             if (mergeTarget) {
                 this.runCommand(`git checkout ${mergeTarget}`);
@@ -837,6 +895,10 @@ ${currentContent.replace('# Changelog', '').replace('All notable changes to this
             
             if (mergeTarget) {
                 this.logSuccess(`🔀 Merged with ${mergeTarget}`);
+            }
+            
+            if (targetEnv === 'production') {
+                this.logSuccess(`🚀 Production deployed to both dev (with tag prod-${newVersion}) and prod branches`);
             }
 
             return true;

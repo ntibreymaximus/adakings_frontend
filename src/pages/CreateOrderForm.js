@@ -2,13 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Form, Button, Container, Row, Col, Card, ListGroup, Modal } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import useAuth from '../hooks/useAuth';
 import { authenticatedFetch, API_ENDPOINTS } from '../utils/api';
 
 // Delivery locations will be fetched from backend
 
 const CreateOrderForm = () => {
-  const { logout } = useAuth();
   const navigate = useNavigate();
   const [allMenuItems, setAllMenuItems] = useState([]);
   const [customerPhone, setCustomerPhone] = useState('');
@@ -20,38 +18,19 @@ const CreateOrderForm = () => {
   const [errors, setErrors] = useState({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
-  const [nextOrderNumber, setNextOrderNumber] = useState('Loading...');
   const [showExtraDropdown, setShowExtraDropdown] = useState(false);
   const [showMenuDropdown, setShowMenuDropdown] = useState(true);
   const [deliveryLocations, setDeliveryLocations] = useState([]);
   const [loadingLocations, setLoadingLocations] = useState(false);
-  
-  // Missing state variables
-  const [recentCustomers, setRecentCustomers] = useState([]);
-  const [popularItems, setPopularItems] = useState([]);
-  const [customerSuggestions, setCustomerSuggestions] = useState([]);
-  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
-  const [lastOrderData, setLastOrderData] = useState(null);
-  const [orderStartTime, setOrderStartTime] = useState(new Date());
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Filter menu items into main items and extras
   const mainMenuItems = (allMenuItems || []).filter(item => !item.is_extra && item.is_available);
   const extraMenuItems = (allMenuItems || []).filter(item => item.is_extra && item.is_available);
+  
+  // Fallback: if no main menu items found, show all available items (in case is_extra field is missing or different)
+  const displayMenuItems = mainMenuItems.length > 0 ? mainMenuItems : (allMenuItems || []).filter(item => item.is_available);
 
-  const fetchNextOrderNumber = useCallback(async () => {
-    try {
-      const response = await authenticatedFetch(API_ENDPOINTS.NEXT_ORDER_NUMBER);
-      if (!response.ok) {
-        throw new Error('Failed to fetch next order number');
-      }
-      const data = await response.json();
-      setNextOrderNumber(data.next_order_number);
-    } catch (error) {
-      console.error('Error fetching next order number:', error);
-      setNextOrderNumber('N/A');
-      console.error('Could not load next order number.');
-    }
-  }, []);
 
   // Fetch delivery locations from backend
   const fetchDeliveryLocations = useCallback(async () => {
@@ -62,7 +41,21 @@ const CreateOrderForm = () => {
         throw new Error(`Failed to fetch delivery locations. Status: ${response.status}`);
       }
       const data = await response.json();
-      setDeliveryLocations(data);
+      
+      // Ensure we have an array
+      let locations = data;
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+        // If it's a paginated response, extract the results
+        locations = data.results || data.items || data.data || [];
+      }
+      
+      // Ensure we have an array
+      if (!Array.isArray(locations)) {
+        console.error('DeliveryLocations: Expected array but got:', typeof locations, locations);
+        locations = [];
+      }
+      
+      setDeliveryLocations(locations);
     } catch (error) {
       console.error('Error fetching delivery locations:', error);
       // Fallback to empty array if fetch fails
@@ -76,7 +69,6 @@ const CreateOrderForm = () => {
 
   useEffect(() => {
     const fetchInitialData = async () => {
-      await fetchNextOrderNumber();
       await fetchDeliveryLocations();
       try {
         const response = await authenticatedFetch(API_ENDPOINTS.MENU_ITEMS);
@@ -102,6 +94,10 @@ const CreateOrderForm = () => {
         }
         
         console.log('CreateOrderForm: Final items:', items);
+        console.log('CreateOrderForm: Items count:', items.length);
+        console.log('CreateOrderForm: Available items:', items.filter(item => item.is_available).length);
+        console.log('CreateOrderForm: Main items (not extras):', items.filter(item => !item.is_extra && item.is_available).length);
+        console.log('CreateOrderForm: Sample items:', items.slice(0, 3));
         setAllMenuItems(items);
       } catch (error) {
         console.error('Error fetching menu items:', error);
@@ -109,69 +105,19 @@ const CreateOrderForm = () => {
       }
     };
     fetchInitialData();
-  }, [fetchNextOrderNumber, fetchDeliveryLocations]);
+  }, [fetchDeliveryLocations]);
 
-  // Missing function implementations
-  const handleCustomerPhoneSearch = useCallback((phone) => {
-    if (!phone || phone.length < 3) {
-      setCustomerSuggestions([]);
-      setShowCustomerDropdown(false);
-      return;
-    }
-    
-    const filtered = recentCustomers.filter(customer => 
-      customer.phone.includes(phone) || customer.name.toLowerCase().includes(phone.toLowerCase())
-    );
-    setCustomerSuggestions(filtered);
-    setShowCustomerDropdown(filtered.length > 0);
-  }, [recentCustomers]);
 
-  const selectCustomer = useCallback((customer) => {
-    setCustomerPhone(customer.phone);
-    setShowCustomerDropdown(false);
-    
-    // Load last order data if available
-    if (lastOrderData && lastOrderData.customer_phone === customer.phone) {
-      // Optionally auto-populate last order items
-    }
-  }, [lastOrderData]);
-
-  const loadLastOrderItems = useCallback(() => {
-    if (!lastOrderData) return;
-    
-    // Load items from last order
-    const items = {};
-    lastOrderData.items?.forEach(item => {
-      items[item.menu_item_id] = item.quantity;
+  const handleRemoveItem = useCallback((itemId) => {
+    setSelectedItems(prev => {
+      const newItems = { ...prev };
+      delete newItems[itemId];
+      return newItems;
     });
-    setSelectedItems(items);
-  }, [lastOrderData]);
-
-  const addPopularItem = useCallback((itemId) => {
-    handleAddItem(itemId);
+    // Item removed from order
   }, []);
 
-  const fetchRecentCustomers = useCallback(async () => {
-    try {
-      // This would normally fetch from API
-      // For now, use empty array
-      setRecentCustomers([]);
-    } catch (error) {
-      console.error('Error fetching recent customers:', error);
-    }
-  }, []);
-
-  const fetchPopularItems = useCallback(async () => {
-    try {
-      // This would normally fetch from API
-      // For now, use empty array
-      setPopularItems([]);
-    } catch (error) {
-      console.error('Error fetching popular items:', error);
-    }
-  }, []);
-
-  const handleQuantityChange = (itemId, quantity) => {
+  const handleQuantityChange = useCallback((itemId, quantity) => {
     const numQuantity = parseInt(quantity, 10);
     if (numQuantity <= 0) {
       handleRemoveItem(itemId);
@@ -181,10 +127,10 @@ const CreateOrderForm = () => {
         [itemId]: numQuantity,
       }));
     }
-  };
+  }, [handleRemoveItem]);
 
-  const handleAddItem = (itemId) => {
-    const item = mainMenuItems.find(i => i.id === itemId);
+  const handleAddItem = useCallback((itemId) => {
+    const item = displayMenuItems.find(i => i.id === itemId);
     if (!item) return;
 
     if (!selectedItems[itemId] || selectedItems[itemId] === 0) {
@@ -194,17 +140,9 @@ const CreateOrderForm = () => {
         // Item is already in the order
     }
     setShowMenuDropdown(false);
-  };
+  }, [displayMenuItems, selectedItems, handleQuantityChange]);
 
-  const handleRemoveItem = (itemId) => {
-    const itemName = mainMenuItems.find(item => item.id === itemId)?.name || 'Item';
-    setSelectedItems(prev => {
-      const newItems = { ...prev };
-      delete newItems[itemId];
-      return newItems;
-    });
-    // Item removed from order
-  };
+
 
   const handleAddExtra = (extraId) => {
     const extra = extraMenuItems.find(e => e.id === extraId);
@@ -314,29 +252,37 @@ const CreateOrderForm = () => {
   const grandTotal = currentOrderSubTotal + extrasSubTotal + currentDeliveryFee;
 
   const handleFinalSubmit = async () => {
-    const payloadItems = Object.entries(selectedItems)
-      .filter(([, quantity]) => quantity > 0)
-      .map(([itemId, quantity]) => ({ menu_item_id: itemId, quantity }));
-    
-    const payloadExtras = Object.entries(selectedExtras)
-      .filter(([, quantity]) => quantity > 0)
-      .map(([extraId, quantity]) => ({ menu_item_id: extraId, quantity }));
-    
-    // Combine main items and extras into one items array
-    const allItems = [...payloadItems, ...payloadExtras];
-
-    const orderPayload = {
-      customer_phone: customerPhone.trim(),
-      delivery_type: deliveryType,
-      notes: notes.trim(),
-      items: allItems,
-    };
-
-    if (deliveryType === 'Delivery') {
-      orderPayload.delivery_location = deliveryLocation;
+    // Prevent multiple submissions
+    if (isSubmitting) {
+      toast.warning('Order is being processed, please wait...');
+      return;
     }
 
+    setIsSubmitting(true);
+
     try {
+      const payloadItems = Object.entries(selectedItems)
+        .filter(([, quantity]) => quantity > 0)
+        .map(([itemId, quantity]) => ({ menu_item_id: itemId, quantity }));
+      
+      const payloadExtras = Object.entries(selectedExtras)
+        .filter(([, quantity]) => quantity > 0)
+        .map(([extraId, quantity]) => ({ menu_item_id: extraId, quantity }));
+      
+      // Combine main items and extras into one items array
+      const allItems = [...payloadItems, ...payloadExtras];
+
+      const orderPayload = {
+        customer_phone: customerPhone.trim(),
+        delivery_type: deliveryType,
+        notes: notes.trim(),
+        items: allItems,
+      };
+
+      if (deliveryType === 'Delivery') {
+        orderPayload.delivery_location = deliveryLocation;
+      }
+
       const response = await authenticatedFetch(API_ENDPOINTS.ORDERS, {
         method: 'POST',
         body: JSON.stringify(orderPayload),
@@ -375,7 +321,6 @@ const CreateOrderForm = () => {
         setSelectedExtras({});
         setErrors({});
         setIsModalOpen(false);
-        fetchNextOrderNumber();
         navigate('/view-orders');
       } else {
         const errorData = await response.json().catch(() => ({ detail: `Request failed with status ${response.status}` }));
@@ -385,63 +330,12 @@ const CreateOrderForm = () => {
     } catch (error) {
       console.error('Order submission error:', error);
       console.error('Network error: Could not submit order.');
+    } finally {
+      // Always re-enable the button after the request completes
+      setIsSubmitting(false);
     }
   };
 
-  const renderMenuItem = (item) => {
-    const quantity = selectedItems[item.id] || 0;
-    return (
-      <ListGroup.Item key={item.id} className="py-3 border-0">
-        <div className="d-flex flex-wrap flex-md-nowrap justify-content-between align-items-center">
-          <div className="flex-grow-1 me-3 mb-2 mb-md-0 w-100">
-            <h6 className="mb-1 ada-text-primary">{item.name}</h6>
-            <div className="d-flex align-items-center flex-wrap">
-              <span className="fw-bold text-success">₵{item.price ? parseFloat(item.price).toFixed(2) : '0.00'}</span>
-              {item.description && (
-                <small className="text-muted ms-2 text-truncate" style={{ maxWidth: '100%' }}>• {item.description}</small>
-              )}
-            </div>
-          </div>
-          <div className="d-flex align-items-center">
-            {quantity === 0 ? (
-              <Button 
-                variant="success" 
-                size="sm" 
-                onClick={() => handleAddItem(item.id)}
-                className="ada-shadow-sm"
-                style={{ minHeight: '44px', minWidth: '44px' }}
-              >
-                <i className="bi bi-plus-circle me-1"></i>
-                Add
-              </Button>
-            ) : (
-              <div className="d-flex align-items-center">
-                <Button 
-                  variant={quantity === 1 ? 'danger' : 'secondary'} 
-                  size="sm" 
-                  onClick={() => handleQuantityChange(item.id, quantity - 1)}
-                  className="ada-shadow-sm"
-                  style={{ minHeight: '44px', minWidth: '44px' }}
-                >
-                  {quantity === 1 ? <i className="bi bi-trash" style={{ fontSize: '0.8rem' }}></i> : <i className="bi bi-dash"></i>}
-                </Button>
-                <span className="mx-3 fw-bold ada-text-primary" style={{ minWidth: '25px', textAlign: 'center', fontSize: '1.1rem' }}>{quantity}</span>
-                <Button 
-                  variant="primary" 
-                  size="sm" 
-                  onClick={() => handleQuantityChange(item.id, quantity + 1)}
-                  className="ada-shadow-sm"
-                  style={{ minHeight: '44px', minWidth: '44px', borderRadius: 'var(--ada-border-radius-sm)' }}
-                >
-                  <i className="bi bi-plus"></i>
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-      </ListGroup.Item>
-    );
-  };
 
   return (
     <Container className="my-3 my-md-4 px-3 px-md-4" style={{ minHeight: 'calc(100vh - 100px)' }}>
@@ -484,7 +378,7 @@ const CreateOrderForm = () => {
                 <div className="ada-shadow-sm mb-3" style={{ border: '1px solid #e9ecef', borderRadius: 'var(--ada-border-radius-lg)', backgroundColor: 'var(--ada-off-white)' }}>
                   <ListGroup variant="flush">
                     {Object.entries(selectedItems).map(([itemId, quantity]) => {
-                      const item = mainMenuItems.find(mi => mi.id.toString() === itemId);
+                      const item = displayMenuItems.find(mi => mi.id.toString() === itemId);
                       if (!item || quantity <= 0) return null;
                       return (
                         <ListGroup.Item key={itemId} className="py-3">
@@ -539,24 +433,35 @@ const CreateOrderForm = () => {
               {showMenuDropdown && (
                 <div className="mb-3 p-3 ada-shadow-sm" style={{ border: '1px solid #e9ecef', borderRadius: 'var(--ada-border-radius-lg)', backgroundColor: 'var(--ada-light-gray)' }}>
                   <div className="d-flex gap-2 flex-wrap">
-                    {mainMenuItems
-                      .filter(item => !selectedItems[item.id])
-                      .map(item => (
-                        <Button
-                          key={item.id}
-                          variant="outline-success"
-                          size="sm"
-                          onClick={() => handleAddItem(item.id)}
-                          className="ada-shadow-sm mb-2"
-                          style={{ minHeight: '44px' }}
-                        >
-                          {item.name} (₵{parseFloat(item.price || 0).toFixed(2)})
-                          <i className="bi bi-plus-circle ms-1"></i>
-                        </Button>
-                      ))
-                    }
+                    {displayMenuItems.length === 0 ? (
+                      <div className="text-center py-3">
+                        <div className="text-muted mb-2">
+                          <i className="bi bi-exclamation-triangle" style={{ fontSize: '1.5rem' }}></i>
+                        </div>
+                        <p className="text-muted mb-0">No menu items available</p>
+                        <small className="text-muted">
+                          {allMenuItems.length === 0 ? 'No items loaded from API' : `${allMenuItems.length} total items, but none are available items`}
+                        </small>
+                      </div>
+                    ) : (
+                      displayMenuItems
+                        .filter(item => !selectedItems[item.id])
+                        .map(item => (
+                          <Button
+                            key={item.id}
+                            variant="outline-success"
+                            size="sm"
+                            onClick={() => handleAddItem(item.id)}
+                            className="ada-shadow-sm mb-2"
+                            style={{ minHeight: '44px' }}
+                          >
+                            {item.name} (₵{parseFloat(item.price || 0).toFixed(2)})
+                            <i className="bi bi-plus-circle ms-1"></i>
+                          </Button>
+                        ))
+                    )}
                   </div>
-                  {mainMenuItems.filter(item => !selectedItems[item.id]).length === 0 && (
+                  {displayMenuItems.filter(item => !selectedItems[item.id]).length === 0 && (
                     <small className="text-muted fst-italic">All menu items have been added</small>
                   )}
                 </div>
@@ -687,7 +592,7 @@ const CreateOrderForm = () => {
                         <option value="">
                           {loadingLocations ? '⏳ Loading locations...' : '📍 Select a location'}
                         </option>
-                        {deliveryLocations.map(location => (
+                        {(deliveryLocations && Array.isArray(deliveryLocations) ? deliveryLocations : []).map(location => (
                           <option key={location.id || location.name} value={location.name}>
                             {location.name} (Fee: ₵{parseFloat(location.fee || 0).toFixed(2)})
                           </option>
@@ -768,7 +673,7 @@ const CreateOrderForm = () => {
                   <div className="mb-2" style={{ maxHeight: '120px', overflowY: 'auto' }}>
                     {Object.entries(selectedItems).map(([itemId, quantity]) => {
                       if (quantity <= 0) return null;
-                      const item = mainMenuItems.find(mi => mi.id.toString() === itemId);
+                      const item = displayMenuItems.find(mi => mi.id.toString() === itemId);
                       if (!item) return null;
                       const itemTotal = parseFloat(item.price || 0) * quantity;
                       return (
@@ -1067,11 +972,23 @@ const CreateOrderForm = () => {
             <Button 
               variant="primary" 
               onClick={handleFinalSubmit}
+              disabled={isSubmitting}
               className="order-1 order-sm-3 flex-fill"
               style={{ minHeight: '48px' }}
             >
-              <i className="bi bi-check-circle me-2"></i>
-              Accept
+              {isSubmitting ? (
+                <>
+                  <div className="spinner-border spinner-border-sm me-2" role="status">
+                    <span className="visually-hidden">Processing...</span>
+                  </div>
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <i className="bi bi-check-circle me-2"></i>
+                  Accept
+                </>
+              )}
             </Button>
           </div>
         </Modal.Footer>

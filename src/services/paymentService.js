@@ -3,11 +3,9 @@
 import { 
   generateTransactionId, 
   generateTransactionReference,
-  formatTransactionId,
-  isValidTransactionId
+  formatTransactionId
 } from '../utils/transactionUtils';
-
-const API_BASE_URL = 'http://localhost:8000/api';
+import { API_BASE_URL } from '../utils/api';
 
 /**
  * Get authentication headers
@@ -63,7 +61,7 @@ export const initiatePayment = async (paymentData) => {
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-    throw { status: response.status, data: errorData };
+    throw new Error(`Payment failed: ${errorData.detail || 'Unknown error'}`);
   }
 
   const result = await response.json();
@@ -124,7 +122,7 @@ export const getPaymentDetails = async (reference) => {
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ detail: 'Payment not found' }));
-    throw { status: response.status, data: errorData };
+    throw new Error(`Payment not found: ${errorData.detail || 'Unknown error'}`);
   }
 
   return await response.json();
@@ -152,7 +150,7 @@ export const getPayments = async (filters = {}) => {
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ detail: 'Failed to fetch payments' }));
-    throw { status: response.status, data: errorData };
+    throw new Error(`Failed to fetch payments: ${errorData.detail || 'Unknown error'}`);
   }
 
   return await response.json();
@@ -292,7 +290,7 @@ export const isImmediatePayment = (paymentMethod) => {
   return ['CASH', 'TELECEL CASH', 'MTN MOMO', 'PAYSTACK(USSD)'].includes(paymentMethod);
 };
 
-export default {
+const paymentService = {
   initiatePayment,
   getPaymentModes,
   getPaymentDetails,
@@ -304,4 +302,6 @@ export default {
   requiresMobileNumber,
   isImmediatePayment
 };
+
+export default paymentService;
 

@@ -213,7 +213,7 @@ export const openPaymentWindow = (authorizationUrl, onSuccess, onClose) => {
   return paymentWindow;
 };
 
-export default {
+const paymentUtils = {
   PAYMENT_METHODS,
   PAYMENT_STATUSES,
   validateGhanaianMobileNumber,
@@ -225,4 +225,6 @@ export default {
   formatAmount,
   openPaymentWindow
 };
+
+export default paymentUtils;
 

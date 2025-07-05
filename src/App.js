@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from './utils/api';
 import LoginPage from './components/LoginPage';
 import UserProfilePage from './components/UserProfilePage';
 import DashboardPage from './components/DashboardPage';
@@ -12,29 +13,18 @@ import StatsDebugger from './components/StatsDebugger';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Navbar from './components/Navbar';
-import MobileNavbar from './components/MobileNavbar';
-import PWADashboard from './components/PWADashboard';
-import PWALogin from './components/PWALogin';
-import PWAProfile from './components/PWAProfile';
-import PWAOrders from './components/PWAOrders';
-import PWAOrderDetails from './components/PWAOrderDetails';
-import PWAMenu from './components/PWAMenu';
-import PWATransactions from './components/PWATransactions';
-import PWACreateOrder from './components/PWACreateOrder';
-import PWAEditOrder from './components/PWAEditOrder';
 import AuthTest from './components/AuthTest';
 import InstantReloadTest from './components/InstantReloadTest';
-import OfflineIndicator from './components/OfflineIndicator';
+// Initialize polling manager
+import './utils/pollingManager';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './styles/theme.css';
 import './App.css';
-import { usePWA } from './hooks/usePWA';
-import { useOfflineHandler } from './utils/offlineHandler';
+import './utils/cleanupPWA'; // Clean up any remaining PWA data
 
-// Create a separate component for the main app logic
-function AppContent() {
+function App() {
   const [userData, setUserData] = useState(() => {
     try {
       const storedUserData = localStorage.getItem('userData');
@@ -48,16 +38,8 @@ function AppContent() {
     }
     return null;
   });
-  const { isPWA, isInstallable, installPWA } = usePWA();
-  const { isOnline } = useOfflineHandler();
+  
   const navigate = useNavigate();
-
-  // Dynamic CSS import for PWA mode
-  React.useEffect(() => {
-    if (isPWA) {
-      import('./styles/mobile-native.css');
-    }
-  }, [isPWA]);
 
   const handleLoginSuccess = (data) => {
     setUserData(data.user);
@@ -70,7 +52,7 @@ function AppContent() {
   const handleLogout = async () => {
     try {
       // Call backend logout endpoint
-      await fetch('http://localhost:8000/api/users/logout/', {
+      await fetch(`${API_BASE_URL}/users/logout/`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -90,84 +72,38 @@ function AppContent() {
   };
 
   return (
-    <div className={isPWA ? "pwa-app" : "App"}>
-      {/* Global offline indicator */}
-      <OfflineIndicator />
-      
-      {isPWA ? (
-        // PWA Mode - Native Mobile Layout
-        <>
-          {userData && <MobileNavbar userData={userData} onLogout={handleLogout} />}
-          {isInstallable && (
-            <div className="pwa-content">
-              <div className="pwa-card">
-                <button className="pwa-btn pwa-btn-primary" onClick={installPWA}>
-                  <i className="bi bi-download"></i>
-                  Install App
-                </button>
-              </div>
-            </div>
-          )}
-        </>
-      ) : (
-        // Web Mode - Original Bootstrap Layout
-        userData && <Navbar userData={userData} onLogout={handleLogout} />
-      )}
+    <div className="App">
+      {/* Standard web navigation */}
+      {userData && <Navbar userData={userData} onLogout={handleLogout} />}
       
       <Routes>
         <Route 
           path="/login" 
-          element={!userData ? (
-            isPWA ? <PWALogin onLoginSuccess={handleLoginSuccess} /> : <LoginPage onLoginSuccess={handleLoginSuccess} />
-          ) : <Navigate to="/dashboard" />} 
+          element={!userData ? <LoginPage onLoginSuccess={handleLoginSuccess} /> : <Navigate to="/dashboard" />} 
         />
         <Route 
           path="/dashboard" 
-          element={userData ? (
-            isPWA ? <PWADashboard userData={userData} onLogout={handleLogout} /> : <DashboardPage userData={userData} />
-          ) : <Navigate to="/login" />}
+          element={userData ? <DashboardPage userData={userData} /> : <Navigate to="/login" />}
         />
         <Route 
           path="/profile" 
-          element={userData ? (
-            isPWA ? <PWAProfile userData={userData} /> : <UserProfilePage userData={userData} />
-          ) : <Navigate to="/login" />} 
+          element={userData ? <UserProfilePage userData={userData} /> : <Navigate to="/login" />} 
         />
         <Route 
           path="/create-order" 
-          element={userData ? (
-            isPWA ? <PWACreateOrder /> : <CreateOrderPage />
-          ) : <Navigate to="/login" />} 
+          element={userData ? <CreateOrderPage /> : <Navigate to="/login" />} 
         />
         <Route 
           path="/view-orders" 
-          element={userData ? (
-            isPWA ? <PWAOrders /> : <ViewOrdersPage />
-          ) : <Navigate to="/login" />} 
-        />
-        <Route 
-          path="/order-details/:orderNumber" 
-          element={userData ? (
-            isPWA ? <PWAOrderDetails /> : <Navigate to="/view-orders" />
-          ) : <Navigate to="/login" />} 
-        />
-        <Route 
-          path="/edit-order/:orderNumber" 
-          element={userData ? (
-            isPWA ? <PWAEditOrder /> : <Navigate to="/view-orders" />
-          ) : <Navigate to="/login" />} 
+          element={userData ? <ViewOrdersPage /> : <Navigate to="/login" />} 
         />
         <Route 
           path="/view-menu" 
-          element={userData ? (
-            isPWA ? <PWAMenu /> : <ViewMenuPage />
-          ) : <Navigate to="/login" />} 
+          element={userData ? <ViewMenuPage /> : <Navigate to="/login" />} 
         />
         <Route 
           path="/view-transactions" 
-          element={userData ? (
-            isPWA ? <PWATransactions /> : <ViewTransactionsPage />
-          ) : <Navigate to="/login" />} 
+          element={userData ? <ViewTransactionsPage /> : <Navigate to="/login" />} 
         />
         <Route 
           path="/debug-transactions" 
@@ -204,11 +140,6 @@ function AppContent() {
       />
     </div>
   );
-}
-
-// Main App component that wraps everything
-function App() {
-  return <AppContent />;
 }
 
 export default App;

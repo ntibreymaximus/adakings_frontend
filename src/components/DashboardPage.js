@@ -67,17 +67,19 @@ const DashboardPage = ({ userData }) => {
         ))}
       </Row>
 
+
       {/* Recent Activity Card */}
       <Row className="mt-4">
         <Col xs={12}>
           <RecentActivityCard 
             maxItems={5}
             showFullHistory={true}
-            refreshInterval={30000}
+            refreshInterval={500}
             className="ada-fade-in"
           />
         </Col>
       </Row>
+      
     </Container>
   );
 };

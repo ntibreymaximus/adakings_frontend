@@ -198,7 +198,7 @@ export const getShortTransactionId = (transactionId) => {
   return transactionId;
 };
 
-export default {
+const transactionUtils = {
   generateTransactionId,
   generatePaymentReference,
   generateRefundReference,
@@ -210,3 +210,5 @@ export default {
   isRefundTransaction,
   getShortTransactionId
 };
+
+export default transactionUtils;

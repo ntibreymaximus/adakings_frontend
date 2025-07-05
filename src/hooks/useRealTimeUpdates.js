@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'react-toastify';
+import pollingManager from '../utils/pollingManager';
 
 /**
  * Real-time updates hook for instant order synchronization
@@ -8,7 +9,7 @@ import { toast } from 'react-toastify';
 export const useRealTimeUpdates = (options = {}) => {
   const {
     endpoint,
-    pollInterval = 2000, // 2 seconds for instant feel
+    pollInterval = 500, // Ultra-fast 500ms polling for instant updates
     enableWebSocket = true,
     enableOptimisticUpdates = true,
     onUpdate,
@@ -101,8 +102,44 @@ export const useRealTimeUpdates = (options = {}) => {
     }, 0);
   }, []);
 
+  // Debounce timer to prevent excessive requests
+  const debounceRef = useRef(null);
+  
+  // Local cache to reduce redundant requests
+  const cacheRef = useRef({
+    data: null,
+    timestamp: 0,
+    ttl: 1000 // 1 second cache TTL for instant updates
+  });
+  
+  // Check if cached data is still valid
+  const isCacheValid = useCallback(() => {
+    const now = Date.now();
+    return cacheRef.current.data && (now - cacheRef.current.timestamp) < cacheRef.current.ttl;
+  }, []);
+  
   // Fetch data with error handling and retry logic
-  const fetchData = useCallback(async (isBackground = false) => {
+  const fetchData = useCallback(async (isBackground = false, useCache = true) => {
+    // Check cache first for background requests
+    if (isBackground && useCache && isCacheValid()) {
+      const cachedData = cacheRef.current.data;
+      const dataArray = cachedData.results || cachedData.data || cachedData || [];
+      
+      // Apply optimistic updates to cached data
+      let finalData = [...dataArray];
+      optimisticUpdates.current.forEach((update, id) => {
+        const index = finalData.findIndex(item => item.id === id);
+        if (index >= 0) {
+          finalData[index] = { ...finalData[index], ...update };
+        } else if (update._isNew) {
+          finalData.unshift(update);
+        }
+      });
+      
+      setData(finalData);
+      return; // Use cached data
+    }
+    
     try {
       if (!isBackground) setLoading(true);
       setError(null);
@@ -117,7 +154,7 @@ export const useRealTimeUpdates = (options = {}) => {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        signal: AbortSignal.timeout(15000) // 15 second timeout to be more lenient
+        signal: AbortSignal.timeout(2000) // Ultra-fast 2 second timeout for instant responsiveness
       });
 
       if (!response.ok) {
@@ -129,6 +166,13 @@ export const useRealTimeUpdates = (options = {}) => {
 
       const newData = await response.json();
       const dataArray = newData.results || newData.data || newData || [];
+      
+      // Update cache
+      cacheRef.current = {
+        data: newData,
+        timestamp: Date.now(),
+        ttl: isBackground ? 1000 : 2000 // Minimal cache for instant updates
+      };
       
       // Check if data actually changed
       const newHash = calculateHash(dataArray);
@@ -160,7 +204,7 @@ export const useRealTimeUpdates = (options = {}) => {
       
     } catch (err) {
       // Handle different types of errors more gracefully
-      const isTimeoutError = err.name === 'TimeoutError' || err.message.includes('timeout');
+      const isTimeoutError = err.name === 'TimeoutError' || err.name === 'AbortError' || err.message.includes('timeout');
       const isNetworkError = err.name === 'TypeError' || err.message.includes('Failed to fetch');
       
       if (err.message.includes('AUTHENTICATION_EXPIRED')) {
@@ -178,9 +222,9 @@ export const useRealTimeUpdates = (options = {}) => {
       retryAttempts.current += 1;
       
       if (!isBackground && retryAttempts.current <= maxRetries) {
-        // Exponential backoff for retries - longer delays for timeout errors
-        const baseDelay = isTimeoutError ? 2000 : 1000;
-        const delay = Math.min(baseDelay * Math.pow(2, retryAttempts.current - 1), 10000);
+        // Minimal backoff for instant recovery
+        const baseDelay = isTimeoutError ? 500 : 200;
+        const delay = Math.min(baseDelay * Math.pow(1.5, retryAttempts.current - 1), 2000);
         setTimeout(() => fetchData(isBackground), delay);
       } else {
         // Only set user-visible errors for non-timeout issues or after max retries
@@ -202,33 +246,72 @@ export const useRealTimeUpdates = (options = {}) => {
     } finally {
       if (!isBackground) setLoading(false);
     }
-  }, [endpoint, onUpdate, onError, calculateHash]);
+  }, [endpoint, onUpdate, onError, calculateHash, isCacheValid]);
 
-  // WebSocket connection for real-time updates
+  // WebSocket connection for real-time updates with instant reconnection
+  const wsReconnectAttempts = useRef(0);
+  const wsReconnectDelay = useRef(100); // Start with 100ms for instant reconnection
+  const maxReconnectDelay = 3000; // Max 3 seconds for faster recovery
+  const maxReconnectAttempts = 20;
+  const wsHeartbeatInterval = useRef(null);
+  const wsLastHeartbeat = useRef(null);
+  
   const connectWebSocket = useCallback(() => {
     if (!enableWebSocket || !endpoint) return;
 
     try {
-      // Fix double slash issue by ensuring proper URL construction
-      const baseUrl = endpoint.replace(/^http/, 'ws').replace(/\/$/, '');
-      const wsUrl = `${baseUrl}/ws/`;
+      // Convert HTTP to WebSocket URL and construct proper WebSocket endpoint
+      const baseUrl = endpoint.replace(/^http/, 'ws').replace(/\/api\/orders\/$/, '');
+      const wsUrl = `${baseUrl}/ws/orders/`;
       const token = localStorage.getItem('token');
       
+      if (!token) {
+        console.warn('[WebSocket] No authentication token available');
+        return;
+      }
+      
+      console.log(`[WebSocket] Connecting to: ${wsUrl} (attempt ${wsReconnectAttempts.current + 1})`);
       wsRef.current = new WebSocket(`${wsUrl}?token=${token}`);
       
+      // Set connection timeout
+      const connectionTimeout = setTimeout(() => {
+        if (wsRef.current && wsRef.current.readyState === WebSocket.CONNECTING) {
+          console.warn('[WebSocket] Connection timeout, closing...');
+          wsRef.current.close();
+        }
+      }, 3000); // 3 second timeout for faster recovery
+      
       wsRef.current.onopen = () => {
-        console.log('[RealTime] WebSocket connected');
+        clearTimeout(connectionTimeout);
+        console.log('[RealTime] WebSocket connected successfully');
         setIsConnected(true);
-        toast.success('Real-time updates connected', {
-          position: 'bottom-right',
-          autoClose: 2000,
-          hideProgressBar: true
-        });
+        
+        // Reset reconnection parameters on successful connection
+        wsReconnectAttempts.current = 0;
+        wsReconnectDelay.current = 100;
+        
+        // Start client-side heartbeat
+        startHeartbeat();
+        
+        // Show success notification only after the first connection or after reconnection
+        if (wsReconnectAttempts.current > 0 || !wsLastHeartbeat.current) {
+          toast.success('Real-time updates connected', {
+            position: 'bottom-right',
+            autoClose: 2000,
+            hideProgressBar: true
+          });
+        }
       };
       
       wsRef.current.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
+          
+          // Handle heartbeat responses
+          if (message.type === 'heartbeat' || message.type === 'heartbeat_ack') {
+            wsLastHeartbeat.current = Date.now();
+            return;
+          }
           
           if (message.type === 'data_update') {
             // Instant update from WebSocket
@@ -259,16 +342,48 @@ export const useRealTimeUpdates = (options = {}) => {
         }
       };
       
-      wsRef.current.onclose = () => {
-        console.log('[RealTime] WebSocket disconnected');
+      wsRef.current.onclose = (event) => {
+        clearTimeout(connectionTimeout);
+        stopHeartbeat();
         setIsConnected(false);
         
-        // Attempt to reconnect after 3 seconds
-        setTimeout(() => {
-          if (autoStart) {
-            connectWebSocket();
-          }
-        }, 3000);
+        const wasCleanClose = event.code === 1000;
+        const wasAuthError = event.code === 4001;
+        
+        if (wasAuthError) {
+          console.error('[WebSocket] Authentication failed');
+          toast.error('Authentication expired. Please login again.', {
+            position: 'bottom-right',
+            autoClose: 5000
+          });
+          return;
+        }
+        
+        console.log(`[RealTime] WebSocket disconnected (code: ${event.code}, clean: ${wasCleanClose})`);
+        
+        // Attempt to reconnect with exponential backoff
+        if (autoStart && wsReconnectAttempts.current < maxReconnectAttempts) {
+          wsReconnectAttempts.current += 1;
+          
+          // Minimal backoff with small jitter for instant reconnection
+          const jitter = Math.random() * 100; // 0-100ms jitter
+          const delay = Math.min(wsReconnectDelay.current + jitter, maxReconnectDelay);
+          wsReconnectDelay.current = Math.min(wsReconnectDelay.current * 1.2, maxReconnectDelay);
+          
+          console.log(`[WebSocket] Reconnecting in ${Math.round(delay)}ms (attempt ${wsReconnectAttempts.current}/${maxReconnectAttempts})`);
+          
+          setTimeout(() => {
+            if (autoStart) {
+              connectWebSocket();
+            }
+          }, delay);
+        } else if (wsReconnectAttempts.current >= maxReconnectAttempts) {
+          console.error('[WebSocket] Max reconnection attempts reached');
+          toast.error('Connection lost. Please refresh the page.', {
+            position: 'bottom-right',
+            autoClose: 0 // Don't auto-close
+          });
+        }
       };
       
       wsRef.current.onerror = (error) => {
@@ -281,6 +396,38 @@ export const useRealTimeUpdates = (options = {}) => {
       setIsConnected(false);
     }
   }, [enableWebSocket, endpoint, onUpdate, autoStart]);
+  
+  // Client-side heartbeat to detect connection issues
+  const startHeartbeat = useCallback(() => {
+    stopHeartbeat(); // Clear any existing heartbeat
+    
+    wsHeartbeatInterval.current = setInterval(() => {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        try {
+          wsRef.current.send(JSON.stringify({
+            type: 'heartbeat',
+            timestamp: Date.now()
+          }));
+          
+          // Check if we've missed heartbeats (connection might be stale)
+          const now = Date.now();
+          if (wsLastHeartbeat.current && (now - wsLastHeartbeat.current) > 60000) {
+            console.warn('[WebSocket] Heartbeat timeout, forcing reconnection');
+            wsRef.current.close(1000, 'Heartbeat timeout');
+          }
+        } catch (err) {
+          console.error('[WebSocket] Error sending heartbeat:', err);
+        }
+      }
+    }, 30000); // Send heartbeat every 30 seconds
+  }, []);
+  
+  const stopHeartbeat = useCallback(() => {
+    if (wsHeartbeatInterval.current) {
+      clearInterval(wsHeartbeatInterval.current);
+      wsHeartbeatInterval.current = null;
+    }
+  }, []);
 
   // Start polling for updates with coordinated intervals
   const startPolling = useCallback(() => {

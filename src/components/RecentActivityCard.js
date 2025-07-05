@@ -10,7 +10,7 @@ import { getRelativeTime } from '../services/activityService';
 const RecentActivityCard = ({ 
   maxItems = 5, 
   showFullHistory = true,
-  refreshInterval = 3000, // 3 seconds for instant updates
+  refreshInterval = 500, // 500ms for instant updates
   className = "",
   style = {}
 }) => {
@@ -22,6 +22,7 @@ const RecentActivityCard = ({
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [showTodayOnly, setShowTodayOnly] = useState(true);
 
   // Fetch recent activity data
   const fetchRecentActivity = async () => {
@@ -110,6 +111,9 @@ const RecentActivityCard = ({
       console.log('- Orders count:', orders.length);
       console.log('- Transactions count (after merge and filter):', recentTransactions.length);
       console.log('- All Transactions (before filter):', transactions.length);
+      console.log('- Sample transaction:', recentTransactions[0]);
+      console.log('- Orders data:', orders.slice(0, 2));
+      console.log('- Recent transactions data:', recentTransactions.slice(0, 2));
 
       // Create comprehensive activity list
 let allActivities = [];
@@ -119,14 +123,25 @@ let allActivities = [];
       let orderHistory = [];
       let refunds = [];
 
+      // Get today's date as a string (local timezone)
+      const today = new Date().toISOString().split('T')[0];
+      console.log('RecentActivityCard: Today\'s date for filtering:', today);
+
       // Process orders into activities
       orders.forEach(order => {
+        // Validate timestamp before processing
+        const orderTimestamp = order.created_at || order.date || new Date().toISOString();
+        if (!isValidTimestamp(orderTimestamp)) {
+          console.warn('Invalid order timestamp:', order.created_at, 'for order:', order.id);
+          return; // Skip this order
+        }
+        
         // Order creation activity
         allActivities.push({
           id: `order-created-${order.id}`,
           type: 'order_created',
           eventType: 'order',
-          timestamp: order.created_at,
+          timestamp: orderTimestamp,
           orderId: order.id,
           orderNumber: order.order_number || order.id,
           title: `Order #${order.order_number || order.id} Created`,
@@ -145,11 +160,17 @@ let allActivities = [];
 
         // Order status change activity (if status is not initial)
         if (order.status && order.status !== 'Pending' && order.updated_at !== order.created_at) {
+          const statusTimestamp = order.updated_at || order.created_at || new Date().toISOString();
+          if (!isValidTimestamp(statusTimestamp)) {
+            console.warn('Invalid status timestamp:', statusTimestamp, 'for order:', order.id);
+            return; // Skip this status change
+          }
+          
           allActivities.push({
             id: `order-status-${order.id}-${order.status}`,
             type: 'order_status_changed',
             eventType: 'order',
-            timestamp: order.updated_at || order.created_at,
+            timestamp: statusTimestamp,
             orderId: order.id,
             orderNumber: order.order_number || order.id,
             title: `Order #${order.order_number || order.id} ${getStatusDisplayText(order.status)}`,
@@ -170,6 +191,13 @@ let allActivities = [];
 
       // Process all transactions into detailed activities
       recentTransactions.forEach(transaction => {
+        // Validate timestamp before processing
+        const transactionTimestamp = transaction.created_at || transaction.date || transaction.timestamp || new Date().toISOString();
+        if (!isValidTimestamp(transactionTimestamp)) {
+          console.warn('Invalid transaction timestamp:', transaction.created_at, 'for transaction:', transaction.id);
+          return; // Skip this transaction
+        }
+        
         const isRefund = isRefundTransaction(transaction);
         const activityType = getTransactionActivityType(transaction);
         
@@ -177,7 +205,7 @@ let allActivities = [];
           id: `transaction-${transaction.id}`,
           type: activityType,
           eventType: 'payment',
-          timestamp: transaction.created_at,
+          timestamp: transactionTimestamp,
           transactionId: transaction.id,
           orderId: transaction.order_id || transaction.order,
           orderNumber: transaction.order_number || transaction.order_id,
@@ -272,10 +300,30 @@ let allActivities = [];
 
       // Sort all activities by timestamp (newest first) and limit
       allActivities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-      const mergedActivities = allActivities.slice(0, maxItems);
+// Filter activities to only include today's (if enabled)
+      let filteredActivities = allActivities;
+      
+      if (showTodayOnly) {
+        filteredActivities = allActivities.filter(activity => {
+          const activityDate = new Date(activity.timestamp).toISOString().split('T')[0];
+          const isToday = activityDate === today;
+          
+          // Debug log for each activity
+          if (activity.eventType === 'payment') {
+            console.log(`Transaction ${activity.id}: ${activity.timestamp} -> ${activityDate} (today: ${today}) = ${isToday}`);
+          }
+          
+          return isToday;
+        });
+      }
+
+      const mergedActivities = filteredActivities.slice(0, maxItems);
       
       console.log('RecentActivityCard: Final activities:', mergedActivities);
-      console.log('RecentActivityCard: Total activities found:', allActivities.length);
+      console.log('RecentActivityCard: Total activities found (before filtering):', allActivities.length);
+      console.log('RecentActivityCard: Filtered activities found:', filteredActivities.length);
+      console.log('RecentActivityCard: Sample activities:', allActivities.slice(0, 3));
+      console.log('RecentActivityCard: Show today only:', showTodayOnly);
 
       setActivities(mergedActivities);
       setLastUpdated(new Date());
@@ -391,14 +439,21 @@ let allActivities = [];
       <Card.Header className="d-flex justify-content-between align-items-center">
         <span>
           <i className="bi bi-clock-history me-2"></i>
-          Recent Activity
+          Recent Activity {showTodayOnly ? '(Today)' : '(All)'}
         </span>
         <div className="d-flex align-items-center gap-2">
           {lastUpdated && (
             <small className="text-light opacity-75">
-              Updated {getRelativeTime(lastUpdated.toISOString())}
+              Updated {getSafeRelativeTime(lastUpdated.toISOString())}
             </small>
           )}
+          <button 
+            className={`btn btn-sm ${showTodayOnly ? 'btn-outline-light' : 'btn-outline-warning'}`}
+            onClick={() => setShowTodayOnly(!showTodayOnly)}
+            title={showTodayOnly ? 'Show all activities' : 'Show today only'}
+          >
+            <i className={`bi ${showTodayOnly ? 'bi-calendar-day' : 'bi-calendar'}`}></i>
+          </button>
           <button 
             className="btn btn-sm btn-outline-light"
             onClick={handleRefresh}
@@ -445,7 +500,7 @@ let allActivities = [];
                         {activity.description}
                       </div>
                       <div className="text-muted" style={{ fontSize: '0.75rem' }}>
-                        {getRelativeTime(activity.timestamp)}
+                        {getSafeRelativeTime(activity.timestamp)}
                       </div>
                     </div>
                     
@@ -780,6 +835,35 @@ const getOrderStatusColor = (status) => {
     'Cancelled': '#f44336'
   };
   return colors[status] || '#666';
+};
+
+/**
+ * Helper function to validate timestamp
+ */
+const isValidTimestamp = (timestamp) => {
+  if (!timestamp) return false;
+  const date = new Date(timestamp);
+  return !isNaN(date.getTime());
+};
+
+/**
+ * Safe version of getRelativeTime with error handling
+ */
+const getSafeRelativeTime = (timestamp) => {
+  try {
+    if (!timestamp) return 'Unknown time';
+    
+    const date = new Date(timestamp);
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid timestamp for relative time:', timestamp);
+      return 'Invalid time';
+    }
+    
+    return getRelativeTime(timestamp);
+  } catch (error) {
+    console.error('Error calculating relative time:', error, 'for timestamp:', timestamp);
+    return 'Time error';
+  }
 };
 
 /**

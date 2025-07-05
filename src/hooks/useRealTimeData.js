@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import pollingManager from '../utils/pollingManager';
 
 /**
  * Custom hook for real-time data updates with automatic refresh
@@ -7,12 +8,12 @@ import { useState, useEffect, useCallback, useRef } from 'react';
  * @param {boolean} enabled - Whether auto-refresh is enabled
  * @returns {Object} { data, loading, error, refreshData, lastUpdated }
  */
-export const useRealTimeData = (fetchFunction, refreshInterval = 30000, enabled = true) => {
+export const useRealTimeData = (fetchFunction, refreshInterval = 5000, enabled = true) => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
-  const intervalRef = useRef(null);
+  const pollerIdRef = useRef(null);
   const isMountedRef = useRef(true);
 
   const refreshData = useCallback(async (showLoadingSpinner = false) => {
@@ -48,46 +49,49 @@ export const useRealTimeData = (fetchFunction, refreshInterval = 30000, enabled 
     refreshData(true);
   }, [refreshData]);
 
-  // Set up automatic refresh
+  // Set up automatic refresh using polling manager
   useEffect(() => {
     if (!enabled || refreshInterval <= 0) {
       return;
     }
 
-    const startInterval = () => {
-      intervalRef.current = setInterval(() => {
-        refreshData(false); // Silent refresh without loading spinner
-      }, refreshInterval);
-    };
+    // Generate unique poller ID
+    const pollerId = `realtime_data_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    pollerIdRef.current = pollerId;
 
-    // Start the interval
-    startInterval();
-
-    // Handle visibility change - pause when tab is hidden, resume when visible
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        // Tab is hidden, clear interval
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-          intervalRef.current = null;
+    // Register with polling manager
+    const poller = pollingManager.register(pollerId, {
+      fetchFunction: async () => {
+        console.log(`[useRealTimeData] Executing poll for ${pollerId}`);
+        await refreshData(false); // Silent refresh without loading spinner
+        return 'success';
+      },
+      interval: refreshInterval,
+      onUpdate: (data) => {
+        console.log(`[useRealTimeData] Poll update for ${pollerId}`);
+        // Data is already handled in refreshData
+      },
+      onError: (error) => {
+        console.error('Polling manager error for', pollerId, ':', error);
+        if (isMountedRef.current) {
+          setError(error.message || 'Failed to fetch data');
         }
-      } else {
-        // Tab is visible, restart interval and refresh immediately
-        if (!intervalRef.current) {
-          refreshData(false);
-          startInterval();
-        }
-      }
-    };
+      },
+      maxRetries: 3,
+      backoffMultiplier: 1.5
+    });
+    
+    console.log(`[useRealTimeData] Successfully registered poller ${pollerId}:`, poller);
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    console.log(`[useRealTimeData] Registered poller ${pollerId} with ${refreshInterval}ms interval`);
 
     // Cleanup function
     return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
+      if (pollerIdRef.current) {
+        pollingManager.unregister(pollerIdRef.current);
+        console.log(`[useRealTimeData] Unregistered poller ${pollerIdRef.current}`);
+        pollerIdRef.current = null;
       }
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [enabled, refreshInterval, refreshData]);
 
@@ -95,8 +99,9 @@ export const useRealTimeData = (fetchFunction, refreshInterval = 30000, enabled 
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
+      if (pollerIdRef.current) {
+        pollingManager.unregister(pollerIdRef.current);
+        pollerIdRef.current = null;
       }
     };
   }, []);
@@ -116,7 +121,7 @@ export const useRealTimeData = (fetchFunction, refreshInterval = 30000, enabled 
  * @param {number} refreshInterval - Refresh interval in milliseconds
  * @returns {Object} Orders data with real-time updates
  */
-export const useRealTimeOrders = (refreshInterval = 30000) => {
+export const useRealTimeOrders = (refreshInterval = 3000) => {
   const fetchOrders = useCallback(async () => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -144,7 +149,7 @@ export const useRealTimeOrders = (refreshInterval = 30000) => {
  * @param {number} refreshInterval - Refresh interval in milliseconds
  * @returns {Object} Transactions data with real-time updates
  */
-export const useRealTimeTransactions = (refreshInterval = 30000) => {
+export const useRealTimeTransactions = (refreshInterval = 5000) => {
   const fetchTransactions = useCallback(async () => {
     const token = localStorage.getItem('token');
     if (!token) {
@@ -172,7 +177,7 @@ export const useRealTimeTransactions = (refreshInterval = 30000) => {
  * @param {number} refreshInterval - Refresh interval in milliseconds
  * @returns {Object} Dashboard stats with real-time updates
  */
-export const useRealTimeDashboardStats = (refreshInterval = 60000) => {
+export const useRealTimeDashboardStats = (refreshInterval = 4000) => {
   const fetchDashboardStats = useCallback(async () => {
     const token = localStorage.getItem('token');
     if (!token) {
