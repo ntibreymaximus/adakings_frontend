@@ -13,7 +13,6 @@ import {
     formatPaymentError
 } from '../services/paymentService';
 import { API_BASE_URL } from '../utils/api';
-import PullToRefreshWrapper from './PullToRefreshWrapper';
 
 // Optimized ViewOrdersPage with instant loading
 const ViewOrdersPage = memo(() => {
@@ -878,13 +877,6 @@ const ViewOrdersPage = memo(() => {
 
 
   return (
-    <PullToRefreshWrapper 
-      onRefresh={async () => {
-        await fetchOrders(false); // Don't show loading spinner for refresh
-        toast.success('Orders updated');
-      }}
-      enabled={isMobile}
-    >
       <Container className="my-3 my-md-4 px-3 px-md-4">
         {/* Return to Dashboard Button */}
         <div className="mb-3">
@@ -2395,7 +2387,6 @@ const ViewOrdersPage = memo(() => {
         </Modal.Footer>
       </Modal>
       </Container>
-    </PullToRefreshWrapper>
   );
 });
 

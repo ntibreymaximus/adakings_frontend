@@ -1,0 +1,138 @@
+/* Offline Banner Styles */
+.offline-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background-color: #dc3545;
+  color: white;
+  padding: 8px 16px;
+  z-index: 10000;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  font-size: 14px;
+  text-align: center;
+}
+
+.offline-banner-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Adjust main content when offline banner is visible */
+body.offline-mode {
+  padding-top: 40px;
+}
+
+/* Connection Toast Styles */
+.connection-toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 12px 20px;
+  border-radius: 8px;
+  color: white;
+  font-weight: 500;
+  z-index: 9999;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: slideInRight 0.3s ease-out;
+  min-width: 280px;
+  max-width: 400px;
+}
+
+.connection-toast.offline {
+  background-color: #dc3545;
+  border-left: 4px solid #a71e2a;
+}
+
+.connection-toast.online {
+  background-color: #28a745;
+  border-left: 4px solid #1e7e34;
+}
+
+.toast-content {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+}
+
+/* Animations */
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .offline-banner {
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+  
+  .connection-toast {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    min-width: auto;
+    max-width: none;
+  }
+  
+  .toast-content {
+    font-size: 13px;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .offline-banner {
+    border: 2px solid #fff;
+  }
+  
+  .connection-toast {
+    border: 2px solid #fff;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .connection-toast {
+    animation: none;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .offline-banner {
+    background-color: #721c24;
+    border-bottom: 1px solid #dc3545;
+  }
+  
+  .connection-toast.offline {
+    background-color: #721c24;
+    border-left-color: #dc3545;
+  }
+  
+  .connection-toast.online {
+    background-color: #155724;
+    border-left-color: #28a745;
+  }
+}

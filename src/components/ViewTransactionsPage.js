@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Container, Table, Card, Alert, Spinner, Button, Badge, Row, Col, Modal, Form } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import optimizedToast, { contextToast } from '../utils/toastUtils';
 import { useAuth } from '../contexts/AuthContext';
 import { API_BASE_URL } from '../utils/api';
 import { 
   formatTransactionId, 
   getShortTransactionId
 } from '../utils/transactionUtils';
-import PullToRefreshWrapper from './PullToRefreshWrapper';
 const ViewTransactionsPage = () => {
     const { logout } = useAuth();
     const navigate = useNavigate();
@@ -235,14 +235,6 @@ const ViewTransactionsPage = () => {
     }
 
   return (
-    <PullToRefreshWrapper 
-      onRefresh={async () => {
-        contextToast.dataRefreshed();
-        setLoading(true);
-        await fetchTransactions();
-      }}
-      enabled={isMobile}
-    >
       <Container className="mt-4">
         <div className="mb-3">
           <Button
@@ -718,7 +710,6 @@ const ViewTransactionsPage = () => {
         </Modal.Footer>
       </Modal>
       </Container>
-    </PullToRefreshWrapper>
   );
 };
 

@@ -3,7 +3,6 @@ import { Container, Row, Col, Card } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import optimizedToast, { contextToast } from '../utils/toastUtils';
 import RecentActivityCard from './RecentActivityCard';
-import PullToRefreshWrapper from './PullToRefreshWrapper';
 
 const DashboardPage = ({ userData }) => {
   const navigate = useNavigate();
@@ -66,10 +65,6 @@ const DashboardPage = ({ userData }) => {
   ];
 
   return (
-    <PullToRefreshWrapper 
-      onRefresh={handleRefresh}
-      enabled={isMobile}
-    >
       <Container className="my-3 my-md-4 px-3 px-md-4">
         <Row className="g-3 g-md-4">
         {dashboardItems.map((item) => (
@@ -104,7 +99,6 @@ const DashboardPage = ({ userData }) => {
         </Col>
         </Row>
       </Container>
-    </PullToRefreshWrapper>
   );
 };
 

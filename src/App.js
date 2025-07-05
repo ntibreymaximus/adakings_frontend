@@ -1,7 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { PWAProvider, usePWA } from './contexts/PWAContext';
 import { setAuthContext, setupAutoLogoutTimer, setupVisibilityCheck } from './utils/authInterceptor';
+import { initializeOfflineServices } from './utils/serviceWorkerRegistration';
 import LoginPage from './components/LoginPage';
 import UserProfilePage from './components/UserProfilePage';
 import DashboardPage from './components/DashboardPage';
@@ -13,16 +15,29 @@ import ViewTransactionsPage from './components/ViewTransactionsPage';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Navbar from './components/Navbar';
+import BottomNavBar from './components/BottomNavBar';
+import PWAStatusIndicator from './components/PWAStatusIndicator';
+import PWAInstallPrompt from './components/PWAInstallPrompt';
+import PWAUpdateNotification from './components/PWAUpdateNotification';
+import PWAManager from './components/PWAManager';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './styles/theme.css';
+import './styles/pwa.css';
 import './App.css';
 import './utils/cleanupPWA'; // Clean up any remaining PWA data
 
 // Inner App component that uses authentication context
 function AppContent() {
   const { userData, logout, checkTokenValidity } = useAuth();
+  const { 
+    shouldShowBottomNav, 
+    shouldHideStandardNav, 
+    getPWAClasses
+  } = usePWA();
+  
+  const [showPWAManager, setShowPWAManager] = useState(false);
 
   // Setup global authentication interceptor
   useEffect(() => {
@@ -42,10 +57,28 @@ function AppContent() {
     };
   }, [userData, logout, checkTokenValidity]);
 
+  // Initialize offline services
+  useEffect(() => {
+    initializeOfflineServices();
+  }, []);
+
+  // Setup keyboard shortcut for PWA manager (Ctrl+Shift+P)
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.ctrlKey && event.shiftKey && event.key === 'P') {
+        event.preventDefault();
+        setShowPWAManager(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   return (
-    <div className="App">
-      {/* Standard web navigation */}
-      {userData && <Navbar userData={userData} onLogout={() => logout('manual')} />}
+    <div className={`App ${getPWAClasses()}`}>
+      {/* Conditional navigation based on PWA mode */}
+      {userData && !shouldHideStandardNav() && <Navbar userData={userData} onLogout={() => logout('manual')} />}
       
       <Routes>
         <Route 
@@ -83,6 +116,24 @@ function AppContent() {
         <Route path="*" element={<Navigate to={userData ? "/dashboard" : "/login"} />} /> 
       </Routes>
       
+      {/* PWA-specific bottom navigation */}
+      {userData && shouldShowBottomNav() && <BottomNavBar />}
+      
+      {/* PWA status indicator */}
+      <PWAStatusIndicator />
+      
+      {/* PWA Install Prompt */}
+      <PWAInstallPrompt />
+      
+      {/* PWA Update Notification */}
+      <PWAUpdateNotification />
+      
+      {/* PWA Manager Modal */}
+      <PWAManager 
+        isVisible={showPWAManager} 
+        onClose={() => setShowPWAManager(false)} 
+      />
+      
       <ToastContainer
         position="top-right"
         autoClose={3000}
@@ -102,11 +153,13 @@ function AppContent() {
   );
 }
 
-// Main App component wrapped with AuthProvider
+// Main App component wrapped with AuthProvider and PWAProvider
 function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <PWAProvider>
+        <AppContent />
+      </PWAProvider>
     </AuthProvider>
   );
 }

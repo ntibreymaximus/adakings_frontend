@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { API_BASE_URL } from '../utils/api';
 import { tokenFetch } from '../utils/tokenFetch';
-import PullToRefreshWrapper from './PullToRefreshWrapper';
 import { menuCacheService } from '../services/menuCacheService';
 
 const ViewMenuPage = () => {
@@ -148,14 +147,6 @@ const ViewMenuPage = () => {
   };
 
   return (
-    <PullToRefreshWrapper 
-      onRefresh={async () => {
-        toast.info('Refreshing menu items...');
-        setLoading(true);
-        await fetchMenuItems(true); // Force refresh from server
-      }}
-      enabled={isMobile}
-    >
       <Container className="my-3 my-md-4 px-3 px-md-4">
         {/* Return to Dashboard Button */}
         <div className="mb-3">
@@ -307,7 +298,6 @@ const ViewMenuPage = () => {
         </Card.Body>
       </Card>
       </Container>
-    </PullToRefreshWrapper>
   );
 };
 

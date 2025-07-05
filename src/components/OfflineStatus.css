@@ -1,0 +1,348 @@
+/* Enhanced Offline Status Component Styles */
+
+.offline-status {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  padding: 1rem;
+  margin: 0.5rem 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.offline-status:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+/* Connection Status */
+.connection-status {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+}
+
+.connection-status.online .status-indicator {
+  color: #28a745;
+}
+
+.connection-status.offline .status-indicator {
+  color: #dc3545;
+}
+
+.connection-status.online .status-indicator i {
+  animation: pulse-green 2s infinite;
+}
+
+.connection-status.offline .status-indicator i {
+  animation: pulse-red 2s infinite;
+}
+
+.offline-message {
+  margin-left: 1.25rem;
+  color: #6c757d;
+}
+
+/* Sync Status */
+.sync-status {
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  padding-top: 1rem;
+  margin-bottom: 1rem;
+}
+
+.sync-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-weight: 500;
+  color: #495057;
+}
+
+.sync-spinner {
+  margin-left: auto;
+}
+
+.rotating {
+  animation: spin 1s linear infinite;
+}
+
+.sync-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pending-operations {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.retry-operations {
+  color: #856404;
+}
+
+/* Cache Status */
+.cache-status {
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  padding-top: 1rem;
+  margin-bottom: 1rem;
+}
+
+.cache-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-weight: 500;
+  color: #495057;
+}
+
+.cache-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.cache-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.25rem 0;
+}
+
+.stat-label {
+  font-size: 0.875rem;
+  color: #6c757d;
+}
+
+.stat-value {
+  font-weight: 500;
+  color: #495057;
+}
+
+/* Offline Capabilities */
+.offline-capabilities {
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  padding-top: 1rem;
+  margin-bottom: 1rem;
+}
+
+.capabilities-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-weight: 500;
+  color: #495057;
+}
+
+.capabilities-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.capability-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+  font-size: 0.875rem;
+}
+
+.service-worker-status,
+.background-sync-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+/* Operation History */
+.operation-history {
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  padding-top: 1rem;
+}
+
+.history-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-weight: 500;
+  color: #495057;
+}
+
+.operations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.operation-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+
+.operation-type {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.operation-status {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.retry-count {
+  color: #856404;
+  font-size: 0.75rem;
+}
+
+.operation-time {
+  color: #6c757d;
+  font-size: 0.75rem;
+}
+
+/* Animations */
+@keyframes pulse-green {
+  0%, 100% {
+    opacity: 1;
+    color: #28a745;
+  }
+  50% {
+    opacity: 0.6;
+    color: #20c997;
+  }
+}
+
+@keyframes pulse-red {
+  0%, 100% {
+    opacity: 1;
+    color: #dc3545;
+  }
+  50% {
+    opacity: 0.6;
+    color: #fd7e14;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .offline-status {
+    padding: 0.75rem;
+    margin: 0.25rem 0;
+  }
+  
+  .cache-details {
+    grid-template-columns: 1fr;
+  }
+  
+  .operation-item {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+  
+  .operation-status,
+  .operation-time {
+    justify-self: start;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .offline-status {
+    background: rgba(33, 37, 41, 0.95);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #f8f9fa;
+  }
+  
+  .sync-header,
+  .cache-header,
+  .capabilities-header,
+  .history-header {
+    color: #e9ecef;
+  }
+  
+  .stat-label,
+  .operation-time {
+    color: #adb5bd;
+  }
+  
+  .stat-value {
+    color: #e9ecef;
+  }
+  
+  .operation-item {
+    background: rgba(255, 255, 255, 0.05);
+  }
+  
+  .offline-message {
+    color: #adb5bd;
+  }
+}
+
+/* Compact mode for mobile */
+.offline-status.compact {
+  padding: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.offline-status.compact .connection-status {
+  margin-bottom: 0.5rem;
+}
+
+.offline-status.compact .sync-status,
+.offline-status.compact .cache-status,
+.offline-status.compact .offline-capabilities,
+.offline-status.compact .operation-history {
+  padding-top: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Floating mode for overlays */
+.offline-status.floating {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1050;
+  max-width: 320px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+@media (max-width: 576px) {
+  .offline-status.floating {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    max-width: none;
+  }
+}
