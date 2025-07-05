@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Form, Button, Container, Row, Col, Card, ListGroup, Modal } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import optimizedToast, { contextToast } from '../utils/toastUtils';
 import { API_ENDPOINTS } from '../utils/api';
 import { apiFirstService } from '../services/apiFirstService';
 import { menuCacheService } from '../services/menuCacheService';
@@ -402,7 +402,7 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
   const handleFinalSubmit = async () => {
     // Prevent multiple submissions
     if (isSubmitting) {
-      toast.warning(`Order is being ${isEditMode ? 'updated' : 'processed'}, please wait...`);
+      contextToast.operationPending();
       return;
     }
 
@@ -412,7 +412,7 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
     // Fast pre-validation before setting loading state
     const preValidationItems = Object.entries(selectedItems).filter(([, quantity]) => quantity > 0);
     if (preValidationItems.length === 0) {
-      toast.error('Please add at least one item to the order');
+      contextToast.formValidation('Items');
       return;
     }
     
@@ -491,14 +491,7 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
       const actionText = isEditMode ? 'updated' : 'created';
       const locationText = deliveryType === 'Delivery' && deliveryLocation ? ` to ${deliveryLocation === 'Other' ? (customLocationName || 'Custom Location') : deliveryLocation}` : '';
       
-      toast.success(`🎉 Order ${result.order_number} ${actionText}! Total: ₵${grandTotal.toFixed(2)} | ${deliveryType}${locationText}`, {
-        position: "top-right",
-        autoClose: 3000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-      });
+      optimizedToast.success(`Order ${result.order_number} ${actionText} - ₵${grandTotal.toFixed(2)}`);
       
       // Clear form only if creating new order
       if (!isEditMode) {
@@ -523,7 +516,7 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
       navigate('/view-orders');
     } catch (error) {
       console.error('🚨 Network/Request Error:', error);
-      toast.error(`Error ${isEditMode ? 'updating' : 'creating'} order. Please try again.`);
+      optimizedToast.error(`Error ${isEditMode ? 'updating' : 'creating'} order`);
     } finally {
       // Always re-enable the button after the request completes
       setIsSubmitting(false);

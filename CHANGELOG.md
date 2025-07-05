@@ -2,6 +2,52 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.0] - 2025-07-05
+
+### 🔧 Feature Development
+
+**📋 Release Information:**
+- **Environment**: feature/toastupgrade
+- **Branch**: `feature/toastupgrade-2.1.0`
+- **Version**: `2.1.0`
+- **Deployment Time**: 2025-07-05 20:21:30
+- **Description**: React feature branch for 'toastupgrade' development (no build)
+
+**📝 Changes Made:**
+React v2.1.0: Deploy to feature/toastupgrade environment
+
+**📁 Files Modified:**
+  - Modified: `ERSION`
+  - Modified: `package.json`
+  - Modified: `src/App.css`
+  - Modified: `src/App.js`
+  - Modified: `src/components/DashboardPage.js`
+  - Modified: `src/components/ViewOrdersPage.js`
+  - Modified: `src/components/ViewTransactionsPage.js`
+  - Modified: `src/contexts/AuthContext.js`
+  - Modified: `src/pages/CreateOrderForm.js`
+  - Changed: `TOAST_OPTIMIZATION.md`
+  - Changed: `src/utils/toastUtils.js`
+
+**🔄 React Build Details:**
+- **Build Process**: No build process (development only) (4.78 MB, 2 JS files, 1 CSS files)
+- **Environment**: feature/toastupgrade
+- **Optimization**: Disabled
+- **Source Maps**: Enabled
+
+**🔄 Deployment Details:**
+- **Source Branch**: `feature/toastupgrade-2.1.0`
+- **Target Branch**: `feature/toastupgrade-2.1.0`
+- **Merge Strategy**: Automatic merge with main branch
+
+**🎯 React Environment Notes:**
+- React feature branch for component development and testing
+- No build process (fastest deployment for development)
+- Changes are isolated and will be merged after review
+- Use `npm start` for local development server
+
+---
+
 ## [2.0.1] - 2025-07-05
 
 ### 🔧 Feature Development

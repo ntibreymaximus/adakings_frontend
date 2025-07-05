@@ -237,7 +237,7 @@ const ViewTransactionsPage = () => {
   return (
     <PullToRefreshWrapper 
       onRefresh={async () => {
-        toast.info('Refreshing transactions...');
+        contextToast.dataRefreshed();
         setLoading(true);
         await fetchTransactions();
       }}

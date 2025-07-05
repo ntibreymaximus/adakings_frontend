@@ -85,16 +85,17 @@ function AppContent() {
       
       <ToastContainer
         position="top-right"
-        autoClose={5000}
-        hideProgressBar={false}
-        newestOnTop={false}
+        autoClose={3000}
+        hideProgressBar={true}
+        newestOnTop={true}
         closeOnClick
         rtl={false}
         pauseOnFocusLoss={false}
         draggable
-        pauseOnHover
-        toastClassName="toast-custom"
-        bodyClassName="toast-body-custom"
+        pauseOnHover={false}
+        limit={3}
+        toastClassName="toast-optimized"
+        bodyClassName="toast-body-optimized"
         style={{ zIndex: 9999 }}
       />
     </div>

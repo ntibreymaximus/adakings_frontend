@@ -1,7 +1,7 @@
 import React, { useState, useEffect, memo, useMemo, useCallback, useRef } from 'react';
 import { Container, Table, Card, Modal, Form, Button, Row, Col } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import optimizedToast, { contextToast } from '../utils/toastUtils';
 import { useAuth } from '../contexts/AuthContext';
 import {
     validateGhanaianMobileNumber,
@@ -154,7 +154,7 @@ const ViewOrdersPage = memo(() => {
                 errorMessage = `Server error (${error.message}). Please try again.`;
             }
             
-            toast.error(errorMessage);
+            optimizedToast.error(errorMessage);
         } finally {
             if (showLoader) {
                 setLoading(false);
@@ -309,7 +309,7 @@ const ViewOrdersPage = memo(() => {
 
     const handleUpdateStatus = async () => {
         if (!selectedOrder || !newStatus) {
-            toast.error('Please select a status');
+            contextToast.formValidation('Status');
             return;
         }
         
@@ -326,7 +326,7 @@ const ViewOrdersPage = memo(() => {
   const performStatusUpdate = async () => {
     // Prevent multiple status updates
     if (isUpdatingStatus) {
-      toast.warning('Status update is in progress, please wait...');
+      optimizedToast.warning('Update in progress');
       return;
     }
 
@@ -345,7 +345,7 @@ const ViewOrdersPage = memo(() => {
       if (isDeliveryOrder) {
         // For delivery orders: payment only required for "Fulfilled" status
         if (newStatus === 'Fulfilled' && !isPaymentConfirmed) {
-          toast.error('Cannot mark delivery order as "Fulfilled" - Payment must be fully confirmed first.');
+          optimizedToast.error('Payment required for fulfillment');
           return;
         }
       } else {
@@ -355,19 +355,19 @@ const ViewOrdersPage = memo(() => {
         
         if (isRestrictedStatus) {
           if (hasNoPayment) {
-            toast.error(`Cannot update pickup order to "${newStatus}" - Payment required. Please process payment first.`);
+            optimizedToast.error('Payment required');
             return;
           }
           if (hasPendingPayment) {
-            toast.error(`Cannot update pickup order to "${newStatus}" - Payment is still pending. Please wait for payment confirmation.`);
+            optimizedToast.error('Payment pending');
             return;
           }
           if (isPartiallyPaid && newStatus === 'Fulfilled') {
-            toast.error('Cannot mark pickup order as "Fulfilled" - Full payment required.');
+            optimizedToast.error('Full payment required');
             return;
           }
           if (isPartiallyPaid) {
-            toast.warning(`Pickup order is only partially paid. Proceeding to "${newStatus}".`);
+            optimizedToast.warning('Partially paid order');
             // Allow but warn for partially paid orders (except Fulfilled)
           }
         }
@@ -406,7 +406,7 @@ const ViewOrdersPage = memo(() => {
         setFilteredOrders(updatedFilteredOrders);
         
         
-        toast.success(`Order status updated to ${newStatus}`);
+        contextToast.orderUpdated(newStatus);
         
         setShowStatusModal(false);
         setSelectedOrder(null);
@@ -441,10 +441,10 @@ const ViewOrdersPage = memo(() => {
           }
         }
         
-        toast.error(errorMessage);
+        optimizedToast.error(errorMessage);
       }
     } catch (error) {
-      toast.error('Network error: Could not update order status');
+      optimizedToast.networkError();
     } finally {
       // Always re-enable status updates
       setIsUpdatingStatus(false);
@@ -453,13 +453,13 @@ const ViewOrdersPage = memo(() => {
 
   const handleUpdatePayment = async () => {
     if (!selectedOrder || !newPaymentMode || !paymentAmount) {
-      toast.error('Please select payment mode and enter amount');
+      contextToast.formValidation('Payment details');
       return;
     }
 
     const amount = parseFloat(paymentAmount);
     if (isNaN(amount) || amount <= 0) {
-      toast.error('Please enter a valid payment amount');
+      contextToast.formValidation('Valid amount');
       return;
     }
 
@@ -469,7 +469,7 @@ const ViewOrdersPage = memo(() => {
     const confirmPayment = async () => {
         // Prevent duplicate payment processing
         if (isProcessingPayment) {
-            toast.warning('Payment is already being processed, please wait...');
+            contextToast.operationPending();
             return;
         }
         
@@ -491,14 +491,14 @@ const ViewOrdersPage = memo(() => {
             // Add mobile number only for PAYSTACK(API) - the only true mobile money payment
             if (newPaymentMode === 'PAYSTACK(API)') {
                 if (!mobileNumber || mobileNumber.trim() === '') {
-                    toast.error('Mobile number is required for Paystack API payments');
+                    contextToast.formValidation('Mobile number');
                     return;
                 }
                 
                 // Validate mobile number using utility function
                 const validation = validateGhanaianMobileNumber(mobileNumber);
                 if (!validation.isValid) {
-                    toast.error(validation.message);
+                    optimizedToast.error(validation.message);
                     return;
                 }
                 
@@ -512,47 +512,46 @@ const ViewOrdersPage = memo(() => {
                 if (newPaymentMode === 'PAYSTACK(API)') {
                     // For Paystack API payments, handle authorization URL
                     if (paymentResponse.authorization_url) {
-                        toast.success('Payment initiated successfully!');
-                        toast.info('Redirecting to Paystack for payment...');
+                        optimizedToast.success('Payment initiated');
+                        optimizedToast.info('Redirecting to Paystack');
                         
                         // Open Paystack payment window using utility function
                         openPaymentWindow(
                             paymentResponse.authorization_url,
                             async (paymentData) => {
                                 // Payment success callback
-                                toast.success('Payment completed successfully!');
+                                optimizedToast.success('Payment completed');
                                 await refreshOrderData();
                             },
                             async () => {
                                 // Payment window closed callback
-                                toast.info('Payment window closed. Refreshing order status...');
+                                optimizedToast.info('Refreshing status');
                                 await refreshOrderData();
                             }
                         );
                     } else {
-                        toast.warning('Payment initiated but no authorization URL received. Please check with payment provider.');
+                        optimizedToast.warning('Payment initiated - check provider');
                     }
             } else {
                 // For cash, Telecel Cash, MTN MoMo, PAYSTACK(USSD) - payment is processed immediately
                 if (isRefundMode) {
-                    toast.success(`Refund of ₵${amount.toFixed(2)} processed via ${getPaymentModeDisplay(newPaymentMode)}`);
-                    toast.info('Cash refund completed. Please provide the refund amount to the customer.');
+                    contextToast.refundProcessed(amount.toFixed(2));
                     
                     // Show transaction details
                     if (paymentResponse.custom_transaction_id) {
-                        toast.info(`Transaction ID: ${paymentResponse.formatted_transaction_id || paymentResponse.custom_transaction_id}`);
+                        optimizedToast.info(`ID: ${paymentResponse.formatted_transaction_id || paymentResponse.custom_transaction_id}`);
                     }
                 } else {
-                    toast.success(`Payment of ₵${amount.toFixed(2)} received via ${getPaymentModeDisplay(newPaymentMode)}`);
+                    contextToast.paymentReceived(amount.toFixed(2), getPaymentModeDisplay(newPaymentMode));
                     
                     // Show transaction details
                     if (paymentResponse.custom_transaction_id) {
-                        toast.info(`Transaction ID: ${paymentResponse.formatted_transaction_id || paymentResponse.custom_transaction_id}`);
+                        optimizedToast.info(`ID: ${paymentResponse.formatted_transaction_id || paymentResponse.custom_transaction_id}`);
                     }
                     
                     // Check if this is a delivery order - it should auto-change to "Fulfilled" when payment confirmed
                     if (selectedOrder.delivery_type === 'Delivery') {
-                        toast.info('🚚 Payment confirmed! Delivery order automatically marked as "Fulfilled".');
+                        optimizedToast.info('🚚 Order fulfilled');
                     }
                 }
                 
@@ -571,7 +570,7 @@ const ViewOrdersPage = memo(() => {
                 setMobileNumber('');
         } catch (error) {
             const errorMessage = formatPaymentError(error);
-            toast.error(errorMessage);
+            optimizedToast.error(errorMessage);
         } finally {
             // Always re-enable payment processing
             setIsProcessingPayment(false);

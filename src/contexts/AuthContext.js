@@ -4,7 +4,7 @@
  */
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import optimizedToast, { contextToast } from '../utils/toastUtils';
 import { API_BASE_URL } from '../utils/api';
 
 const AuthContext = createContext();
@@ -86,19 +86,19 @@ export const AuthProvider = ({ children }) => {
       if (showMessage) {
         switch (reason) {
           case 'token_expired':
-            toast.error('Your session has expired. Please log in again.');
+            optimizedToast.error('Session expired');
             break;
           case 'token_invalid':
-            toast.error('Invalid session. Please log in again.');
+            optimizedToast.error('Invalid session');
             break;
           case 'unauthorized':
-            toast.error('Access denied. Please log in again.');
+            optimizedToast.authError();
             break;
           case 'manual':
-            toast.info('Successfully logged out.');
+            optimizedToast.success('Logged out');
             break;
           default:
-            toast.info('Session ended. Please log in again.');
+            optimizedToast.info('Session ended');
         }
       }
       
@@ -203,12 +203,12 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('token', data.access);
       localStorage.setItem('refreshToken', data.refresh);
       
-      toast.success(`Welcome back, ${data.user.username || data.user.email}!`);
+      optimizedToast.success(`Welcome ${data.user.username || data.user.email}`);
       navigate('/dashboard');
       
       return data;
     } catch (error) {
-      toast.error(error.message || 'Login failed. Please try again.');
+      optimizedToast.error(error.message || 'Login failed');
       throw error;
     } finally {
       setIsLoading(false);
@@ -222,7 +222,7 @@ export const AuthProvider = ({ children }) => {
       if (e.key === 'token' && e.newValue === null && userData) {
         // Token was removed in another tab
         setUserData(null);
-        toast.info('You have been logged out from another tab.');
+        optimizedToast.info('Logged out remotely');
         navigate('/login', { replace: true });
       }
     };

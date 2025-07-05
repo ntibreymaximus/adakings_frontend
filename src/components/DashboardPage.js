@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import optimizedToast, { contextToast } from '../utils/toastUtils';
 import RecentActivityCard from './RecentActivityCard';
 import PullToRefreshWrapper from './PullToRefreshWrapper';
 
@@ -24,7 +24,7 @@ const DashboardPage = ({ userData }) => {
 
   // Refresh function for pull-to-refresh
   const handleRefresh = async () => {
-    toast.info('Refreshing dashboard...');
+    contextToast.dataRefreshed();
     // Force refresh of RecentActivityCard by adding a small delay
     await new Promise(resolve => setTimeout(resolve, 500));
     // The RecentActivityCard component will handle its own refresh
