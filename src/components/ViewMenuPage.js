@@ -2,13 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Form, InputGroup, Spinner, Alert, Button, Card, Badge } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { useAuth } from '../contexts/AuthContext';
 import { API_BASE_URL } from '../utils/api';
+import { tokenFetch } from '../utils/tokenFetch';
 import PullToRefreshWrapper from './PullToRefreshWrapper';
 import { menuCacheService } from '../services/menuCacheService';
 
 const ViewMenuPage = () => {
-    const { logout, authenticatedFetch } = useAuth();
     const navigate = useNavigate();
     const [menuItems, setMenuItems] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -59,7 +58,7 @@ const ViewMenuPage = () => {
         fetchMenuItems();
         
         return () => window.removeEventListener('resize', handleResize);
-    }, [logout]);
+    }, []);
 
 
     // Filter menu items based on search and item type
@@ -124,7 +123,7 @@ const ViewMenuPage = () => {
   // Function to toggle menu item availability
   const toggleAvailability = async (itemId, currentStatus) => {
     try {
-      const response = await authenticatedFetch(`${API_BASE_URL}/menu/items/${itemId}/toggle-availability/`, {
+      const response = await tokenFetch(`${API_BASE_URL}/menu/items/${itemId}/toggle-availability/`, {
         method: 'PUT',
       });
 

@@ -215,79 +215,6 @@ export const AuthProvider = ({ children }) => {
     }
   }, [navigate]);
 
-  // Enhanced fetch with automatic token handling
-  const authenticatedFetch = useCallback(async (url, options = {}) => {
-    console.log('🔐 Authenticating request to:', url);
-    
-    // Check token validity before making request
-    const isValid = await checkTokenValidity();
-    if (!isValid) {
-      console.log('🚨 Authentication invalid, clearing data and redirecting to login');
-      
-      // Clear all auth data immediately
-      setUserData(null);
-      localStorage.removeItem('token');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('userData');
-      
-      // Force navigation to login
-      window.location.href = '/login';
-      
-      throw new Error('AUTHENTICATION_REQUIRED');
-    }
-
-    const token = localStorage.getItem('token');
-    const defaultOptions = {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-    };
-
-    try {
-      const response = await fetch(url, { ...defaultOptions, ...options });
-      
-      // Handle authentication errors
-      if (response.status === 401) {
-        console.log('🚨 Received 401, attempting token refresh');
-        try {
-          await refreshToken();
-          // Retry the request with new token
-          const newToken = localStorage.getItem('token');
-          const retryOptions = {
-            ...defaultOptions,
-            headers: {
-              ...defaultOptions.headers,
-              'Authorization': `Bearer ${newToken}`,
-            },
-          };
-          return await fetch(url, { ...retryOptions, ...options });
-        } catch (refreshError) {
-          console.log('🚨 Token refresh failed, forcing immediate logout');
-          
-          // Clear all auth data immediately
-          setUserData(null);
-          localStorage.removeItem('token');
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('userData');
-          
-          // Force navigation to login
-          window.location.href = '/login';
-          
-          throw new Error('AUTHENTICATION_EXPIRED');
-        }
-      }
-
-      return response;
-    } catch (error) {
-      // Handle network errors
-      if (error.message === 'AUTHENTICATION_EXPIRED' || error.message === 'AUTHENTICATION_REQUIRED') {
-        throw error;
-      }
-      throw error;
-    }
-  }, [checkTokenValidity, refreshToken, logout]);
 
   // Listen for storage changes (logout from other tabs)
   useEffect(() => {
@@ -317,7 +244,6 @@ export const AuthProvider = ({ children }) => {
     isAuthenticated: !!userData,
     login,
     logout,
-    authenticatedFetch,
     checkTokenValidity,
   };
 

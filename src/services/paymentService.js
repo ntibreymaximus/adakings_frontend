@@ -5,15 +5,15 @@ import {
   generateTransactionReference,
   formatTransactionId
 } from '../utils/transactionUtils';
-
-// PaymentService will be initialized with authenticatedFetch from AuthContext
-let authenticatedFetch = null;
+import { API_BASE_URL } from '../utils/api';
+import { tokenFetch } from '../utils/tokenFetch';
 
 /**
- * Initialize payment service with authenticated fetch function
+ * Initialize payment service (legacy function - no longer needed)
  */
-export const initializePaymentService = (authFetch) => {
-  authenticatedFetch = authFetch;
+export const initializePaymentService = () => {
+  // No longer needed since we use direct token access
+  console.log('Payment service ready with direct token authentication');
 };
 
 /**
@@ -22,10 +22,6 @@ export const initializePaymentService = (authFetch) => {
  * @returns {Promise<object>} - Payment response
  */
 export const initiatePayment = async (paymentData) => {
-  if (!authenticatedFetch) {
-    throw new Error('PaymentService not initialized. Call initializePaymentService first.');
-  }
-  
   // Generate custom transaction ID and reference
   const transactionId = generateTransactionId();
   const transactionRef = generateTransactionReference(
@@ -49,7 +45,7 @@ export const initiatePayment = async (paymentData) => {
   };
   
   
-  const response = await authenticatedFetch(`/payments/initiate/`, {
+  const response = await tokenFetch(`${API_BASE_URL}/payments/initiate/`, {
     method: 'POST',
     body: JSON.stringify(enhancedPaymentData),
   });
@@ -75,12 +71,8 @@ export const initiatePayment = async (paymentData) => {
  * @returns {Promise<Array>} - Array of payment modes
  */
 export const getPaymentModes = async () => {
-  if (!authenticatedFetch) {
-    return getFallbackPaymentModes();
-  }
-  
   try {
-    const response = await authenticatedFetch(`/payments/payment-modes/`);
+    const response = await tokenFetch(`${API_BASE_URL}/payments/payment-modes/`);
 
     if (response.ok) {
       const data = await response.json();
@@ -111,7 +103,7 @@ const getFallbackPaymentModes = () => [
  * @returns {Promise<object>} - Payment details
  */
 export const getPaymentDetails = async (reference) => {
-  const response = await authenticatedFetch(`/payments/${reference}/`);
+  const response = await tokenFetch(`${API_BASE_URL}/payments/${reference}/`);
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ detail: 'Payment not found' }));
@@ -135,9 +127,9 @@ export const getPayments = async (filters = {}) => {
     }
   });
 
-  const url = `/payments/${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  const url = `${API_BASE_URL}/payments/${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
   
-  const response = await authenticatedFetch(url);
+  const response = await tokenFetch(url);
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ detail: 'Failed to fetch payments' }));

@@ -15,6 +15,7 @@
  */
 
 import { API_ENDPOINTS } from '../utils/api';
+import { tokenFetch } from '../utils/tokenFetch';
 
 class ApiFirstService {
   constructor() {
@@ -179,27 +180,14 @@ class ApiFirstService {
   async makeApiRequest(endpoint, options) {
     const { timeout = 8000, ...fetchOptions } = options;
 
-    // Get authentication token
-    const token = localStorage.getItem('token');
-    if (!token) {
-      throw new Error('No authentication token found');
-    }
-
-    // Add authentication headers
-    const headers = {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      ...fetchOptions.headers
-    };
-
     // Create timeout promise
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => reject(new Error(`Request timeout after ${timeout}ms`)), timeout);
     });
 
-    // Make the API call with timeout
+    // Make the API call with timeout using tokenFetch
     const response = await Promise.race([
-      fetch(endpoint, { ...fetchOptions, headers }),
+      tokenFetch(endpoint, fetchOptions),
       timeoutPromise
     ]);
 

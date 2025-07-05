@@ -2,7 +2,6 @@ import React, { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { setAuthContext, setupAutoLogoutTimer, setupVisibilityCheck } from './utils/authInterceptor';
-import { initializePaymentService } from './services/paymentService';
 import LoginPage from './components/LoginPage';
 import UserProfilePage from './components/UserProfilePage';
 import DashboardPage from './components/DashboardPage';
@@ -23,15 +22,14 @@ import './utils/cleanupPWA'; // Clean up any remaining PWA data
 
 // Inner App component that uses authentication context
 function AppContent() {
-  const { userData, logout, checkTokenValidity, authenticatedFetch } = useAuth();
+  const { userData, logout, checkTokenValidity } = useAuth();
 
   // Setup global authentication interceptor
   useEffect(() => {
     const authContext = { logout, checkTokenValidity };
     setAuthContext(authContext);
     
-    // Initialize API services with authenticated fetch
-    initializePaymentService(authenticatedFetch);
+    // API services now use direct token authentication
     
     // Setup auto-logout timer based on token expiry
     if (userData) {
@@ -42,7 +40,7 @@ function AppContent() {
     return () => {
       // Cleanup would be handled by the interceptor
     };
-  }, [userData, logout, checkTokenValidity, authenticatedFetch]);
+  }, [userData, logout, checkTokenValidity]);
 
   return (
     <div className="App">

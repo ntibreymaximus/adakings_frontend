@@ -2,6 +2,53 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.1] - 2025-07-05
+
+### 🔧 Feature Development
+
+**📋 Release Information:**
+- **Environment**: feature/apifetch
+- **Branch**: `feature/apifetch-2.0.1`
+- **Version**: `2.0.1`
+- **Deployment Time**: 2025-07-05 20:09:18
+- **Description**: React feature branch for 'apifetch' development (no build)
+
+**📝 Changes Made:**
+React v2.0.1: Deploy to feature/apifetch environment
+
+**📁 Files Modified:**
+  - Modified: `ERSION`
+  - Modified: `package.json`
+  - Modified: `src/App.js`
+  - Modified: `src/components/ViewMenuPage.js`
+  - Modified: `src/contexts/AuthContext.js`
+  - Modified: `src/pages/CreateOrderForm.js`
+  - Modified: `src/pages/EditOrderPage.js`
+  - Modified: `src/services/apiFirstService.js`
+  - Modified: `src/services/paymentService.js`
+  - Modified: `src/utils/api.js`
+  - Changed: `AUTHENTICATION_MIGRATION_SUMMARY.md`
+  - Changed: `src/utils/tokenFetch.js`
+
+**🔄 React Build Details:**
+- **Build Process**: No build process (development only) (4.78 MB, 2 JS files, 1 CSS files)
+- **Environment**: feature/apifetch
+- **Optimization**: Disabled
+- **Source Maps**: Enabled
+
+**🔄 Deployment Details:**
+- **Source Branch**: `feature/apifetch-2.0.1`
+- **Target Branch**: `feature/apifetch-2.0.1`
+- **Merge Strategy**: Automatic merge with main branch
+
+**🎯 React Environment Notes:**
+- React feature branch for component development and testing
+- No build process (fastest deployment for development)
+- Changes are isolated and will be merged after review
+- Use `npm start` for local development server
+
+---
+
 ## [2.0.0] - 2025-07-05
 
 ### 🔧 Feature Development

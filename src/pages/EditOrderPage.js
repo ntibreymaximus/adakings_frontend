@@ -3,13 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Container, Spinner, Alert, Button } from 'react-bootstrap';
 import { toast } from 'react-toastify';
 import { API_ENDPOINTS } from '../utils/api';
-import { useAuth } from '../contexts/AuthContext';
+import { tokenFetch } from '../utils/tokenFetch';
 import CreateOrderForm from './CreateOrderForm';
 
 const EditOrderPage = () => {
   const { orderNumber } = useParams();
   const navigate = useNavigate();
-  const { authenticatedFetch } = useAuth();
   const [orderData, setOrderData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -18,7 +17,7 @@ const EditOrderPage = () => {
     const fetchOrderData = async () => {
       try {
         setLoading(true);
-        const response = await authenticatedFetch(`${API_ENDPOINTS.ORDERS}${orderNumber}/`);
+        const response = await tokenFetch(`${API_ENDPOINTS.ORDERS}${orderNumber}/`);
         
         if (!response.ok) {
           if (response.status === 404) {

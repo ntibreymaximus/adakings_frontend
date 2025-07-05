@@ -77,40 +77,8 @@ async function getAuthHeaders() {
   };
 }
 
-// Enhanced fetch with authentication
-export async function authenticatedFetch(url, options = {}) {
-  const authHeaders = await getAuthHeaders();
-  
-  if (!authHeaders) {
-    throw new Error('Authentication required');
-  }
-  
-  // Only cache GET requests, never cache POST/PATCH/PUT/DELETE
-  const method = options.method || 'GET';
-  const shouldCache = method.toUpperCase() === 'GET';
-  
-  const defaultOptions = {
-    headers: {
-      ...authHeaders,
-      ...options.headers,
-    },
-    // Only apply caching for GET requests
-    ...(shouldCache && { cache: 'default' }),
-  };
-  
-  const response = await fetch(url, { ...defaultOptions, ...options });
-  
-  // Handle 401 Unauthorized responses
-  if (response.status === 401) {
-    localStorage.removeItem('token');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('userData');
-    // Don't use hard redirect, let React Router handle navigation
-    throw new Error('AUTHENTICATION_EXPIRED');
-  }
-  
-  return response;
-}
+// Note: authenticatedFetch has been replaced with tokenFetch utility
+// All API calls now use the simpler tokenFetch from ../utils/tokenFetch.js
 
 // API endpoints - dynamically determine based on how the frontend is accessed
 const getApiBaseUrl = () => {

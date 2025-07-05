@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Form, Button, Container, Row, Col, Card, ListGroup, Modal } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -32,6 +32,9 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   
+  // Refs for cleanup and debouncing
+  const searchTimeoutRef = useRef(null);
+  
   // Filter menu items into main items and extras
   const mainMenuItems = (allMenuItems || []).filter(item => !item.is_extra && item.is_available);
   const extraMenuItems = (allMenuItems || []).filter(item => item.is_extra && item.is_available);
@@ -46,7 +49,15 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
 
   // Fetch delivery locations from backend
   const fetchDeliveryLocations = useCallback(async () => {
+    // Prevent multiple simultaneous calls
+    if (loadingLocations) {
+      console.log('⚠️ Delivery locations already loading, skipping...');
+      return;
+    }
+    
     setLoadingLocations(true);
+    console.log('🚀 Fetching delivery locations...');
+    
     try {
       const data = await apiFirstService.request(`${API_ENDPOINTS.ORDERS}delivery-locations/`, {
         method: 'GET'
@@ -65,13 +76,15 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
       }
       
       setDeliveryLocations(locations);
+      console.log(`✅ Loaded ${locations.length} delivery locations`);
     } catch (error) {
+      console.error('❌ Error fetching delivery locations:', error);
       // Fallback to empty array if fetch fails
       setDeliveryLocations([]);
     } finally {
       setLoadingLocations(false);
     }
-  }, []);
+  }, [loadingLocations]);
 
 
 
@@ -144,7 +157,10 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
 
   useEffect(() => {
     const fetchInitialData = async () => {
-      await fetchDeliveryLocations();
+      // Only fetch delivery locations once on mount
+      if (deliveryLocations.length === 0 && !loadingLocations) {
+        await fetchDeliveryLocations();
+      }
       
       try {
         // Use cache service for instant menu loading
@@ -166,7 +182,8 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
     };
     
     fetchInitialData();
-  }, [fetchDeliveryLocations, isEditMode, existingOrder, populateFormWithOrderData, isInitialized]);
+    // Remove fetchDeliveryLocations from dependencies to prevent repeated calls
+  }, [isEditMode, existingOrder, populateFormWithOrderData, isInitialized, deliveryLocations.length, loadingLocations]);
   
   // Separate effect to repopulate items when menu items are loaded (after initial load)
   useEffect(() => {
@@ -190,6 +207,15 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showLocationDropdown]);
+  
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
 
 
   const handleRemoveItem = useCallback((itemId) => {
@@ -282,6 +308,11 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
       setCustomLocationFee('');
       setLocationSearchTerm('');
       setShowLocationDropdown(false);
+    } else if (newDeliveryType === 'Delivery') {
+      // When switching to delivery, fetch locations if not already loaded
+      if (deliveryLocations.length === 0 && !loadingLocations) {
+        fetchDeliveryLocations();
+      }
     }
   };
 
@@ -749,18 +780,33 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
                           type="text"
                           value={locationSearchTerm}
                           onChange={(e) => {
-                            setLocationSearchTerm(e.target.value);
-                            // Only show dropdown if not setting up custom location
-                            if (deliveryLocation !== 'Other') {
-                              setShowLocationDropdown(true);
+                            const newValue = e.target.value;
+                            setLocationSearchTerm(newValue);
+                            
+                            // Clear any existing timeout
+                            if (searchTimeoutRef.current) {
+                              clearTimeout(searchTimeoutRef.current);
                             }
-                            if (e.target.value === '') {
+                            
+                            // Debounce dropdown showing to prevent erratic behavior
+                            searchTimeoutRef.current = setTimeout(() => {
+                              // Only show dropdown if not setting up custom location and locations are loaded
+                              if (deliveryLocation !== 'Other' && !loadingLocations && newValue.length > 0) {
+                                setShowLocationDropdown(true);
+                              } else if (newValue.length === 0) {
+                                setShowLocationDropdown(false);
+                              }
+                            }, 150); // 150ms debounce
+                            
+                            // Clear delivery location if search term is cleared
+                            if (newValue === '') {
                               setDeliveryLocation('');
+                              setShowLocationDropdown(false);
                             }
                           }}
                           onFocus={() => {
-                            // Only show dropdown if not setting up custom location
-                            if (deliveryLocation !== 'Other') {
+                            // Only show dropdown if not setting up custom location and locations are loaded
+                            if (deliveryLocation !== 'Other' && !loadingLocations) {
                               setShowLocationDropdown(true);
                             }
                           }}
@@ -772,7 +818,9 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
                               ? '⏳ Loading locations...' 
                               : deliveryLocation === 'Other'
                                 ? '🏠 Custom location - use fields below'
-                                : '📍 Search locations...'
+                                : deliveryLocations.length === 0
+                                  ? '📍 No locations available'
+                                  : '📍 Search locations...'
                           }
                           disabled={loadingLocations || deliveryLocation === 'Other'}
                         />
