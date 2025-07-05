@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Spinner, Alert } from 'react-bootstrap';
+import { Card, Spinner, Alert, Badge } from 'react-bootstrap';
+import { API_BASE_URL } from '../utils/api';
 import { useNavigate } from 'react-router-dom';
 import { getRelativeTime } from '../services/activityService';
 
@@ -10,7 +11,7 @@ import { getRelativeTime } from '../services/activityService';
 const RecentActivityCard = ({ 
   maxItems = 5, 
   showFullHistory = true,
-  refreshInterval = 500, // 500ms for instant updates
+  refreshInterval = 30000, // 30 seconds for reasonable updates
   className = "",
   style = {}
 }) => {
@@ -23,12 +24,31 @@ const RecentActivityCard = ({
   const [lastUpdated, setLastUpdated] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
   const [showTodayOnly, setShowTodayOnly] = useState(true);
+  const [lastFetchTime, setLastFetchTime] = useState(0);
+  const [isCurrentlyFetching, setIsCurrentlyFetching] = useState(false);
 
-  // Fetch recent activity data
-  const fetchRecentActivity = async () => {
+  // Fetch recent activity data with intelligent throttling
+  const fetchRecentActivity = async (forceRefresh = false) => {
+    const now = Date.now();
+    const MIN_FETCH_INTERVAL = 10000; // Minimum 10 seconds between fetches
+    
+    // Prevent concurrent fetches
+    if (isCurrentlyFetching) {
+      console.log('📈 Activity fetch already in progress, skipping...');
+      return;
+    }
+    
+    // Throttle requests (unless forced)
+    if (!forceRefresh && (now - lastFetchTime) < MIN_FETCH_INTERVAL) {
+      console.log('📈 Activity fetch throttled, too soon since last fetch');
+      return;
+    }
+    
     try {
+      setIsCurrentlyFetching(true);
       setLoading(true);
       setError(null);
+      setLastFetchTime(now);
       
       const token = localStorage.getItem('token');
       if (!token) {
@@ -40,19 +60,18 @@ const RecentActivityCard = ({
       lastWeek.setDate(lastWeek.getDate() - 7);
       const lastWeekStr = lastWeek.toISOString().split('T')[0];
       
-      console.log('RecentActivityCard: Fetching activity data from', lastWeekStr);
 
       // Parallel fetch of all activity sources - only use existing endpoints
       const fetchPromises = [
         // Fetch recent orders (with all statuses)
-        fetch(`http://localhost:8000/api/orders/?created_at__gte=${lastWeekStr}&ordering=-updated_at`, {
+        fetch(`${API_BASE_URL}/orders/?created_at__gte=${lastWeekStr}&ordering=-updated_at`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           }
         }),
         // Try main transaction endpoint without date filter first (get latest transactions)
-        fetch(`http://localhost:8000/api/payments/transaction-table/?ordering=-created_at&limit=50`, {
+        fetch(`${API_BASE_URL}/payments/transaction-table/?ordering=-created_at&limit=50`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -74,10 +93,6 @@ const RecentActivityCard = ({
       const ordersData = ordersResponse.ok ? await ordersResponse.json() : null;
       const transactionsData = transactionsResponse.ok ? await transactionsResponse.json() : null;
 
-      // Debug logging
-      console.log('RecentActivityCard: API Responses:');
-      console.log('- Orders:', ordersData);
-      console.log('- Transactions (main):', transactionsData);
 
       // Extract arrays from response objects and merge all transaction sources
       const orders = ordersData ? (ordersData.results || ordersData) : [];
@@ -107,13 +122,6 @@ const RecentActivityCard = ({
         return transactionDate >= cutoffDate;
       });
       
-      console.log('RecentActivityCard: Extracted arrays:');
-      console.log('- Orders count:', orders.length);
-      console.log('- Transactions count (after merge and filter):', recentTransactions.length);
-      console.log('- All Transactions (before filter):', transactions.length);
-      console.log('- Sample transaction:', recentTransactions[0]);
-      console.log('- Orders data:', orders.slice(0, 2));
-      console.log('- Recent transactions data:', recentTransactions.slice(0, 2));
 
       // Create comprehensive activity list
 let allActivities = [];
@@ -125,14 +133,12 @@ let allActivities = [];
 
       // Get today's date as a string (local timezone)
       const today = new Date().toISOString().split('T')[0];
-      console.log('RecentActivityCard: Today\'s date for filtering:', today);
 
       // Process orders into activities
       orders.forEach(order => {
         // Validate timestamp before processing
         const orderTimestamp = order.created_at || order.date || new Date().toISOString();
         if (!isValidTimestamp(orderTimestamp)) {
-          console.warn('Invalid order timestamp:', order.created_at, 'for order:', order.id);
           return; // Skip this order
         }
         
@@ -162,7 +168,6 @@ let allActivities = [];
         if (order.status && order.status !== 'Pending' && order.updated_at !== order.created_at) {
           const statusTimestamp = order.updated_at || order.created_at || new Date().toISOString();
           if (!isValidTimestamp(statusTimestamp)) {
-            console.warn('Invalid status timestamp:', statusTimestamp, 'for order:', order.id);
             return; // Skip this status change
           }
           
@@ -194,7 +199,6 @@ let allActivities = [];
         // Validate timestamp before processing
         const transactionTimestamp = transaction.created_at || transaction.date || transaction.timestamp || new Date().toISOString();
         if (!isValidTimestamp(transactionTimestamp)) {
-          console.warn('Invalid transaction timestamp:', transaction.created_at, 'for transaction:', transaction.id);
           return; // Skip this transaction
         }
         
@@ -308,10 +312,6 @@ let allActivities = [];
           const activityDate = new Date(activity.timestamp).toISOString().split('T')[0];
           const isToday = activityDate === today;
           
-          // Debug log for each activity
-          if (activity.eventType === 'payment') {
-            console.log(`Transaction ${activity.id}: ${activity.timestamp} -> ${activityDate} (today: ${today}) = ${isToday}`);
-          }
           
           return isToday;
         });
@@ -319,27 +319,22 @@ let allActivities = [];
 
       const mergedActivities = filteredActivities.slice(0, maxItems);
       
-      console.log('RecentActivityCard: Final activities:', mergedActivities);
-      console.log('RecentActivityCard: Total activities found (before filtering):', allActivities.length);
-      console.log('RecentActivityCard: Filtered activities found:', filteredActivities.length);
-      console.log('RecentActivityCard: Sample activities:', allActivities.slice(0, 3));
-      console.log('RecentActivityCard: Show today only:', showTodayOnly);
 
       setActivities(mergedActivities);
       setLastUpdated(new Date());
       setRetryCount(0);
       
     } catch (err) {
-      console.error('Error fetching recent activity:', err);
       setError(err.message);
       
       // Auto-retry for network errors with longer delays to prevent reload loops
       if (retryCount < 2 && !err.message.includes('Session expired') && !err.message.includes('AUTHENTICATION')) {
         setRetryCount(prev => prev + 1);
-        setTimeout(() => fetchRecentActivity(), 10000 * (retryCount + 1)); // Longer retry delays
+        setTimeout(() => fetchRecentActivity(true), 10000 * (retryCount + 1)); // Longer retry delays
       }
     } finally {
       setLoading(false);
+      setIsCurrentlyFetching(false);
     }
   };
 
@@ -360,7 +355,7 @@ let allActivities = [];
 
   // Manual refresh function
   const handleRefresh = () => {
-    fetchRecentActivity();
+    fetchRecentActivity(true); // Force refresh on manual action
   };
 
   // Navigate to full activity history
@@ -855,13 +850,11 @@ const getSafeRelativeTime = (timestamp) => {
     
     const date = new Date(timestamp);
     if (isNaN(date.getTime())) {
-      console.warn('Invalid timestamp for relative time:', timestamp);
       return 'Invalid time';
     }
     
     return getRelativeTime(timestamp);
   } catch (error) {
-    console.error('Error calculating relative time:', error, 'for timestamp:', timestamp);
     return 'Time error';
   }
 };

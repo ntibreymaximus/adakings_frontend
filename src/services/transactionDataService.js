@@ -1,13 +1,16 @@
 /**
- * Unified Transaction Data Service
- * Ensures consistent transaction data across PWA and webview contexts
+ * Unified Transaction Data Service with API-First approach
+ * Prioritizes direct API calls over caching for real-time transaction data
  */
+
+import { API_BASE_URL } from '../utils/api';
+import { apiFirstService } from './apiFirstService';
 
 class TransactionDataService {
   constructor() {
     this.cache = new Map();
     this.cacheTimestamps = new Map();
-    this.cacheTimeout = 5 * 1000; // 5 seconds cache timeout for real-time consistency
+    this.cacheTimeout = 30 * 1000; // 30 seconds cache timeout
     this.listeners = new Set();
     this.isOnline = navigator.onLine;
     
@@ -40,7 +43,7 @@ class TransactionDataService {
       try {
         callback({ type, data, timestamp: new Date() });
       } catch (error) {
-        console.error('Error in transaction data listener:', error);
+        // Silent error for listener callbacks
       }
     });
   }
@@ -56,7 +59,6 @@ class TransactionDataService {
     localStorage.removeItem('cachedTransactionsTimestamp');
     localStorage.removeItem('cachedDashboard');
     localStorage.removeItem('cachedDashboardTimestamp');
-    console.log('[TransactionDataService] Cache cleared (including dashboard cache)');
     // Notify listeners that cache was cleared
     this.notifyListeners('cache-cleared');
   }
@@ -71,77 +73,42 @@ class TransactionDataService {
   }
 
   /**
-   * Get transactions with unified caching strategy
+   * Get transactions with API-first approach
    */
   async getTransactions(forceRefresh = false) {
-    const cacheKey = 'transactions';
+    console.log('🌐 Getting transactions via API-first approach');
     
-    // Return cached data if valid and not forcing refresh
-    if (!forceRefresh && this.isCacheValid(cacheKey)) {
-      console.log('[TransactionDataService] Returning cached data');
-      return this.cache.get(cacheKey);
-    }
-
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication token not found');
-      }
-
-      console.log('[TransactionDataService] Fetching fresh transaction data');
+      // Use API-first service for real-time transaction data
+      const endpoint = `${API_BASE_URL}/payments/transaction-table/?_t=${Date.now()}`;
       
-      // Add cache-busting parameter to prevent service worker caching issues
-      const cacheBuster = `?_t=${Date.now()}&refresh=${forceRefresh ? '1' : '0'}`;
-      const url = `http://localhost:8000/api/payments/transaction-table/${cacheBuster}`;
-      
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
+      const data = await apiFirstService.request(endpoint, {
+        useCache: false, // Never cache transaction data - always fresh
+        fallbackToCache: false, // Don't fall back to cache for real-time data
+        bypassCache: forceRefresh,
+        timeout: 10000 // Longer timeout for transaction data
       });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          this.notifyListeners('auth-error');
-          throw new Error('Session expired. Please login again.');
-        }
-        throw new Error(`HTTP ${response.status}: Failed to fetch transactions`);
-      }
-
-      const data = await response.json();
-      console.log('[TransactionDataService] Raw API response:', data);
       
       // Normalize the response data
       const normalizedData = this.normalizeTransactionData(data);
       
-      // Update cache
-      this.cache.set(cacheKey, normalizedData);
-      this.cacheTimestamps.set(cacheKey, Date.now());
-      
-      // Update localStorage for offline fallback
+      // Only store in localStorage for offline fallback (not caching)
       localStorage.setItem('cachedTransactions', JSON.stringify(normalizedData.transactions));
       localStorage.setItem('cachedTransactionsTimestamp', new Date().toISOString());
       
       // Notify listeners of new data
       this.notifyListeners('data-updated', normalizedData);
       
-      console.log('[TransactionDataService] Processed transactions:', normalizedData.transactions.length);
+      console.log(`✅ API-first returned ${normalizedData.transactions.length} transactions`);
       return normalizedData;
       
     } catch (error) {
-      console.error('[TransactionDataService] Error fetching transactions:', error);
+      console.warn('❌ API-first failed for transactions:', error.message);
       
-      // Try to return cached data if available
-      if (this.cache.has(cacheKey)) {
-        console.log('[TransactionDataService] Returning stale cached data due to error');
-        return this.cache.get(cacheKey);
-      }
-      
-      // Try localStorage fallback
+      // Only fall back to localStorage for offline scenarios
       const fallbackData = this.getOfflineData();
       if (fallbackData) {
-        console.log('[TransactionDataService] Using localStorage fallback data');
+        console.log('🔄 Using offline fallback data for transactions');
         return fallbackData;
       }
       
@@ -167,7 +134,6 @@ class TransactionDataService {
     } else if (apiResponse.results && Array.isArray(apiResponse.results)) {
       transactions = apiResponse.results;
     } else {
-      console.warn('[TransactionDataService] Unexpected API response format:', apiResponse);
       transactions = [];
     }
 
@@ -227,7 +193,7 @@ class TransactionDataService {
         };
       }
     } catch (error) {
-      console.error('[TransactionDataService] Error reading offline data:', error);
+      // Silent error for offline data reading
     }
     return null;
   }
@@ -240,17 +206,6 @@ class TransactionDataService {
       return [];
     }
 
-    console.log('[TransactionDataService] Filtering transactions by date:', {
-      dateString,
-      totalTransactions: transactions.length,
-      sampleDates: transactions.slice(0, 3).map(t => ({
-        id: t.id,
-        created_at: t.created_at,
-        date: t.date,
-        parsedUTC: new Date(t.created_at || t.date).toISOString().split('T')[0],
-        parsedLocal: new Date(t.created_at || t.date).toLocaleDateString('en-CA')
-      }))
-    });
 
     const filtered = transactions.filter(transaction => {
       const transactionDateUTC = new Date(transaction.created_at || transaction.date)
@@ -262,25 +217,10 @@ class TransactionDataService {
       const matchesUTC = transactionDateUTC === dateString;
       const matchesLocal = transactionDateLocal === dateString;
       
-      if (matchesUTC || matchesLocal) {
-        console.log('[TransactionDataService] Transaction matches date filter:', {
-          transactionId: transaction.id,
-          dateString,
-          transactionDateUTC,
-          transactionDateLocal,
-          matchesUTC,
-          matchesLocal
-        });
-      }
       
       return matchesUTC || matchesLocal;
     });
     
-    console.log('[TransactionDataService] Filtered results:', {
-      dateString,
-      filteredCount: filtered.length,
-      totalCount: transactions.length
-    });
     
     return filtered;
   }

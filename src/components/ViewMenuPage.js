@@ -2,72 +2,65 @@ import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Form, InputGroup, Spinner, Alert, Button, Card, Badge } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import useAuth from '../hooks/useAuth';
+import { useAuth } from '../contexts/AuthContext';
+import { API_BASE_URL } from '../utils/api';
+import PullToRefreshWrapper from './PullToRefreshWrapper';
+import { menuCacheService } from '../services/menuCacheService';
 
 const ViewMenuPage = () => {
-    const { logout } = useAuth();
+    const { logout, authenticatedFetch } = useAuth();
     const navigate = useNavigate();
     const [menuItems, setMenuItems] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('all');
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+    // Function to fetch menu items (can be reused for refresh) - Now uses cache service
+    const fetchMenuItems = async (forceRefresh = false) => {
+        try {
+            setError(''); // Clear any previous errors
+            
+            if (forceRefresh) {
+                // Clear cache for fresh data
+                menuCacheService.clearCache();
+            }
+            
+            // Get filters based on current UI state
+            const filters = {};
+            if (categoryFilter !== 'all') {
+                filters.item_type = categoryFilter;
+            }
+            if (searchTerm.trim()) {
+                filters.search = searchTerm.trim();
+            }
+            
+            // Use cache service for instant loading
+            const items = await menuCacheService.getMenuItems(filters);
+            setMenuItems(items);
+            
+            console.log(`✅ Loaded ${items.length} menu items ${forceRefresh ? '(forced refresh)' : '(cache or fresh)'}`);
+            
+        } catch (err) {
+            console.error('❌ Error loading menu items:', err);
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchMenuItems = async () => {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                setError('Authentication token not found. Please log in.');
-                setLoading(false);
-                logout();
-                return;
-            }
-
-            try {
-                const response = await fetch('http://localhost:8000/api/menu/items/', {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                    },
-                });
-
-                if (!response.ok) {
-                    if (response.status === 401) {
-                        logout();
-                    }
-                    throw new Error('Failed to fetch menu items');
-                }
-
-                const data = await response.json();
-                console.log('ViewMenuPage: API response:', data);
-                console.log('ViewMenuPage: Data type:', typeof data);
-                console.log('ViewMenuPage: Is array?', Array.isArray(data));
-                
-                // Handle different response structures
-                let items = data;
-                if (data && typeof data === 'object' && !Array.isArray(data)) {
-                    // If it's an object, look for common array properties
-                    items = data.results || data.items || data.data || [];
-                }
-                
-                // Ensure we have an array
-                if (!Array.isArray(items)) {
-                    console.error('ViewMenuPage: Expected array but got:', typeof items, items);
-                    items = [];
-                }
-                
-                console.log('ViewMenuPage: Final items:', items);
-                setMenuItems(items);
-                
-                // Categories are handled via the filter dropdown in the UI
-            } catch (err) {
-                setError(err.message);
-            } finally {
-                setLoading(false);
-            }
+        const handleResize = () => {
+            setIsMobile(window.innerWidth < 768);
         };
-
+        
+        window.addEventListener('resize', handleResize);
         fetchMenuItems();
+        
+        return () => window.removeEventListener('resize', handleResize);
     }, [logout]);
+
 
     // Filter menu items based on search and item type
     const safeMenuItems = Array.isArray(menuItems) ? menuItems : [];
@@ -87,11 +80,25 @@ const ViewMenuPage = () => {
 
     if (loading) {
         return (
-            <Container className="mt-4 text-center">
-                <Spinner animation="border" role="status">
-                    <span className="visually-hidden">Loading...</span>
-                </Spinner>
-                <p className="mt-2">Loading menu items...</p>
+            <Container className="mt-4">
+                <div className="mb-3">
+                    <Button
+                        variant="outline-primary"
+                        size="sm"
+                        onClick={() => navigate('/dashboard')}
+                        className="d-flex align-items-center ada-shadow-sm"
+                        style={{ minHeight: '44px' }}
+                    >
+                        <i className="bi bi-arrow-left me-2"></i>
+                        <span>Return to Dashboard</span>
+                    </Button>
+                </div>
+                <div className="text-center">
+                    <div className="spinner-border" role="status">
+                        <span className="visually-hidden">Loading...</span>
+                    </div>
+                    <p className="mt-2">Loading menu items...</p>
+                </div>
             </Container>
         );
     }
@@ -116,26 +123,12 @@ const ViewMenuPage = () => {
 
   // Function to toggle menu item availability
   const toggleAvailability = async (itemId, currentStatus) => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      toast.error('Authentication token not found. Please log in.');
-      logout();
-      return;
-    }
-
     try {
-      const response = await fetch(`http://localhost:8000/api/menu/items/${itemId}/toggle-availability/`, {
+      const response = await authenticatedFetch(`${API_BASE_URL}/menu/items/${itemId}/toggle-availability/`, {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
       });
 
       if (!response.ok) {
-        if (response.status === 401) {
-          logout();
-        }
         throw new Error('Failed to toggle availability');
       }
 
@@ -145,29 +138,39 @@ const ViewMenuPage = () => {
       setMenuItems(prev => prev.map(item => 
         item.id === itemId ? { ...item, is_available: updatedItem.is_available } : item
       ));
+      
+      // Update the cache service with the new item data
+      menuCacheService.updateMenuItemInCache(updatedItem);
 
       toast.success(`${updatedItem.name} is now ${updatedItem.is_available ? 'available' : 'unavailable'}`);
     } catch (err) {
-      console.error('Error toggling availability:', err);
       toast.error('Failed to update item availability. Please try again.');
     }
   };
 
   return (
-    <Container className="my-3 my-md-4 px-3 px-md-4">
-      {/* Return to Dashboard Button */}
-      <div className="mb-3">
-        <Button
-          variant="outline-primary"
-          size="sm"
-          onClick={() => navigate('/dashboard')}
-          className="d-flex align-items-center ada-shadow-sm"
-          style={{ minHeight: '44px' }}
-        >
-          <i className="bi bi-arrow-left me-2"></i>
-          <span>Return to Dashboard</span>
-        </Button>
-      </div>
+    <PullToRefreshWrapper 
+      onRefresh={async () => {
+        toast.info('Refreshing menu items...');
+        setLoading(true);
+        await fetchMenuItems(true); // Force refresh from server
+      }}
+      enabled={isMobile}
+    >
+      <Container className="my-3 my-md-4 px-3 px-md-4">
+        {/* Return to Dashboard Button */}
+        <div className="mb-3">
+          <Button
+            variant="outline-primary"
+            size="sm"
+            onClick={() => navigate('/dashboard')}
+            className="d-flex align-items-center ada-shadow-sm"
+            style={{ minHeight: '44px' }}
+          >
+            <i className="bi bi-arrow-left me-2"></i>
+            <span>Return to Dashboard</span>
+          </Button>
+        </div>
       
       <Card className="border-0">
         <Card.Header className="bg-primary text-white">
@@ -304,7 +307,8 @@ const ViewMenuPage = () => {
           )}
         </Card.Body>
       </Card>
-    </Container>
+      </Container>
+    </PullToRefreshWrapper>
   );
 };
 

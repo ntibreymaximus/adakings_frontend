@@ -1,47 +1,24 @@
 import React, { useState } from 'react';
 import { Container, Form, Button, Row, Col, Card, Alert } from 'react-bootstrap';
 import { toast } from 'react-toastify';
+import { useAuth } from '../contexts/AuthContext';
 import 'react-toastify/dist/ReactToastify.css';
 
-const LoginPage = ({ onLoginSuccess }) => {
+const LoginPage = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const { login, isLoading } = useAuth();
 
   const handleLogin = async (event) => {
     event.preventDefault();
     setLoginError('');
-    setIsLoading(true);
-    const loginURL = 'http://localhost:8000/api/users/login/';
 
     try {
-      const response = await fetch(loginURL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username, password }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        if (onLoginSuccess) {
-          onLoginSuccess(data);
-        }
-      } else {
-        const errorMsg = data.detail || 'Login failed. Please try again.';
-        setLoginError(errorMsg);
-        toast.error(errorMsg);
-      }
+      await login(username, password);
     } catch (error) {
-      const errorMsg = 'An error occurred during login. Please check your connection and try again.';
-      setLoginError(errorMsg);
-      toast.error(errorMsg);
-    } finally {
-      setIsLoading(false);
+      setLoginError(error.message);
     }
   };
 

@@ -1,22 +1,19 @@
-import React, { useState } from 'react';
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
-import { API_BASE_URL } from './utils/api';
+import React, { useEffect } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { setAuthContext, setupAutoLogoutTimer, setupVisibilityCheck } from './utils/authInterceptor';
+import { initializePaymentService } from './services/paymentService';
 import LoginPage from './components/LoginPage';
 import UserProfilePage from './components/UserProfilePage';
 import DashboardPage from './components/DashboardPage';
 import CreateOrderPage from './pages/CreateOrderForm';
+import EditOrderPage from './pages/EditOrderPage';
 import ViewOrdersPage from './components/ViewOrdersPage';
 import ViewMenuPage from './components/ViewMenuPage';
 import ViewTransactionsPage from './components/ViewTransactionsPage';
-import TransactionDebugger from './components/TransactionDebugger';
-import StatsDebugger from './components/StatsDebugger';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Navbar from './components/Navbar';
-import AuthTest from './components/AuthTest';
-import InstantReloadTest from './components/InstantReloadTest';
-// Initialize polling manager
-import './utils/pollingManager';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 import 'bootstrap-icons/font/bootstrap-icons.css';
@@ -24,62 +21,38 @@ import './styles/theme.css';
 import './App.css';
 import './utils/cleanupPWA'; // Clean up any remaining PWA data
 
-function App() {
-  const [userData, setUserData] = useState(() => {
-    try {
-      const storedUserData = localStorage.getItem('userData');
-      const token = localStorage.getItem('token');
-      if (storedUserData && token) {
-        return JSON.parse(storedUserData);
-      }
-    } catch (error) {
-      console.error("Failed to parse user data from localStorage", error);
-      return null;
-    }
-    return null;
-  });
-  
-  const navigate = useNavigate();
+// Inner App component that uses authentication context
+function AppContent() {
+  const { userData, logout, checkTokenValidity, authenticatedFetch } = useAuth();
 
-  const handleLoginSuccess = (data) => {
-    setUserData(data.user);
-    localStorage.setItem('userData', JSON.stringify(data.user));
-    localStorage.setItem('token', data.access);
-    localStorage.setItem('refreshToken', data.refresh);
-    navigate('/dashboard');
-  };
-
-  const handleLogout = async () => {
-    try {
-      // Call backend logout endpoint
-      await fetch(`${API_BASE_URL}/users/logout/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json',
-        },
-      });
-    } catch (error) {
-      console.error('Logout API call failed:', error);
-    } finally {
-      // Clear local state and storage regardless of API call result
-      setUserData(null);
-      localStorage.removeItem('userData');
-      localStorage.removeItem('token');
-      localStorage.removeItem('refreshToken');
-      navigate('/login');
+  // Setup global authentication interceptor
+  useEffect(() => {
+    const authContext = { logout, checkTokenValidity };
+    setAuthContext(authContext);
+    
+    // Initialize API services with authenticated fetch
+    initializePaymentService(authenticatedFetch);
+    
+    // Setup auto-logout timer based on token expiry
+    if (userData) {
+      setupAutoLogoutTimer(logout);
+      setupVisibilityCheck(checkTokenValidity);
     }
-  };
+    
+    return () => {
+      // Cleanup would be handled by the interceptor
+    };
+  }, [userData, logout, checkTokenValidity, authenticatedFetch]);
 
   return (
     <div className="App">
       {/* Standard web navigation */}
-      {userData && <Navbar userData={userData} onLogout={handleLogout} />}
+      {userData && <Navbar userData={userData} onLogout={() => logout('manual')} />}
       
       <Routes>
         <Route 
           path="/login" 
-          element={!userData ? <LoginPage onLoginSuccess={handleLoginSuccess} /> : <Navigate to="/dashboard" />} 
+          element={!userData ? <LoginPage /> : <Navigate to="/dashboard" />} 
         />
         <Route 
           path="/dashboard" 
@@ -94,6 +67,10 @@ function App() {
           element={userData ? <CreateOrderPage /> : <Navigate to="/login" />} 
         />
         <Route 
+          path="/edit-order/:orderNumber" 
+          element={userData ? <EditOrderPage /> : <Navigate to="/login" />} 
+        />
+        <Route 
           path="/view-orders" 
           element={userData ? <ViewOrdersPage /> : <Navigate to="/login" />} 
         />
@@ -104,22 +81,6 @@ function App() {
         <Route 
           path="/view-transactions" 
           element={userData ? <ViewTransactionsPage /> : <Navigate to="/login" />} 
-        />
-        <Route 
-          path="/debug-transactions" 
-          element={userData ? <TransactionDebugger /> : <Navigate to="/login" />} 
-        />
-        <Route 
-          path="/debug-stats" 
-          element={userData ? <StatsDebugger /> : <Navigate to="/login" />} 
-        />
-        <Route 
-          path="/auth-test" 
-          element={<AuthTest />} 
-        />
-        <Route 
-          path="/instant-reload-test" 
-          element={<InstantReloadTest />} 
         />
         <Route path="*" element={<Navigate to={userData ? "/dashboard" : "/login"} />} /> 
       </Routes>
@@ -139,6 +100,15 @@ function App() {
         style={{ zIndex: 9999 }}
       />
     </div>
+  );
+}
+
+// Main App component wrapped with AuthProvider
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 

@@ -1,6 +1,6 @@
 // API utility functions with JWT authentication handling
 
-// Check if token is expired (basic check)
+// Check if token is expired (with 30-second buffer to prevent edge cases)
 function isTokenExpired(token) {
   if (!token) return true;
   
@@ -8,9 +8,9 @@ function isTokenExpired(token) {
     // JWT tokens have 3 parts separated by dots
     const payload = JSON.parse(atob(token.split('.')[1]));
     const currentTime = Date.now() / 1000;
-    return payload.exp < currentTime;
+    const bufferTime = 30; // 30 seconds buffer
+    return payload.exp < (currentTime + bufferTime);
   } catch (error) {
-    console.error('Error checking token expiry:', error);
     return true; // Assume expired if we can't parse
   }
 }
@@ -67,7 +67,6 @@ async function getAuthHeaders() {
     try {
       token = await refreshAccessToken();
     } catch (error) {
-      console.error('Token refresh failed:', error);
       return null;
     }
   }
@@ -86,11 +85,17 @@ export async function authenticatedFetch(url, options = {}) {
     throw new Error('Authentication required');
   }
   
+  // Only cache GET requests, never cache POST/PATCH/PUT/DELETE
+  const method = options.method || 'GET';
+  const shouldCache = method.toUpperCase() === 'GET';
+  
   const defaultOptions = {
     headers: {
       ...authHeaders,
       ...options.headers,
     },
+    // Only apply caching for GET requests
+    ...(shouldCache && { cache: 'default' }),
   };
   
   const response = await fetch(url, { ...defaultOptions, ...options });
@@ -107,8 +112,26 @@ export async function authenticatedFetch(url, options = {}) {
   return response;
 }
 
-// API endpoints
-export const API_BASE_URL = 'http://localhost:8000/api';
+// API endpoints - dynamically determine based on how the frontend is accessed
+const getApiBaseUrl = () => {
+  // If accessing from network (not localhost), use network IP
+  if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    return `http://${window.location.hostname}:8000/api`;
+  }
+  return 'http://localhost:8000/api';
+};
+
+// Base URL without /api suffix for direct backend access
+const getBackendBaseUrl = () => {
+  // If accessing from network (not localhost), use network IP
+  if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    return `http://${window.location.hostname}:8000`;
+  }
+  return 'http://localhost:8000';
+};
+
+export const API_BASE_URL = getApiBaseUrl();
+export const BACKEND_BASE_URL = getBackendBaseUrl();
 
 export const API_ENDPOINTS = {
   MENU_ITEMS: `${API_BASE_URL}/menu/items/`,

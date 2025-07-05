@@ -5,18 +5,15 @@ import {
   generateTransactionReference,
   formatTransactionId
 } from '../utils/transactionUtils';
-import { API_BASE_URL } from '../utils/api';
+
+// PaymentService will be initialized with authenticatedFetch from AuthContext
+let authenticatedFetch = null;
 
 /**
- * Get authentication headers
- * @returns {object} - Headers object with authorization
+ * Initialize payment service with authenticated fetch function
  */
-const getAuthHeaders = () => {
-  const token = localStorage.getItem('token');
-  return {
-    'Authorization': `Bearer ${token}`,
-    'Content-Type': 'application/json',
-  };
+export const initializePaymentService = (authFetch) => {
+  authenticatedFetch = authFetch;
 };
 
 /**
@@ -25,6 +22,10 @@ const getAuthHeaders = () => {
  * @returns {Promise<object>} - Payment response
  */
 export const initiatePayment = async (paymentData) => {
+  if (!authenticatedFetch) {
+    throw new Error('PaymentService not initialized. Call initializePaymentService first.');
+  }
+  
   // Generate custom transaction ID and reference
   const transactionId = generateTransactionId();
   const transactionRef = generateTransactionReference(
@@ -47,15 +48,9 @@ export const initiatePayment = async (paymentData) => {
     }
   };
   
-  console.log('Generated transaction identifiers:', {
-    transaction_id: transactionId,
-    transaction_reference: transactionRef,
-    order_number: paymentData.order_number
-  });
   
-  const response = await fetch(`${API_BASE_URL}/payments/initiate/`, {
+  const response = await authenticatedFetch(`/payments/initiate/`, {
     method: 'POST',
-    headers: getAuthHeaders(),
     body: JSON.stringify(enhancedPaymentData),
   });
 
@@ -80,20 +75,20 @@ export const initiatePayment = async (paymentData) => {
  * @returns {Promise<Array>} - Array of payment modes
  */
 export const getPaymentModes = async () => {
+  if (!authenticatedFetch) {
+    return getFallbackPaymentModes();
+  }
+  
   try {
-    const response = await fetch(`${API_BASE_URL}/payments/payment-modes/`, {
-      headers: getAuthHeaders(),
-    });
+    const response = await authenticatedFetch(`/payments/payment-modes/`);
 
     if (response.ok) {
       const data = await response.json();
       return data.payment_modes.map(item => item.value);
     } else {
-      console.warn('Failed to fetch payment modes, using fallback');
       return getFallbackPaymentModes();
     }
   } catch (error) {
-    console.warn('Error fetching payment modes:', error);
     return getFallbackPaymentModes();
   }
 };
@@ -116,9 +111,7 @@ const getFallbackPaymentModes = () => [
  * @returns {Promise<object>} - Payment details
  */
 export const getPaymentDetails = async (reference) => {
-  const response = await fetch(`${API_BASE_URL}/payments/${reference}/`, {
-    headers: getAuthHeaders(),
-  });
+  const response = await authenticatedFetch(`/payments/${reference}/`);
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ detail: 'Payment not found' }));
@@ -142,11 +135,9 @@ export const getPayments = async (filters = {}) => {
     }
   });
 
-  const url = `${API_BASE_URL}/payments/${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  const url = `/payments/${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
   
-  const response = await fetch(url, {
-    headers: getAuthHeaders(),
-  });
+  const response = await authenticatedFetch(url);
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ detail: 'Failed to fetch payments' }));
@@ -190,7 +181,6 @@ export const handlePaymentCallback = async (reference, callbackData = {}) => {
   try {
     return await verifyPaymentStatus(reference);
   } catch (error) {
-    console.error('Payment verification error:', error);
     throw error;
   }
 };

@@ -1,8 +1,8 @@
-import React, { useState, useEffect, memo, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, memo, useMemo, useCallback, useRef } from 'react';
 import { Container, Table, Card, Modal, Form, Button, Row, Col } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import useAuth from '../hooks/useAuth';
+import { useAuth } from '../contexts/AuthContext';
 import {
     validateGhanaianMobileNumber,
     sanitizeMobileNumberInput,
@@ -12,9 +12,10 @@ import {
     initiatePayment,
     formatPaymentError
 } from '../services/paymentService';
-import { useRealTimeUpdates } from '../hooks/useRealTimeUpdates';
 import { API_BASE_URL } from '../utils/api';
+import PullToRefreshWrapper from './PullToRefreshWrapper';
 
+// Optimized ViewOrdersPage with instant loading
 const ViewOrdersPage = memo(() => {
     const { logout } = useAuth();
     const navigate = useNavigate();
@@ -50,32 +51,118 @@ const ViewOrdersPage = memo(() => {
     outForDelivery: 0
   });
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isCancellingOrder, setIsCancellingOrder] = useState(false);
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const ordersPerPage = 10;
   const [paginatedOrders, setPaginatedOrders] = useState([]);
 
-    // Initialize real-time updates
-    const {
-        isLive,
-        refresh: manualRefresh,
-    } = useRealTimeUpdates({
-        endpoint: `${API_BASE_URL}/orders/`,
-        enableWebSocket: false, // Disable WebSocket until backend supports it
-        onUpdate: (newData) => {
-            console.log('ViewOrdersPage: Real-time update received:', newData);
-            // newData is already an array from the hook, not an object with results
-            if (Array.isArray(newData)) {
-                setAllOrders(newData);
-                console.log('ViewOrdersPage: Orders updated via real-time, count:', newData.length);
+    // Fetch orders from API - with consistent loading
+    const fetchOrders = useCallback(async (showLoader = true) => {
+        try {
+            if (showLoader) {
+                setLoading(true);
             } else {
-                console.warn('ViewOrdersPage: Unexpected data format:', newData);
+                setIsRefreshing(true);
             }
-        },
-        pollInterval: 2000, // Faster updates for better responsiveness
-        enabled: true
-    });
+            
+            const token = localStorage.getItem('token');
+            if (!token) {
+                logout();
+                return;
+            }
+
+            // Check if we're looking at today's date - use optimized endpoint
+            const today = new Date().toISOString().split('T')[0];
+            const isToday = selectedDate === today;
+            
+            const endpoint = isToday 
+                ? `${API_BASE_URL}/orders/today/` // Fast today's orders endpoint
+                : `${API_BASE_URL}/orders/?date=${selectedDate}`; // Regular endpoint with date filter
+
+            console.log('🔍 Fetching orders:', {
+                endpoint,
+                selectedDate,
+                isToday,
+                showLoader
+            });
+
+            const response = await fetch(endpoint, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                    'Cache-Control': isToday ? 'max-age=60' : 'max-age=300' // Cache today's orders for 1 min, others for 5 min
+                },
+            });
+
+            console.log('📡 Response status:', response.status, response.statusText);
+
+            if (!response.ok) {
+                if (response.status === 401) {
+                    logout();
+                    return;
+                }
+                
+                // Try to get error details from response
+                let errorDetails = `HTTP ${response.status}`;
+                try {
+                    const errorData = await response.json();
+                    if (errorData.detail || errorData.message) {
+                        errorDetails += `: ${errorData.detail || errorData.message}`;
+                    }
+                } catch (parseError) {
+                    // If we can't parse the error response, use the status text
+                    if (response.statusText) {
+                        errorDetails += `: ${response.statusText}`;
+                    }
+                }
+                
+                throw new Error(errorDetails);
+            }
+
+            const data = await response.json();
+            const orders = Array.isArray(data) ? data : (data.results || []);
+            
+            console.log('✅ Orders fetched successfully:', {
+                totalOrders: orders.length,
+                data: data,
+                selectedDate
+            });
+            
+            // Update state immediately
+            setAllOrders(orders);
+            
+        } catch (error) {
+            console.error('Error fetching orders:', error);
+            
+            // Provide more specific error messages
+            let errorMessage = 'Failed to load orders';
+            
+            if (error.message.includes('HTTP 404')) {
+                errorMessage = `No orders found for ${new Date(selectedDate).toLocaleDateString()}`;
+            } else if (error.message.includes('HTTP 403')) {
+                errorMessage = 'Access denied. Please check your permissions.';
+            } else if (error.message.includes('HTTP 500')) {
+                errorMessage = 'Server error. Please try again later.';
+            } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                errorMessage = 'Network error. Please check your connection and try again.';
+            } else if (error.message.includes('HTTP')) {
+                errorMessage = `Server error (${error.message}). Please try again.`;
+            }
+            
+            toast.error(errorMessage);
+        } finally {
+            if (showLoader) {
+                setLoading(false);
+            } else {
+                setIsRefreshing(false);
+            }
+        }
+    }, [logout, selectedDate]);
 
     useEffect(() => {
         const fetchPaymentModes = async () => {
@@ -99,7 +186,6 @@ const ViewOrdersPage = memo(() => {
                     }));
                     setPaymentModes(modes);
                 } else {
-                    console.warn('Failed to fetch payment modes, using fallback');
                     // Use fallback payment modes if API fails
                     setPaymentModes([
                         { value: 'CASH', label: 'Cash', disabled: false },
@@ -110,7 +196,6 @@ const ViewOrdersPage = memo(() => {
                     ]);
                 }
             } catch (err) {
-                console.warn('Error fetching payment modes:', err);
                 // Use fallback payment modes if API fails
                 setPaymentModes([
                     { value: 'CASH', label: 'Cash', disabled: false },
@@ -122,12 +207,14 @@ const ViewOrdersPage = memo(() => {
             }
         };
 
-        // Only fetch payment modes, orders are now handled by real-time updates
+        // Fetch payment modes (async, non-blocking)
         fetchPaymentModes();
         
-        // Set loading to false since real-time updates will handle data loading
-        setLoading(false);
-    }, [logout]);
+        // Fetch orders immediately (priority)
+        fetchOrders();
+    }, [logout, fetchOrders]);
+
+    // Note: Date changes are now handled with debouncing in handleDateChange
 
     // Handle window resize for mobile/desktop view
     useEffect(() => {
@@ -145,49 +232,74 @@ const ViewOrdersPage = memo(() => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
     
-    // Memoized filtered orders and stats calculation for better performance
-    const { filteredOrdersMemo, orderStatsMemo } = useMemo(() => {
-        if (allOrders.length === 0) {
-            return {
-                filteredOrdersMemo: [],
-                orderStatsMemo: { total: 0, pending: 0, accepted: 0, fulfilled: 0, outForDelivery: 0 }
-            };
-        }
-        
-        const filtered = allOrders.filter(order => {
-            const orderDate = new Date(order.created_at).toISOString().split('T')[0];
-            return orderDate === selectedDate;
-        });
-        
-        const stats = {
-            total: filtered.length,
-            pending: filtered.filter(order => order.status === 'Pending' || order.status === 'Accepted').length,
-            accepted: filtered.filter(order => order.status === 'Accepted').length,
-            fulfilled: filtered.filter(order => order.status === 'Fulfilled').length,
-            outForDelivery: filtered.filter(order => order.status === 'Out for Delivery').length
+    // Add page visibility and focus listeners to refresh orders when returning from edit page
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            // Refresh orders when page becomes visible (e.g., returning from edit page)
+            if (!document.hidden) {
+                console.log('🔄 Page became visible, refreshing orders...');
+                fetchOrders(false); // Don't show loading spinner
+            }
         };
         
-        return { filteredOrdersMemo: filtered, orderStatsMemo: stats };
-    }, [allOrders, selectedDate]);
+        const handleWindowFocus = () => {
+            // Refresh orders when window gains focus
+            console.log('🔄 Window gained focus, refreshing orders...');
+            fetchOrders(false); // Don't show loading spinner
+        };
+        
+        // Add event listeners
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('focus', handleWindowFocus);
+        
+        // Cleanup
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('focus', handleWindowFocus);
+        };
+    }, [fetchOrders]);
     
-    // Update state when memoized values change
+    // Calculate stats from all orders (already filtered by backend)
+    const orderStatsMemo = useMemo(() => {
+        const stats = {
+            total: allOrders.length,
+            pending: allOrders.filter(order => order.status === 'Pending' || order.status === 'Accepted').length,
+            accepted: allOrders.filter(order => order.status === 'Accepted').length,
+            fulfilled: allOrders.filter(order => order.status === 'Fulfilled').length,
+            outForDelivery: allOrders.filter(order => order.status === 'Out for Delivery').length
+        };
+        return stats;
+    }, [allOrders]);
+    
+    // Update state when orders or stats change
     useEffect(() => {
-        setFilteredOrders(filteredOrdersMemo);
+        setFilteredOrders(allOrders); // Backend already filtered
         setOrderStats(orderStatsMemo);
-        setCurrentPage(1); // Reset to first page when filtered orders change
-    }, [filteredOrdersMemo, orderStatsMemo]);
+        setCurrentPage(1); // Reset to first page when orders change
+    }, [allOrders, orderStatsMemo]);
     
-    // Update paginated orders when filteredOrders or currentPage changes
+    // Update paginated orders when allOrders or currentPage changes
     useEffect(() => {
         const startIndex = (currentPage - 1) * ordersPerPage;
         const endIndex = startIndex + ordersPerPage;
-        const paginatedData = filteredOrders.slice(startIndex, endIndex);
+        const paginatedData = allOrders.slice(startIndex, endIndex);
         setPaginatedOrders(paginatedData);
-    }, [filteredOrders, currentPage, ordersPerPage]);
+    }, [allOrders, currentPage, ordersPerPage]);
 
     const handleDateChange = useCallback((e) => {
-        setSelectedDate(e.target.value);
+        const newDate = e.target.value;
+        setSelectedDate(newDate);
+        
+        // Debounce API calls for rapid date changes
+        if (dateChangeTimeoutRef.current) {
+            clearTimeout(dateChangeTimeoutRef.current);
+        }
+        dateChangeTimeoutRef.current = setTimeout(() => {
+            fetchOrders(false);
+        }, 300); // 300ms debounce
     }, []);
+    
+    const dateChangeTimeoutRef = useRef(null);
 
     const getTodayDate = () => {
         return new Date().toISOString().split('T')[0];
@@ -293,10 +405,6 @@ const ViewOrdersPage = memo(() => {
         );
         setFilteredOrders(updatedFilteredOrders);
         
-        // Dispatch order update event for real-time sync
-        window.dispatchEvent(new CustomEvent('orderUpdated', {
-          detail: { orderId: selectedOrder.id, newStatus }
-        }));
         
         toast.success(`Order status updated to ${newStatus}`);
         
@@ -305,11 +413,37 @@ const ViewOrdersPage = memo(() => {
         setNewStatus('');
       } else {
         const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
-        console.error('Update failed:', errorData);
-        toast.error(errorData.detail || errorData.message || 'Failed to update order status');
+        
+        // Handle different error response formats
+        let errorMessage = 'Failed to update order status';
+        
+        if (errorData.detail) {
+          errorMessage = errorData.detail;
+        } else if (errorData.message) {
+          errorMessage = errorData.message;
+        } else if (errorData.non_field_errors) {
+          // Handle non-field errors array
+          errorMessage = Array.isArray(errorData.non_field_errors) 
+            ? errorData.non_field_errors.join(', ') 
+            : errorData.non_field_errors;
+        } else if (typeof errorData === 'object' && errorData !== null) {
+          // Handle field-specific validation errors
+          const fieldErrors = [];
+          for (const [field, errors] of Object.entries(errorData)) {
+            if (Array.isArray(errors)) {
+              fieldErrors.push(...errors);
+            } else if (typeof errors === 'string') {
+              fieldErrors.push(errors);
+            }
+          }
+          if (fieldErrors.length > 0) {
+            errorMessage = fieldErrors.join(', ');
+          }
+        }
+        
+        toast.error(errorMessage);
       }
     } catch (error) {
-      console.error('Error updating order status:', error);
       toast.error('Network error: Could not update order status');
     } finally {
       // Always re-enable status updates
@@ -333,6 +467,14 @@ const ViewOrdersPage = memo(() => {
   };
 
     const confirmPayment = async () => {
+        // Prevent duplicate payment processing
+        if (isProcessingPayment) {
+            toast.warning('Payment is already being processed, please wait...');
+            return;
+        }
+        
+        setIsProcessingPayment(true);
+        
         try {
             const amount = parseFloat(paymentAmount);
             
@@ -345,8 +487,6 @@ const ViewOrdersPage = memo(() => {
                 payment_type: isRefundMode ? 'refund' : 'payment' // Set correct type based on mode
             };
             
-            console.log('Sending payment data:', paymentData);
-            console.log('Selected order:', selectedOrder);
             
             // Add mobile number only for PAYSTACK(API) - the only true mobile money payment
             if (newPaymentMode === 'PAYSTACK(API)') {
@@ -367,7 +507,6 @@ const ViewOrdersPage = memo(() => {
             
             // Use the payment service to initiate payment
             const paymentResponse = await initiatePayment(paymentData);
-            console.log('Payment response:', paymentResponse);
                 
                 // Handle different payment methods responses
                 if (newPaymentMode === 'PAYSTACK(API)') {
@@ -420,10 +559,6 @@ const ViewOrdersPage = memo(() => {
                 // Payment/refund was successful, refresh order data from backend to get updated status
                 await refreshOrderData();
                 
-                // Dispatch payment update event for real-time sync
-                window.dispatchEvent(new CustomEvent('paymentUpdated', {
-                    detail: { orderId: selectedOrder.id, paymentMode: newPaymentMode, amount: amount }
-                }));
             }
                 
                 setShowPaymentModal(false);
@@ -435,9 +570,11 @@ const ViewOrdersPage = memo(() => {
                 setPaymentAmount('');
                 setMobileNumber('');
         } catch (error) {
-            console.error('Error updating payment details:', error);
             const errorMessage = formatPaymentError(error);
             toast.error(errorMessage);
+        } finally {
+            // Always re-enable payment processing
+            setIsProcessingPayment(false);
         }
     };
 
@@ -513,21 +650,33 @@ const ViewOrdersPage = memo(() => {
     
     const refreshOrderData = useCallback(async () => {
         try {
-            // Use the real-time refresh instead of manual fetch
-            manualRefresh();
+            // Store the current selected order ID before refresh
+            const selectedOrderId = selectedOrder?.id;
             
-            // If a specific order was selected, update it with fresh data from the current orders
-            if (selectedOrder) {
-                const updatedOrder = allOrders.find(order => order.id === selectedOrder.id);
-                if (updatedOrder) {
-                    setSelectedOrder(updatedOrder);
-                }
+            // Refresh without showing loading spinner
+            await fetchOrders(false);
+            
+            // If we have a selected order, update it with fresh data after fetch completes
+            if (selectedOrderId) {
+                // Wait a bit for the fetchOrders to complete and state to update
+                setTimeout(() => {
+                    setAllOrders(currentOrders => {
+                        const updatedOrder = currentOrders.find(order => order.id === selectedOrderId);
+                        if (updatedOrder) {
+                            console.log('🔄 Updating selectedOrder with fresh data:', updatedOrder);
+                            setSelectedOrder(updatedOrder);
+                        } else {
+                            console.log('⚠️ Could not find updated order in refreshed data');
+                        }
+                        return currentOrders; // Return current state unchanged
+                    });
+                }, 200); // Slightly longer delay to ensure fetchOrders completes
             }
         } catch (error) {
-            console.error('Error refreshing order data:', error);
-            // Don't show error toast for this background operation
+            console.error('Error in refreshOrderData:', error);
+            // Silent error - don't show user notification for refresh failures
         }
-    }, [manualRefresh, selectedOrder, allOrders]);
+    }, [fetchOrders, selectedOrder?.id]);
     
 
     // Function to get status options based on order type
@@ -593,77 +742,99 @@ const ViewOrdersPage = memo(() => {
 
     // Helper function to get status badge color
     const getStatusBadgeColor = (status) => {
-        switch (status) {
-          case 'Pending':
-            return '#FFF8E1';
-          case 'Confirmed':
-            return '#E8F5E9';
-          case 'Processing':
-            return '#E0F7FA';
-          case 'Ready':
-            return '#E8EAF6';
-          case 'In Transit':
-            return '#F3E5F5';
-          case 'Delivered':
-            return '#E0F2F1';
-          case 'Completed':
-            return '#E8F5E9';
-          case 'Cancelled':
-            return '#FFEBEE';
+        switch (status?.toLowerCase()) {
+          case 'pending':
+            return '#ffc107'; // Bootstrap warning
+          case 'accepted':
+          case 'confirmed':
+            return '#0dcaf0'; // Bootstrap info
+          case 'preparing':
+          case 'processing':
+            return '#0d6efd'; // Bootstrap primary
+          case 'ready':
+            return '#198754'; // Bootstrap success
+          case 'out for delivery':
+          case 'in transit':
+            return '#6c757d'; // Bootstrap secondary
+          case 'delivered':
+          case 'fulfilled':
+          case 'completed':
+            return '#198754'; // Bootstrap success
+          case 'cancelled':
+            return '#dc3545'; // Bootstrap danger
           default:
-            return '#ECEFF1';
+            return '#6c757d'; // Bootstrap secondary
         }
     };
 
     // Function to get status text color
     const getStatusTextColor = (status) => {
-        switch (status) {
-          case 'Pending':
-            return '#F57C00';
-          case 'Confirmed':
-            return '#2E7D32';
-          case 'Processing':
-            return '#0097A7';
-          case 'Ready':
-            return '#3949AB';
-          case 'In Transit':
-            return '#7B1FA2';
-          case 'Delivered':
-            return '#00796B';
-          case 'Completed':
-            return '#2E7D32';
-          case 'Cancelled':
-            return '#D32F2F';
+        switch (status?.toLowerCase()) {
+          case 'pending':
+            return '#000'; // Dark text for warning background
+          case 'accepted':
+          case 'confirmed':
+            return '#000'; // Dark text for info background
+          case 'preparing':
+          case 'processing':
+            return '#fff'; // White text for primary background
+          case 'ready':
+            return '#fff'; // White text for success background
+          case 'out for delivery':
+          case 'in transit':
+            return '#fff'; // White text for secondary background
+          case 'delivered':
+          case 'fulfilled':
+          case 'completed':
+            return '#fff'; // White text for success background
+          case 'cancelled':
+            return '#fff'; // White text for danger background
           default:
-            return '#546E7A';
+            return '#fff'; // White text for secondary background
         }
     };
 
     // Function to get payment status badge background color
     const getPaymentStatusBadgeColor = (paymentStatus) => {
-        switch (paymentStatus) {
-          case 'Paid':
-            return '#E8F5E9';
-          case 'Partially Paid':
-            return '#FFF8E1';
-          case 'Not Paid':
-            return '#FFEBEE';
+        switch (paymentStatus?.toLowerCase()) {
+          case 'paid':
+            return '#198754'; // Bootstrap success
+          case 'partially paid':
+          case 'partial':
+            return '#ffc107'; // Bootstrap warning
+          case 'unpaid':
+          case 'not paid':
+            return '#dc3545'; // Bootstrap danger
+          case 'overpaid':
+            return '#0dcaf0'; // Bootstrap info
+          case 'pending payment':
+            return '#6c757d'; // Bootstrap secondary
+          case 'refunded':
+            return '#343a40'; // Bootstrap dark
           default:
-            return '#ECEFF1';
+            return '#6c757d'; // Bootstrap secondary
         }
     };
 
     // Function to get payment status text color
     const getPaymentStatusTextColor = (paymentStatus) => {
-        switch (paymentStatus) {
-          case 'Paid':
-            return '#2E7D32';
-          case 'Partially Paid':
-            return '#F57C00';
-          case 'Not Paid':
-            return '#D32F2F';
+        switch (paymentStatus?.toLowerCase()) {
+          case 'paid':
+            return '#fff'; // White text for success background
+          case 'partially paid':
+          case 'partial':
+            return '#000'; // Dark text for warning background
+          case 'unpaid':
+          case 'not paid':
+            return '#fff'; // White text for danger background
+          case 'overpaid':
+            return '#000'; // Dark text for info background
+          case 'pending payment':
+            return '#fff'; // White text for secondary background
+          case 'refunded':
+            return '#fff'; // White text for dark background
           default:
-            return '#546E7A';
+            return '#fff'; // White text for secondary background
         }
     };
 
@@ -683,31 +854,52 @@ const ViewOrdersPage = memo(() => {
 
     if (loading) {
         return (
-            <Container className="mt-4 text-center">
-                <div className="spinner-border" role="status">
-                    <span className="visually-hidden">Loading...</span>
+            <Container className="mt-4">
+                <div className="mb-3">
+                    <Button
+                        variant="outline-primary"
+                        size="sm"
+                        onClick={() => navigate('/dashboard')}
+                        className="d-flex align-items-center ada-shadow-sm"
+                        style={{ minHeight: '44px' }}
+                    >
+                        <i className="bi bi-arrow-left me-2"></i>
+                        <span>Return to Dashboard</span>
+                    </Button>
                 </div>
-                <p className="mt-2">Loading orders...</p>
+                <div className="text-center">
+                    <div className="spinner-border" role="status">
+                        <span className="visually-hidden">Loading...</span>
+                    </div>
+                    <p className="mt-2">Loading orders...</p>
+                </div>
             </Container>
         );
     }
 
 
   return (
-    <Container className="my-3 my-md-4 px-3 px-md-4">
-      {/* Return to Dashboard Button */}
-      <div className="mb-3">
-        <Button
-          variant="outline-primary"
-          size="sm"
-          onClick={() => navigate('/dashboard')}
-          className="d-flex align-items-center ada-shadow-sm"
-          style={{ minHeight: '44px' }}
-        >
-          <i className="bi bi-arrow-left me-2"></i>
-          <span>Return to Dashboard</span>
-        </Button>
-      </div>
+    <PullToRefreshWrapper 
+      onRefresh={async () => {
+        await fetchOrders(false); // Don't show loading spinner for refresh
+        toast.success('Orders updated');
+      }}
+      enabled={isMobile}
+    >
+      <Container className="my-3 my-md-4 px-3 px-md-4">
+        {/* Return to Dashboard Button */}
+        <div className="mb-3">
+          <Button
+            variant="outline-primary"
+            size="sm"
+            onClick={() => navigate('/dashboard')}
+            className="d-flex align-items-center ada-shadow-sm"
+            style={{ minHeight: '44px' }}
+          >
+            <i className="bi bi-arrow-left me-2"></i>
+            <span>Return to Dashboard</span>
+          </Button>
+        </div>
       
       {/* Order Stats Cards - only shown on desktop */}
       {!isMobile && showStats && (
@@ -755,45 +947,70 @@ const ViewOrdersPage = memo(() => {
         <Card.Header style={{ backgroundColor: 'var(--ada-primary)', color: 'white' }}>
           <div className="d-flex justify-content-between align-items-center flex-wrap">
             <div className="d-flex align-items-center">
-              <h5 className="mb-0 me-2">
-                <i className="bi bi-list-ul me-2"></i>
-                Orders List ({filteredOrders.length})
-                {isLive && (
-                  <span className="badge bg-success ms-2 animate-pulse">
-                    <i className="bi bi-broadcast me-1"></i>
-                    LIVE
-                  </span>
-                )}
-              </h5>
+                <h5 className="mb-0 me-2">
+                  <i className="bi bi-list-ul me-2"></i>
+                  Orders List ({filteredOrders.length})
+                </h5>
             </div>
             <div className="d-flex align-items-center mt-2 mt-sm-0">
-              <Form.Control
-                type="date"
-                value={selectedDate}
-                onChange={handleDateChange}
-                className="ada-shadow-sm"
-                style={{ minHeight: '34px', width: 'auto', maxWidth: '140px' }}
-                size="sm"
-              />
-              {!isToday && (
-                <Button
-                  variant="outline-primary"
-                  size="sm"
-                  onClick={() => setSelectedDate(getTodayDate())}
-                  className="ms-2"
-                >
-                  <i className="bi bi-calendar-check"></i>
-                </Button>
+              {isMobile ? (
+                <>
+                  {/* Mobile: Show only calendar icon that opens date picker */}
+                  <div className="position-relative">
+                    <Form.Control
+                      type="date"
+                      value={selectedDate}
+                      onChange={handleDateChange}
+                      className="position-absolute"
+                      style={{ 
+                        opacity: 0, 
+                        top: 0, 
+                        left: 0, 
+                        width: '40px', 
+                        height: '34px',
+                        cursor: 'pointer',
+                        zIndex: 10
+                      }}
+                      size="sm"
+                    />
+                    <Button
+                      variant="outline-light"
+                      size="sm"
+                      className="d-flex align-items-center justify-content-center"
+                      style={{ 
+                        minWidth: '40px', 
+                        height: '34px',
+                        border: '1px solid rgba(255,255,255,0.5)',
+                        color: 'white'
+                      }}
+                    >
+                      <i className="bi bi-calendar3"></i>
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Desktop: Show full date picker with reset button */}
+                  <Form.Control
+                    type="date"
+                    value={selectedDate}
+                    onChange={handleDateChange}
+                    className="ada-shadow-sm"
+                    style={{ minHeight: '34px', width: 'auto', maxWidth: '140px' }}
+                    size="sm"
+                  />
+                  {!isToday && (
+                    <Button
+                      variant="outline-primary"
+                      size="sm"
+                      onClick={() => setSelectedDate(getTodayDate())}
+                      className="ms-2"
+                    >
+                      <i className="bi bi-calendar-check"></i>
+                    </Button>
+                  )}
+                </>
               )}
-              <Button
-                variant="outline-secondary"
-                size="sm"
-                onClick={manualRefresh}
-                className="ms-2"
-                title="Manual refresh"
-              >
-                <i className="bi bi-arrow-clockwise"></i>
-              </Button>
             </div>
           </div>
         </Card.Header>
@@ -846,12 +1063,17 @@ const ViewOrdersPage = memo(() => {
                       </td>
                       <td>
                         <span 
-                          className={`badge ${order.delivery_type === 'Delivery' ? 'bg-warning text-dark' : 'bg-success'}`}
-                          style={{ fontSize: '0.85rem', padding: '0.5rem 0.75rem' }}
+                          className="badge"
+                          style={{ 
+                            fontSize: '0.85rem', 
+                            padding: '0.5rem 0.75rem',
+                            backgroundColor: order.delivery_type === 'Delivery' ? '#ffc107' : '#198754',
+                            color: order.delivery_type === 'Delivery' ? '#000' : '#fff'
+                          }}
                         >
                           <i className={`bi ${order.delivery_type === 'Delivery' ? 'bi-truck' : 'bi-shop'} me-2`}></i>
-                          {order.delivery_type === 'Delivery' && order.delivery_location 
-                            ? `Delivery to ${order.delivery_location}`
+                          {order.delivery_type === 'Delivery' && (order.delivery_location || order.custom_delivery_location)
+                            ? `Delivery to ${order.effective_delivery_location_name || order.delivery_location || order.custom_delivery_location}`
                             : order.delivery_type || 'Pickup'
                           }
                         </span>
@@ -861,8 +1083,13 @@ const ViewOrdersPage = memo(() => {
                       </td>
                       <td>
                         <span 
-                          className={`badge ${getPaymentStatusBadgeVariant(order.payment_status)}`}
-                          style={{ fontSize: '0.85rem', padding: '0.5rem 0.75rem' }}
+                          className="badge"
+                          style={{ 
+                            fontSize: '0.85rem', 
+                            padding: '0.5rem 0.75rem', 
+                            background: getPaymentStatusBadgeColor(order.payment_status),
+                            color: getPaymentStatusTextColor(order.payment_status)
+                          }}
                         >
                           {order.payment_status || 'Not Paid'}
                         </span>
@@ -879,8 +1106,13 @@ const ViewOrdersPage = memo(() => {
                       </td>
                       <td>
                         <span 
-                          className={`badge ${getStatusBadgeVariant(order.status)}`}
-                          style={{ fontSize: '0.85rem', padding: '0.5rem 0.75rem' }}
+                          className="badge"
+                          style={{ 
+                            fontSize: '0.85rem', 
+                            padding: '0.5rem 0.75rem',
+                            background: getStatusBadgeColor(order.status),
+                            color: getStatusTextColor(order.status)
+                          }}
                         >
                           {order.status}
                         </span>
@@ -1106,6 +1338,8 @@ const ViewOrdersPage = memo(() => {
         show={showStatusModal} 
         onHide={closeStatusModal} 
         centered
+        size={isMobile ? undefined : "lg"}
+        fullscreen={isMobile ? "sm-down" : false}
       >
         <Modal.Header closeButton>
           <Modal.Title>
@@ -1208,33 +1442,37 @@ const ViewOrdersPage = memo(() => {
             </>
           )}
         </Modal.Body>
-        <Modal.Footer style={{ gap: '0.75rem' }}>
-          <div className="d-flex flex-column flex-sm-row w-100">
+        <Modal.Footer className={isMobile ? "p-2" : "p-3"}>
+          <div className="d-flex flex-column flex-sm-row w-100 gap-2">
             <Button 
               variant="danger" 
               onClick={closeStatusModal}
-              className="mb-2 mb-sm-0 me-sm-2 flex-fill"
+              className="flex-fill"
+              size={isMobile ? "sm" : undefined}
+              style={{ minHeight: isMobile ? '36px' : '44px' }}
             >
-              <i className="bi bi-x-circle me-2"></i>
-              Cancel
+              <i className="bi bi-x-circle me-1"></i>
+              {isMobile ? 'Cancel' : 'Cancel'}
             </Button>
             <Button 
               variant="primary" 
               onClick={handleUpdateStatus}
               disabled={!newStatus || newStatus === selectedOrder?.status || isUpdatingStatus}
               className="flex-fill"
+              size={isMobile ? "sm" : undefined}
+              style={{ minHeight: isMobile ? '36px' : '44px' }}
             >
               {isUpdatingStatus ? (
                 <>
-                  <div className="spinner-border spinner-border-sm me-2" role="status">
+                  <div className="spinner-border spinner-border-sm me-1" role="status">
                     <span className="visually-hidden">Updating...</span>
                   </div>
-                  Updating...
+                  {isMobile ? 'Updating...' : 'Updating...'}
                 </>
               ) : (
                 <>
-                  <i className="bi bi-check-circle me-2"></i>
-                  Update Status
+                  <i className="bi bi-check-circle me-1"></i>
+                  {isMobile ? 'Update' : 'Update Status'}
                 </>
               )}
             </Button>
@@ -1247,6 +1485,8 @@ const ViewOrdersPage = memo(() => {
         show={showPaymentModal} 
         onHide={closePaymentModal} 
         centered
+        size={isMobile ? undefined : "lg"}
+        fullscreen={isMobile ? "sm-down" : false}
       >
         <Modal.Header closeButton>
           <Modal.Title>
@@ -1263,22 +1503,22 @@ const ViewOrdersPage = memo(() => {
             )}
           </Modal.Title>
         </Modal.Header>
-        <Modal.Body>
+        <Modal.Body className={isMobile ? "p-3" : "p-4"}>
           {selectedOrder && (
             <>
               {/* Order Total - Prominent Display */}
-              <div className="alert alert-info mb-4" style={{ border: '2px solid #0dcaf0', backgroundColor: '#e7f3ff' }}>
+              <div className={`alert alert-info ${isMobile ? 'mb-3' : 'mb-4'}`} style={{ border: '2px solid #0dcaf0', backgroundColor: '#e7f3ff' }}>
                 <div className="d-flex justify-content-between align-items-center">
                   <div>
-                    <h5 className="mb-0" style={{ color: '#0c63e4' }}>
+                    <h6 className={`mb-0 ${isMobile ? 'fs-6' : 'fs-5'}`} style={{ color: '#0c63e4' }}>
                       <i className="bi bi-receipt me-2"></i>
                       Order Total
-                    </h5>
+                    </h6>
                   </div>
                   <div className="text-end">
-                    <h4 className="mb-0 fw-bold" style={{ color: '#0c63e4', fontSize: '1.5rem' }}>
+                    <h5 className={`mb-0 fw-bold ${isMobile ? 'fs-5' : 'fs-4'}`} style={{ color: '#0c63e4' }}>
                       ₵{parseFloat(selectedOrder.total_price || 0).toFixed(2)}
-                    </h4>
+                    </h5>
                   </div>
                 </div>
               </div>
@@ -1329,10 +1569,10 @@ const ViewOrdersPage = memo(() => {
               
               {!showPaymentConfirmation ? (
                 <>
-                  <Row>
+                  <Row className={isMobile ? 'g-2' : 'g-3'}>
                     <Col md={6}>
-                      <Form.Group controlId="paymentModeSelect" className="mb-3">
-                        <Form.Label className="fw-semibold">Payment Mode <span className="text-danger">*</span></Form.Label>
+                      <Form.Group controlId="paymentModeSelect" className={isMobile ? "mb-2" : "mb-3"}>
+                        <Form.Label className={`fw-semibold ${isMobile ? 'small' : ''}`}>Payment Mode <span className="text-danger">*</span></Form.Label>
                         <Form.Select
                           value={newPaymentMode}
                           onChange={(e) => {
@@ -1354,6 +1594,7 @@ const ViewOrdersPage = memo(() => {
                             }
                           }}
                           className="ada-shadow-sm"
+                          size={isMobile ? "sm" : undefined}
                           required
                           disabled={isRefundMode} // Disabled in refund mode (cash only)
                         >
@@ -1379,18 +1620,20 @@ const ViewOrdersPage = memo(() => {
                       </Form.Group>
                     </Col>
                     <Col md={6}>
-                      <Form.Group controlId="paymentAmount" className="mb-3">
-                        <Form.Label className="fw-semibold">
+                      <Form.Group controlId="paymentAmount" className={isMobile ? "mb-2" : "mb-3"}>
+                        <Form.Label className={`fw-semibold ${isMobile ? 'small' : ''}`}>
                           {isRefundMode ? 'Refund Amount' : 'Amount Received'} <span className="text-danger">*</span>
                         </Form.Label>
                         <Form.Control
                           type="number"
+                          inputMode="decimal"
                           step="0.01"
                           min="0"
                           value={paymentAmount}
                           onChange={(e) => setPaymentAmount(e.target.value)}
                           placeholder="0.00"
                           className="ada-shadow-sm"
+                          size={isMobile ? "sm" : undefined}
                           required
                         />
                       </Form.Group>
@@ -1399,15 +1642,16 @@ const ViewOrdersPage = memo(() => {
                   
                   {/* Mobile Number Input for PAYSTACK(API) */}
                   {newPaymentMode === 'PAYSTACK(API)' && (
-                    <Row className="mb-3">
+                    <Row className={isMobile ? "mb-2" : "mb-3"}>
                       <Col>
                         <Form.Group controlId="mobileNumber">
-                          <Form.Label className="fw-semibold">
+                          <Form.Label className={`fw-semibold ${isMobile ? 'small' : ''}`}>
                             Mobile Number <span className="text-danger">*</span>
-                            <small className="text-muted ms-2">(Required for Paystack API payments)</small>
+                            {!isMobile && <small className="text-muted ms-2">(Required for Paystack API payments)</small>}
                           </Form.Label>
                           <Form.Control
                             type="tel"
+                            inputMode="tel"
                             value={mobileNumber}
                             onChange={(e) => {
                               const sanitized = sanitizeMobileNumberInput(e.target.value);
@@ -1415,21 +1659,24 @@ const ViewOrdersPage = memo(() => {
                             }}
                             placeholder="e.g., 0241234567 or 233241234567"
                             className="ada-shadow-sm"
+                            size={isMobile ? "sm" : undefined}
                             required
                             maxLength="15"
                           />
-                          <Form.Text className="text-muted">
-                            Enter Ghanaian mobile number (MTN, Vodafone, AirtelTigo)
-                          </Form.Text>
+                          {!isMobile && (
+                            <Form.Text className="text-muted">
+                              Enter Ghanaian mobile number (MTN, Vodafone, AirtelTigo)
+                            </Form.Text>
+                          )}
                         </Form.Group>
                       </Col>
                     </Row>
                   )}
                   
-                  <div className="bg-light p-3 rounded">
-                    <small className="text-muted">
+                  <div className={`bg-light rounded ${isMobile ? 'p-2' : 'p-3'}`}>
+                    <small className={`text-muted ${isMobile ? 'smaller' : ''}`}>
                       <i className="bi bi-info-circle me-1"></i>
-                      Payment status will be automatically determined based on the amount received compared to the order total.
+                      {isMobile ? 'Payment status auto-determined by amount vs order total.' : 'Payment status will be automatically determined based on the amount received compared to the order total.'}
                     </small>
                   </div>
                 </>
@@ -1480,34 +1727,53 @@ const ViewOrdersPage = memo(() => {
             </>
           )}
         </Modal.Body>
-        <Modal.Footer>
-          <div className="d-flex flex-column flex-sm-row w-100">
+        <Modal.Footer className={isMobile ? "p-2" : "p-3"}>
+          <div className="d-flex flex-column flex-sm-row w-100 gap-2">
             <Button 
               variant="danger" 
               onClick={closePaymentModal}
-              className="mb-2 mb-sm-0 me-sm-2 flex-fill"
+              disabled={isProcessingPayment}
+              className="flex-fill"
+              size={isMobile ? "sm" : undefined}
+              style={{ minHeight: isMobile ? '36px' : '44px' }}
             >
-              <i className="bi bi-x-circle me-2"></i>
+              <i className="bi bi-x-circle me-1"></i>
               Cancel
             </Button>
             {!showPaymentConfirmation ? (
               <Button 
                 variant="warning" 
                 onClick={handleUpdatePayment}
-                disabled={!newPaymentMode || !paymentAmount}
+                disabled={!newPaymentMode || !paymentAmount || isProcessingPayment}
                 className="flex-fill"
+                size={isMobile ? "sm" : undefined}
+                style={{ minHeight: isMobile ? '36px' : '44px' }}
               >
-                <i className="bi bi-arrow-right me-2"></i>
-                Review Payment
+                <i className="bi bi-arrow-right me-1"></i>
+                {isMobile ? 'Review' : 'Review Payment'}
               </Button>
             ) : (
               <Button 
                 variant={isRefundMode ? "info" : "success"} 
                 onClick={confirmPayment}
+                disabled={isProcessingPayment}
                 className="flex-fill"
+                size={isMobile ? "sm" : undefined}
+                style={{ minHeight: isMobile ? '36px' : '44px' }}
               >
-                <i className={`bi ${isRefundMode ? 'bi-arrow-return-left' : 'bi-check-circle'} me-2`}></i>
-                {isRefundMode ? 'Process Refund' : 'Confirm Payment'}
+                {isProcessingPayment ? (
+                  <>
+                    <div className="spinner-border spinner-border-sm me-1" role="status">
+                      <span className="visually-hidden">Processing...</span>
+                    </div>
+                    {isMobile ? (isRefundMode ? 'Refunding...' : 'Processing...') : (isRefundMode ? 'Processing Refund...' : 'Processing Payment...')}
+                  </>
+                ) : (
+                  <>
+                    <i className={`bi ${isRefundMode ? 'bi-arrow-return-left' : 'bi-check-circle'} me-1`}></i>
+                    {isMobile ? (isRefundMode ? 'Refund' : 'Confirm') : (isRefundMode ? 'Process Refund' : 'Confirm Payment')}
+                  </>
+                )}
               </Button>
             )}
           </div>
@@ -1598,7 +1864,10 @@ const ViewOrdersPage = memo(() => {
                           <Row className="align-items-center g-2">
                             <Col xs={2} md={1}>
                               <div className="text-center">
-                                <span className="badge bg-primary rounded-pill">
+                                <span className="badge rounded-pill" style={{
+                                    backgroundColor: '#0d6efd',
+                                    color: 'white'
+                                  }}>
                                   #{index + 1}
                                 </span>
                               </div>
@@ -1624,7 +1893,10 @@ const ViewOrdersPage = memo(() => {
                             </Col>
                             <Col xs={6} md={2}>
                               <div className="text-center">
-                                <span className={`badge ${getPaymentStatusBadgeVariant(payment.status)}`}>
+                                <span className="badge" style={{
+                                    backgroundColor: getPaymentStatusBadgeColor(payment.status),
+                                    color: getPaymentStatusTextColor(payment.status)
+                                  }}>
                                   {payment.status}
                                 </span>
                                 <div>
@@ -1707,10 +1979,18 @@ const ViewOrdersPage = memo(() => {
             </div>
             {selectedOrder && (
               <div className="d-flex gap-2">
-                <span className={`badge ${getStatusBadgeVariant(selectedOrder.status)}`} style={{ fontSize: '0.75rem' }}>
+                <span className="badge" style={{ 
+                    fontSize: '0.75rem',
+                    backgroundColor: getStatusBadgeColor(selectedOrder.status),
+                    color: getStatusTextColor(selectedOrder.status)
+                  }}>
                   {selectedOrder.status}
                 </span>
-                <span className={`badge ${getPaymentStatusBadgeVariant(selectedOrder.payment_status)}`} style={{ fontSize: '0.75rem' }}>
+                <span className="badge" style={{ 
+                    fontSize: '0.75rem',
+                    backgroundColor: getPaymentStatusBadgeColor(selectedOrder.payment_status),
+                    color: getPaymentStatusTextColor(selectedOrder.payment_status)
+                  }}>
                   {selectedOrder.payment_status || 'Not Paid'}
                 </span>
               </div>
@@ -1767,15 +2047,18 @@ const ViewOrdersPage = memo(() => {
                       </div>
                       <div className="d-flex justify-content-between align-items-center mb-2">
                         <span>Type:</span>
-                        <span className={`badge ${selectedOrder.delivery_type === 'Delivery' ? 'bg-warning text-dark' : 'bg-success'}`}>
+                        <span className="badge" style={{
+                            backgroundColor: selectedOrder.delivery_type === 'Delivery' ? '#ffc107' : '#198754',
+                            color: selectedOrder.delivery_type === 'Delivery' ? '#000' : '#fff'
+                          }}>
                           <i className={`bi ${selectedOrder.delivery_type === 'Delivery' ? 'bi-truck' : 'bi-shop'} me-1`}></i>
                           {selectedOrder.delivery_type || 'Pickup'}
                         </span>
                       </div>
-                      {selectedOrder.delivery_type === 'Delivery' && selectedOrder.delivery_location && (
+                      {selectedOrder.delivery_type === 'Delivery' && (selectedOrder.delivery_location || selectedOrder.custom_delivery_location) && (
                         <div className="d-flex justify-content-between align-items-center mb-2">
                           <span>Location:</span>
-                          <span className="text-muted small">{selectedOrder.delivery_location}</span>
+                          <span className="text-muted small">{selectedOrder.effective_delivery_location_name || selectedOrder.delivery_location || selectedOrder.custom_delivery_location}</span>
                         </div>
                       )}
                       {selectedOrder.delivery_type === 'Delivery' && selectedOrder.delivery_fee && (
@@ -1862,37 +2145,50 @@ const ViewOrdersPage = memo(() => {
             </>
           )}
         </Modal.Body>
-        <Modal.Footer className="p-3">
-          <div className="d-flex flex-column flex-sm-row w-100 gap-3">
+        <Modal.Footer className={isMobile ? "p-2" : "p-3"}>
+          <div className={`d-flex flex-column flex-sm-row w-100 ${isMobile ? 'gap-2' : 'gap-3'}`}>
             <Button 
               variant="danger" 
               onClick={closeOrderDetailsModal}
-              className="order-3 order-sm-1 flex-fill"
-              style={{ minHeight: '48px' }}
+              className="order-4 order-sm-1 flex-fill"
+              size={isMobile ? "sm" : undefined}
+              style={{ minHeight: isMobile ? '36px' : '44px' }}
             >
-              <i className="bi bi-x-circle me-2"></i>
+              <i className="bi bi-x-circle me-1"></i>
               Close
             </Button>
             
             {selectedOrder && (
               <>
             <Button 
+              variant="info" 
+              onClick={() => navigate(`/edit-order/${selectedOrder.order_number || selectedOrder.id}`)}
+              className="flex-fill order-1 order-sm-2"
+              size={isMobile ? "sm" : undefined}
+              style={{ minHeight: isMobile ? '36px' : '44px' }}
+            >
+              <i className="bi bi-pencil me-1"></i>
+              {isMobile ? 'Edit' : 'Edit Order'}
+            </Button>
+            <Button 
               variant="warning" 
               onClick={() => openStatusModal(selectedOrder)}
-              className="flex-fill order-1 order-sm-2"
-              style={{ minHeight: '48px' }}
+              className="flex-fill order-2 order-sm-3"
+              size={isMobile ? "sm" : undefined}
+              style={{ minHeight: isMobile ? '36px' : '44px' }}
             >
               <i className="bi bi-pencil-square me-1"></i>
-              <span className="d-none d-sm-inline">Update </span>Status
+              {isMobile ? 'Status' : 'Update Status'}
             </Button>
             <Button 
               variant="success" 
               onClick={() => openPaymentModal(selectedOrder)}
-              className="flex-fill order-2 order-sm-3"
-              style={{ minHeight: '48px' }}
+              className="flex-fill order-3 order-sm-4"
+              size={isMobile ? "sm" : undefined}
+              style={{ minHeight: isMobile ? '36px' : '44px' }}
             >
               <i className="bi bi-credit-card me-1"></i>
-              <span className="d-none d-sm-inline">Update </span>Payment
+              {isMobile ? 'Payment' : 'Update Payment'}
             </Button>
               </>
             )}
@@ -2044,6 +2340,7 @@ const ViewOrdersPage = memo(() => {
                 setShowCancellationModal(false);
                 setCancellationReason('');
               }}
+              disabled={isCancellingOrder}
               className="mb-2 mb-sm-0 me-sm-2 flex-fill"
             >
               <i className="bi bi-x-circle me-2"></i>
@@ -2057,28 +2354,54 @@ const ViewOrdersPage = memo(() => {
                   return;
                 }
                 
-                // Close the cancellation modal first
-                setShowCancellationModal(false);
+                // Prevent multiple cancellation attempts
+                if (isCancellingOrder) {
+                  toast.warning('Order cancellation is in progress, please wait...');
+                  return;
+                }
                 
-                // Proceed with the actual cancellation
-                await performStatusUpdate();
+                setIsCancellingOrder(true);
                 
-                // Reset the reason
-                setCancellationReason('');
+                try {
+                  // Close the cancellation modal first
+                  setShowCancellationModal(false);
+                  
+                  // Proceed with the actual cancellation
+                  await performStatusUpdate();
+                  
+                  // Reset the reason
+                  setCancellationReason('');
+                } finally {
+                  setIsCancellingOrder(false);
+                }
               }}
-              disabled={!cancellationReason.trim()}
+              disabled={!cancellationReason.trim() || isCancellingOrder}
               className="flex-fill"
             >
-              <i className="bi bi-trash me-2"></i>
-              Cancel Order
+              {isCancellingOrder ? (
+                <>
+                  <div className="spinner-border spinner-border-sm me-2" role="status">
+                    <span className="visually-hidden">Cancelling...</span>
+                  </div>
+                  Cancelling Order...
+                </>
+              ) : (
+                <>
+                  <i className="bi bi-trash me-2"></i>
+                  Cancel Order
+                </>
+              )}
             </Button>
           </div>
         </Modal.Footer>
       </Modal>
-    </Container>
+      </Container>
+    </PullToRefreshWrapper>
   );
 });
 
+// Set display name for debugging
 ViewOrdersPage.displayName = 'ViewOrdersPage';
 
+// Export optimized component
 export default ViewOrdersPage;

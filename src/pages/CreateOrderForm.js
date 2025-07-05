@@ -2,11 +2,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Form, Button, Container, Row, Col, Card, ListGroup, Modal } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { authenticatedFetch, API_ENDPOINTS } from '../utils/api';
+import { API_ENDPOINTS } from '../utils/api';
+import { apiFirstService } from '../services/apiFirstService';
+import { menuCacheService } from '../services/menuCacheService';
 
 // Delivery locations will be fetched from backend
 
-const CreateOrderForm = () => {
+const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber = null }) => {
   const navigate = useNavigate();
   const [allMenuItems, setAllMenuItems] = useState([]);
   const [customerPhone, setCustomerPhone] = useState('');
@@ -18,11 +20,17 @@ const CreateOrderForm = () => {
   const [errors, setErrors] = useState({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [showExtraDropdown, setShowExtraDropdown] = useState(false);
   const [showMenuDropdown, setShowMenuDropdown] = useState(true);
   const [deliveryLocations, setDeliveryLocations] = useState([]);
   const [loadingLocations, setLoadingLocations] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [customLocationName, setCustomLocationName] = useState('');
+  const [customLocationFee, setCustomLocationFee] = useState('');
+  const [locationSearchTerm, setLocationSearchTerm] = useState('');
+  const [showLocationDropdown, setShowLocationDropdown] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
   
   // Filter menu items into main items and extras
   const mainMenuItems = (allMenuItems || []).filter(item => !item.is_extra && item.is_available);
@@ -31,16 +39,18 @@ const CreateOrderForm = () => {
   // Fallback: if no main menu items found, show all available items (in case is_extra field is missing or different)
   const displayMenuItems = mainMenuItems.length > 0 ? mainMenuItems : (allMenuItems || []).filter(item => item.is_available);
 
+  // Filter delivery locations based on search term
+  const filteredDeliveryLocations = deliveryLocations.filter(location =>
+    location.name.toLowerCase().includes(locationSearchTerm.toLowerCase())
+  );
 
   // Fetch delivery locations from backend
   const fetchDeliveryLocations = useCallback(async () => {
     setLoadingLocations(true);
     try {
-      const response = await authenticatedFetch(`${API_ENDPOINTS.ORDERS}delivery-locations/`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch delivery locations. Status: ${response.status}`);
-      }
-      const data = await response.json();
+      const data = await apiFirstService.request(`${API_ENDPOINTS.ORDERS}delivery-locations/`, {
+        method: 'GET'
+      });
       
       // Ensure we have an array
       let locations = data;
@@ -51,13 +61,11 @@ const CreateOrderForm = () => {
       
       // Ensure we have an array
       if (!Array.isArray(locations)) {
-        console.error('DeliveryLocations: Expected array but got:', typeof locations, locations);
         locations = [];
       }
       
       setDeliveryLocations(locations);
     } catch (error) {
-      console.error('Error fetching delivery locations:', error);
       // Fallback to empty array if fetch fails
       setDeliveryLocations([]);
     } finally {
@@ -67,45 +75,121 @@ const CreateOrderForm = () => {
 
 
 
+  // Function to populate form with existing order data
+  const populateFormWithOrderData = useCallback((order) => {
+    if (!order) return;
+    
+    console.log('🔄 Populating form with order data:', order);
+    
+    // Set basic order details
+    setCustomerPhone(order.customer_phone || '');
+    setDeliveryType(order.delivery_type || 'Pickup');
+    setNotes(order.notes || '');
+    
+    // Set delivery location
+    if (order.delivery_type === 'Delivery') {
+      if (order.custom_delivery_location) {
+        setDeliveryLocation('Other');
+        setCustomLocationName(order.custom_delivery_location);
+        setCustomLocationFee(order.custom_delivery_fee?.toString() || '0');
+        setLocationSearchTerm('Custom location - use fields below');
+      } else if (order.delivery_location) {
+        setDeliveryLocation(order.delivery_location);
+        setLocationSearchTerm(order.delivery_location);
+      }
+    }
+    
+    // Set selected items - need to wait for allMenuItems to be loaded
+    if (allMenuItems && allMenuItems.length > 0) {
+      const newSelectedItems = {};
+      const newSelectedExtras = {};
+      
+      if (order.items && Array.isArray(order.items)) {
+        console.log('📋 Processing order items:', order.items);
+        order.items.forEach(item => {
+          // Find the menu item in allMenuItems to get is_extra status
+          const menuItem = allMenuItems.find(mi => mi.id === item.menu_item_id);
+          if (menuItem) {
+            if (menuItem.is_extra) {
+              newSelectedExtras[item.menu_item_id] = item.quantity;
+              console.log(`✨ Added extra: ${menuItem.name} (quantity: ${item.quantity})`);
+            } else {
+              newSelectedItems[item.menu_item_id] = item.quantity;
+              console.log(`🍽️ Added item: ${menuItem.name} (quantity: ${item.quantity})`);
+            }
+          } else {
+            console.warn(`⚠️ Menu item with ID ${item.menu_item_id} not found in current menu items`);
+            // Default to regular item if menu item not found
+            newSelectedItems[item.menu_item_id] = item.quantity;
+          }
+        });
+      }
+      
+      setSelectedItems(newSelectedItems);
+      setSelectedExtras(newSelectedExtras);
+      console.log('✅ Items populated:', { items: newSelectedItems, extras: newSelectedExtras });
+    } else {
+      console.log('⏳ Menu items not loaded yet, will populate items later');
+    }
+  }, [allMenuItems]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   useEffect(() => {
     const fetchInitialData = async () => {
       await fetchDeliveryLocations();
+      
       try {
-        const response = await authenticatedFetch(API_ENDPOINTS.MENU_ITEMS);
-        if (!response.ok) {
-          throw new Error(`Failed to fetch menu items. Status: ${response.status}`);
-        }
-        const data = await response.json();
-        console.log('CreateOrderForm: API response:', data);
-        console.log('CreateOrderForm: Data type:', typeof data);
-        console.log('CreateOrderForm: Is array?', Array.isArray(data));
-        
-        // Handle different response structures
-        let items = data;
-        if (data && typeof data === 'object' && !Array.isArray(data)) {
-            // If it's a paginated response, extract the results
-            items = data.results || data.items || data.data || [];
-        }
-        
-        // Ensure we have an array
-        if (!Array.isArray(items)) {
-            console.error('CreateOrderForm: Expected array but got:', typeof items, items);
-            items = [];
-        }
-        
-        console.log('CreateOrderForm: Final items:', items);
-        console.log('CreateOrderForm: Items count:', items.length);
-        console.log('CreateOrderForm: Available items:', items.filter(item => item.is_available).length);
-        console.log('CreateOrderForm: Main items (not extras):', items.filter(item => !item.is_extra && item.is_available).length);
-        console.log('CreateOrderForm: Sample items:', items.slice(0, 3));
+        // Use cache service for instant menu loading
+        console.log(`🚀 Loading menu items for order ${isEditMode ? 'editing' : 'creation'}...`);
+        const items = await menuCacheService.getMenuItems();
         setAllMenuItems(items);
+        console.log(`✅ Loaded ${items.length} menu items for order ${isEditMode ? 'editing' : 'creation'}`);
+        
+        // If in edit mode and we have existing order data, populate the form
+        if (isEditMode && existingOrder && !isInitialized) {
+          populateFormWithOrderData(existingOrder);
+          setIsInitialized(true);
+        }
       } catch (error) {
-        console.error('Error fetching menu items:', error);
-        console.error('Failed to fetch menu items.');
+        console.error('❌ Error loading menu items for order:', error);
+        // Fallback to empty array on error
+        setAllMenuItems([]);
       }
     };
+    
     fetchInitialData();
-  }, [fetchDeliveryLocations]);
+  }, [fetchDeliveryLocations, isEditMode, existingOrder, populateFormWithOrderData, isInitialized]);
+  
+  // Separate effect to repopulate items when menu items are loaded (after initial load)
+  useEffect(() => {
+    if (isEditMode && existingOrder && allMenuItems.length > 0 && isInitialized) {
+      // Re-populate items now that menu items are available
+      console.log('🔄 Re-populating items with loaded menu data');
+      populateFormWithOrderData(existingOrder);
+    }
+  }, [allMenuItems, isEditMode, existingOrder, populateFormWithOrderData, isInitialized]);
+
+  // Close location dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showLocationDropdown && !event.target.closest('[data-location-search]')) {
+        setShowLocationDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showLocationDropdown]);
 
 
   const handleRemoveItem = useCallback((itemId) => {
@@ -194,7 +278,31 @@ const CreateOrderForm = () => {
     if (newDeliveryType === 'Pickup') {
       setDeliveryLocation('');
       setCustomerPhone('');
+      setCustomLocationName('');
+      setCustomLocationFee('');
+      setLocationSearchTerm('');
+      setShowLocationDropdown(false);
     }
+  };
+
+  // Handle location selection from search dropdown
+  const handleLocationSelect = (location) => {
+    setDeliveryLocation(location.name);
+    setLocationSearchTerm(location.name);
+    setShowLocationDropdown(false);
+    
+    // Clear custom location fields when regular location is selected
+    setCustomLocationName('');
+    setCustomLocationFee('');
+    
+    // Clear any validation errors
+    setErrors(prev => {
+      const newErrors = { ...prev };
+      delete newErrors.deliveryLocation;
+      delete newErrors.customLocationName;
+      delete newErrors.customLocationFee;
+      return newErrors;
+    });
   };
 
   const validateForm = () => {
@@ -208,6 +316,15 @@ const CreateOrderForm = () => {
       }
       if (!deliveryLocation) {
           formErrors.deliveryLocation = 'Delivery location is required for delivery orders.';
+      } else if (deliveryLocation === 'Other') {
+          if (!customLocationName.trim()) {
+              formErrors.customLocationName = 'Custom location name is required.';
+          }
+          if (!customLocationFee.trim()) {
+              formErrors.customLocationFee = 'Custom location fee is required.';
+          } else if (isNaN(parseFloat(customLocationFee)) || parseFloat(customLocationFee) < 0) {
+              formErrors.customLocationFee = 'Please enter a valid fee amount.';
+          }
       }
     } else {
       // For pickup orders, validate phone format only if provided
@@ -231,8 +348,6 @@ const CreateOrderForm = () => {
     e.preventDefault();
     if (validateForm()) {
       setIsModalOpen(true);
-    } else {
-      console.error('Please correct the form errors.');
     }
   };
 
@@ -247,23 +362,33 @@ const CreateOrderForm = () => {
   }, 0);
 
   const currentDeliveryFee = deliveryType === 'Delivery' && deliveryLocation
-                             ? parseFloat(deliveryLocations.find(loc => loc.name === deliveryLocation)?.fee || 0)
+                             ? deliveryLocation === 'Other'
+                               ? parseFloat(customLocationFee || 0)
+                               : parseFloat(deliveryLocations.find(loc => loc.name === deliveryLocation)?.fee || 0)
                              : 0;
   const grandTotal = currentOrderSubTotal + extrasSubTotal + currentDeliveryFee;
 
   const handleFinalSubmit = async () => {
     // Prevent multiple submissions
     if (isSubmitting) {
-      toast.warning('Order is being processed, please wait...');
+      toast.warning(`Order is being ${isEditMode ? 'updated' : 'processed'}, please wait...`);
       return;
     }
 
+    const startTime = performance.now();
+    console.log('⏱️ Order submission started');
+    
+    // Fast pre-validation before setting loading state
+    const preValidationItems = Object.entries(selectedItems).filter(([, quantity]) => quantity > 0);
+    if (preValidationItems.length === 0) {
+      toast.error('Please add at least one item to the order');
+      return;
+    }
+    
     setIsSubmitting(true);
 
     try {
-      const payloadItems = Object.entries(selectedItems)
-        .filter(([, quantity]) => quantity > 0)
-        .map(([itemId, quantity]) => ({ menu_item_id: itemId, quantity }));
+      const payloadItems = preValidationItems.map(([itemId, quantity]) => ({ menu_item_id: itemId, quantity }));
       
       const payloadExtras = Object.entries(selectedExtras)
         .filter(([, quantity]) => quantity > 0)
@@ -280,56 +405,94 @@ const CreateOrderForm = () => {
       };
 
       if (deliveryType === 'Delivery') {
-        orderPayload.delivery_location = deliveryLocation;
+        if (deliveryLocation === 'Other') {
+          // For custom locations, use the custom fields and clear predefined location
+          orderPayload.custom_delivery_location = customLocationName.trim();
+          orderPayload.custom_delivery_fee = parseFloat(customLocationFee);
+          orderPayload.delivery_location = null; // Explicitly clear predefined location
+        } else {
+          // For predefined locations, use the delivery_location field and clear custom fields
+          orderPayload.delivery_location = deliveryLocation;
+          orderPayload.custom_delivery_location = null; // Explicitly clear custom location
+          orderPayload.custom_delivery_fee = null; // Explicitly clear custom fee
+        }
+      } else {
+        // For pickup orders, clear all delivery-related fields
+        orderPayload.delivery_location = null;
+        orderPayload.custom_delivery_location = null;
+        orderPayload.custom_delivery_fee = null;
       }
 
-      const response = await authenticatedFetch(API_ENDPOINTS.ORDERS, {
-        method: 'POST',
-        body: JSON.stringify(orderPayload),
-      });
+      // Determine API endpoint and method based on edit mode
+      const orderNumberForApi = existingOrder?.order_number || orderNumber;
+      const apiUrl = isEditMode 
+        ? `${API_ENDPOINTS.ORDERS}${orderNumberForApi}/`
+        : API_ENDPOINTS.ORDERS;
+      const method = isEditMode ? 'PATCH' : 'POST';
 
-      if (response.ok) {
-        const result = await response.json();
-        
-        // Show success notification
-        toast.success(`🎉 Order ${result.order_number} created successfully!`, {
-          position: "top-right",
-          autoClose: 4000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-        });
-        
-        // Show order details in a second notification
-        setTimeout(() => {
-          toast.info(`📋 Order Total: ₵${grandTotal.toFixed(2)} | Type: ${deliveryType}${deliveryType === 'Delivery' && deliveryLocation ? ` to ${deliveryLocation}` : ''}`, {
-            position: "top-right",
-            autoClose: 6000,
-            hideProgressBar: false,
-            closeOnClick: true,
-            pauseOnHover: true,
-            draggable: true,
-          });
-        }, 500);
-        
+      const payloadTime = performance.now();
+      console.log(`⏱️ Payload prepared in ${(payloadTime - startTime).toFixed(2)}ms`);
+      
+      console.log('🚀 API Request Details:');
+      console.log('- Edit Mode:', isEditMode);
+      console.log('- Method:', method);
+      console.log('- URL:', apiUrl);
+      console.log('- Payload:', JSON.stringify(orderPayload, null, 2));
+      console.log('- Existing Order:', existingOrder);
+
+      const apiStartTime = performance.now();
+      const result = await apiFirstService.request(apiUrl, {
+        method: method,
+        body: JSON.stringify(orderPayload),
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      });
+      const apiEndTime = performance.now();
+
+      console.log(`📡 API call completed in ${(apiEndTime - apiStartTime).toFixed(2)}ms`);
+      console.log('✅ Success Response:', result);
+      
+      // Show success notification with order details
+      const actionText = isEditMode ? 'updated' : 'created';
+      const locationText = deliveryType === 'Delivery' && deliveryLocation ? ` to ${deliveryLocation === 'Other' ? (customLocationName || 'Custom Location') : deliveryLocation}` : '';
+      
+      toast.success(`🎉 Order ${result.order_number} ${actionText}! Total: ₵${grandTotal.toFixed(2)} | ${deliveryType}${locationText}`, {
+        position: "top-right",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+      });
+      
+      // Clear form only if creating new order
+      if (!isEditMode) {
         setCustomerPhone('');
         setDeliveryType('Pickup');
         setDeliveryLocation('');
+        setCustomLocationName('');
+        setCustomLocationFee('');
+        setLocationSearchTerm('');
+        setShowLocationDropdown(false);
         setNotes('');
         setSelectedItems({});
         setSelectedExtras({});
         setErrors({});
-        setIsModalOpen(false);
-        navigate('/view-orders');
-      } else {
-        const errorData = await response.json().catch(() => ({ detail: `Request failed with status ${response.status}` }));
-        let errorMessages = errorData.detail || 'Failed to create order.';
-        console.error(`Error: ${errorMessages}`);
       }
+      
+      setIsModalOpen(false);
+      
+      const endTime = performance.now();
+      console.log(`✅ Order ${actionText} completed in ${(endTime - startTime).toFixed(2)}ms total`);
+      
+      navigate('/view-orders');
     } catch (error) {
-      console.error('Order submission error:', error);
-      console.error('Network error: Could not submit order.');
+      console.error('🚨 Network/Request Error:', error);
+      toast.error(`Error ${isEditMode ? 'updating' : 'creating'} order. Please try again.`);
     } finally {
       // Always re-enable the button after the request completes
       setIsSubmitting(false);
@@ -358,8 +521,8 @@ const CreateOrderForm = () => {
           <Card className="ada-shadow-md">
             <Card.Header className="ada-bg-primary text-white py-3">
               <h5 className="mb-0">
-                <i className="bi bi-plus-circle me-2"></i>
-                Create New Order
+                <i className={`bi ${isEditMode ? 'bi-pencil-square' : 'bi-plus-circle'} me-2`}></i>
+                {isEditMode ? `Edit Order ${existingOrder?.order_number || ''}` : 'Create New Order'}
               </h5>
             </Card.Header>
             <Card.Body className="p-4">
@@ -581,35 +744,141 @@ const CreateOrderForm = () => {
                   <Col md={4}>
                     <Form.Group controlId="deliveryLocation">
                       <Form.Label className="fw-semibold">Delivery Location <span className="text-danger">*</span></Form.Label>
-                      <Form.Select 
-                        value={deliveryLocation} 
-                        onChange={(e) => setDeliveryLocation(e.target.value)} 
-                        isInvalid={!!errors.deliveryLocation}
-                        className="ada-shadow-sm"
-                        style={{ minHeight: '44px' }}
-                        disabled={loadingLocations}
-                      >
-                        <option value="">
-                          {loadingLocations ? '⏳ Loading locations...' : '📍 Select a location'}
-                        </option>
-                        {(deliveryLocations && Array.isArray(deliveryLocations) ? deliveryLocations : []).map(location => (
-                          <option key={location.id || location.name} value={location.name}>
-                            {location.name} (Fee: ₵{parseFloat(location.fee || 0).toFixed(2)})
-                          </option>
-                        ))}
-                      </Form.Select>
+                      <div className="position-relative" data-location-search>
+                        <Form.Control
+                          type="text"
+                          value={locationSearchTerm}
+                          onChange={(e) => {
+                            setLocationSearchTerm(e.target.value);
+                            // Only show dropdown if not setting up custom location
+                            if (deliveryLocation !== 'Other') {
+                              setShowLocationDropdown(true);
+                            }
+                            if (e.target.value === '') {
+                              setDeliveryLocation('');
+                            }
+                          }}
+                          onFocus={() => {
+                            // Only show dropdown if not setting up custom location
+                            if (deliveryLocation !== 'Other') {
+                              setShowLocationDropdown(true);
+                            }
+                          }}
+                          isInvalid={!!errors.deliveryLocation}
+                          className="ada-shadow-sm"
+                          style={{ minHeight: '44px', fontSize: '16px' }}
+                          placeholder={
+                            loadingLocations 
+                              ? '⏳ Loading locations...' 
+                              : deliveryLocation === 'Other'
+                                ? '🏠 Custom location - use fields below'
+                                : '📍 Search locations...'
+                          }
+                          disabled={loadingLocations || deliveryLocation === 'Other'}
+                        />
+                        {showLocationDropdown && !loadingLocations && deliveryLocation !== 'Other' && (
+                          <div 
+                            className="position-absolute w-100 bg-white border rounded shadow-lg" 
+                            style={{ 
+                              zIndex: 1050, 
+                              top: '100%', 
+                              maxHeight: '200px', 
+                              overflowY: 'auto',
+                              border: '1px solid #dee2e6'
+                            }}
+                          >
+                            {filteredDeliveryLocations.length > 0 ? (
+                              filteredDeliveryLocations.map(location => (
+                                <div
+                                  key={location.id || location.name}
+                                  className="p-2 border-bottom cursor-pointer"
+                                  style={{ 
+                                    cursor: 'pointer',
+                                    '&:hover': { backgroundColor: '#f8f9fa' }
+                                  }}
+                                  onMouseEnter={(e) => e.target.style.backgroundColor = '#f8f9fa'}
+                                  onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
+                                  onClick={() => handleLocationSelect(location)}
+                                >
+                                  <div className="fw-semibold">{location.name}</div>
+                                  <small className="text-muted">Fee: ₵{parseFloat(location.fee || 0).toFixed(2)}</small>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="p-2 text-muted text-center">
+                                {locationSearchTerm ? 'No locations found' : 'Type to search locations'}
+                              </div>
+                            )}
+                            <div
+                              className="p-2 border-top cursor-pointer text-primary"
+                              style={{ 
+                                cursor: 'pointer',
+                                backgroundColor: '#f8f9fa'
+                              }}
+                              onClick={() => {
+                                setDeliveryLocation('Other');
+                                setLocationSearchTerm('');
+                                setShowLocationDropdown(false);
+                              }}
+                            >
+                              🏠 Other (Custom Location)
+                            </div>
+                          </div>
+                        )}
+                      </div>
                       <Form.Control.Feedback type="invalid">{errors.deliveryLocation}</Form.Control.Feedback>
                     </Form.Group>
                   </Col>
                 )}
-              {deliveryType === 'Delivery' && (
+                
+                {/* Custom Location Fields - Show when "Other" is selected */}
+                {deliveryType === 'Delivery' && deliveryLocation === 'Other' && (
+                  <>
+                    <Col md={6}>
+                      <Form.Group controlId="customLocationName">
+                        <Form.Label className="fw-semibold">Custom Location Name <span className="text-danger">*</span></Form.Label>
+                        <Form.Control
+                          type="text"
+                          value={customLocationName}
+                          onChange={(e) => setCustomLocationName(e.target.value)}
+                          isInvalid={!!errors.customLocationName}
+                          placeholder="Enter location name"
+                          className="ada-shadow-sm"
+                          style={{ minHeight: '44px', fontSize: '16px' }}
+                        />
+                        <Form.Control.Feedback type="invalid">{errors.customLocationName}</Form.Control.Feedback>
+                      </Form.Group>
+                    </Col>
+                    <Col md={6}>
+                      <Form.Group controlId="customLocationFee">
+                        <Form.Label className="fw-semibold">Custom Delivery Fee (₵) <span className="text-danger">*</span></Form.Label>
+                      <Form.Control
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        step="0.01"
+                        value={customLocationFee}
+                        onChange={(e) => setCustomLocationFee(e.target.value)}
+                        isInvalid={!!errors.customLocationFee}
+                        placeholder="0.00"
+                        className="ada-shadow-sm"
+                        style={{ minHeight: '44px', fontSize: '16px' }}
+                      />
+                        <Form.Control.Feedback type="invalid">{errors.customLocationFee}</Form.Control.Feedback>
+                      </Form.Group>
+                    </Col>
+                  </>
+                )}
+                
+                {deliveryType === 'Delivery' && (
                   <Col md={4}>
                     <Form.Group controlId="customerPhone">
                       <Form.Label className="fw-semibold">
                         Customer Phone <span className="text-danger">*</span>
                       </Form.Label>
                       <Form.Control
-                        type="text"
+                        type="tel"
+                        inputMode="tel"
                         value={customerPhone}
                         onChange={(e) => setCustomerPhone(e.target.value)}
                         isInvalid={!!errors.customerPhone}
@@ -621,8 +890,7 @@ const CreateOrderForm = () => {
                       <Form.Control.Feedback type="invalid">{errors.customerPhone}</Form.Control.Feedback>
                     </Form.Group>
                   </Col>
-                
-                    )}
+                )}
               </Row>
             </div>
             
@@ -745,7 +1013,7 @@ const CreateOrderForm = () => {
                   
                   {deliveryType === 'Delivery' && deliveryLocation && (
                     <div className="d-flex justify-content-between mb-1">
-                      <span>Delivery ({deliveryLocation}):</span>
+                      <span>Delivery ({deliveryLocation === 'Other' ? customLocationName || 'Custom Location' : deliveryLocation}):</span>
                       <span className="fw-semibold">₵{currentDeliveryFee.toFixed(2)}</span>
                     </div>
                   )}
@@ -762,7 +1030,7 @@ const CreateOrderForm = () => {
                     <span className={`badge ${deliveryType === 'Delivery' ? 'bg-warning' : 'bg-success'} w-100 py-2`} style={{ fontSize: '1rem' }}>
                       <i className={`bi ${deliveryType === 'Delivery' ? 'bi-truck' : 'bi-shop'} me-1`}></i>
                       {deliveryType} Order
-                      {deliveryType === 'Delivery' && deliveryLocation && ` to ${deliveryLocation}`}
+                      {deliveryType === 'Delivery' && deliveryLocation && ` to ${deliveryLocation === 'Other' ? (customLocationName || 'Custom Location') : deliveryLocation}`}
                     </span>
                   </div>
                 </>
@@ -779,8 +1047,8 @@ const CreateOrderForm = () => {
                     className="ada-shadow-md py-3"
                     style={{ borderRadius: 'var(--ada-border-radius-md)', minHeight: '54px' }}
                   >
-                    <i className="bi bi-check-circle me-2"></i>
-                    Create Order
+                    <i className={`bi ${isEditMode ? 'bi-check-circle' : 'bi-check-circle'} me-2`}></i>
+                    {isEditMode ? 'Update Order' : 'Create Order'}
                   </Button>
                 </div>
               </Card.Footer>
@@ -789,11 +1057,17 @@ const CreateOrderForm = () => {
         </Col>
       </Row>
 
-      <Modal show={isModalOpen} onHide={() => setIsModalOpen(false)} centered size="lg">
+      <Modal 
+        show={isModalOpen} 
+        onHide={() => setIsModalOpen(false)} 
+        centered
+        size={isMobile ? undefined : "lg"}
+        fullscreen={isMobile ? "sm-down" : false}
+      >
         <Modal.Header closeButton>
           <Modal.Title className="d-flex justify-content-between align-items-center w-100">
             <div>
-              <span>Confirm Order</span>
+              <span>{isEditMode ? 'Confirm Order Update' : 'Confirm Order'}</span>
             </div>
             <div className="d-flex gap-2">
               <span className={`badge ${deliveryType === 'Delivery' ? 'bg-warning text-dark' : 'bg-success'}`} style={{ fontSize: '0.75rem' }}>
@@ -884,7 +1158,7 @@ const CreateOrderForm = () => {
                   {deliveryType === 'Delivery' && deliveryLocation && (
                     <div className="d-flex justify-content-between align-items-center mb-2">
                       <span>Location:</span>
-                      <span className="text-muted small">{deliveryLocation}</span>
+                      <span className="text-muted small">{deliveryLocation === 'Other' ? (customLocationName || 'Custom Location') : deliveryLocation}</span>
                     </div>
                   )}
                   {deliveryType === 'Delivery' && currentDeliveryFee > 0 && (
@@ -941,13 +1215,14 @@ const CreateOrderForm = () => {
             </Col>
           </Row>
         </Modal.Body>
-        <Modal.Footer className="p-3">
-          <div className="d-flex flex-column flex-sm-row w-100 gap-3">
+        <Modal.Footer className={isMobile ? "p-2" : "p-3"}>
+          <div className={`d-flex flex-column flex-sm-row w-100 ${isMobile ? 'gap-2' : 'gap-3'}`}>
             <Button 
               variant="secondary" 
               onClick={() => setIsModalOpen(false)}
               className="order-3 order-sm-1 flex-fill"
-              style={{ minHeight: '48px' }}
+              size={isMobile ? "sm" : undefined}
+              style={{ minHeight: isMobile ? '36px' : '48px' }}
             >
               <i className="bi bi-pencil-square me-2"></i>
               Edit
@@ -958,13 +1233,19 @@ const CreateOrderForm = () => {
                 setIsModalOpen(false); 
                 setCustomerPhone(''); 
                 setDeliveryType('Pickup'); 
+                setDeliveryLocation('');
+                setCustomLocationName('');
+                setCustomLocationFee('');
+                setLocationSearchTerm('');
+                setShowLocationDropdown(false);
                 setNotes(''); 
                 setSelectedItems({}); 
                 setSelectedExtras({}); 
-                setErrors({}); 
+                setErrors({});
               }}
               className="order-2 order-sm-2 flex-fill"
-              style={{ minHeight: '48px' }}
+              size={isMobile ? "sm" : undefined}
+              style={{ minHeight: isMobile ? '36px' : '48px' }}
             >
               <i className="bi bi-x-circle me-2"></i>
               Cancel
@@ -974,19 +1255,20 @@ const CreateOrderForm = () => {
               onClick={handleFinalSubmit}
               disabled={isSubmitting}
               className="order-1 order-sm-3 flex-fill"
-              style={{ minHeight: '48px' }}
+              size={isMobile ? "sm" : undefined}
+              style={{ minHeight: isMobile ? '36px' : '48px' }}
             >
               {isSubmitting ? (
                 <>
                   <div className="spinner-border spinner-border-sm me-2" role="status">
                     <span className="visually-hidden">Processing...</span>
                   </div>
-                  Processing...
+                  {isMobile ? 'Processing...' : 'Processing...'}
                 </>
               ) : (
                 <>
                   <i className="bi bi-check-circle me-2"></i>
-                  Accept
+                  {isEditMode ? (isMobile ? 'Update' : 'Update Order') : (isMobile ? 'Accept' : 'Accept')}
                 </>
               )}
             </Button>
@@ -995,7 +1277,13 @@ const CreateOrderForm = () => {
       </Modal>
 
       {/* Notes Modal */}
-      <Modal show={isNotesModalOpen} onHide={() => setIsNotesModalOpen(false)} centered>
+      <Modal 
+        show={isNotesModalOpen} 
+        onHide={() => setIsNotesModalOpen(false)} 
+        centered
+        size={isMobile ? undefined : "lg"}
+        fullscreen={isMobile ? "sm-down" : false}
+      >
         <Modal.Header closeButton>
           <Modal.Title>
             <i className="bi bi-chat-dots me-2"></i>
@@ -1019,13 +1307,14 @@ const CreateOrderForm = () => {
             Character count: {notes.length}
           </small>
         </Modal.Body>
-        <Modal.Footer className="p-3">
-          <div className="d-flex flex-column flex-sm-row w-100 gap-3">
+        <Modal.Footer className={isMobile ? "p-2" : "p-3"}>
+          <div className={`d-flex flex-column flex-sm-row w-100 ${isMobile ? 'gap-2' : 'gap-3'}`}>
             <Button 
               variant="danger" 
               onClick={() => setIsNotesModalOpen(false)}
               className="order-2 order-sm-1 flex-fill"
-              style={{ minHeight: '48px' }}
+              size={isMobile ? "sm" : undefined}
+              style={{ minHeight: isMobile ? '36px' : '48px' }}
             >
               <i className="bi bi-x-circle me-2"></i>
               Cancel
@@ -1034,10 +1323,11 @@ const CreateOrderForm = () => {
               variant="primary" 
               onClick={() => setIsNotesModalOpen(false)}
               className="ada-shadow-sm order-1 order-sm-2 flex-fill"
-              style={{ minHeight: '48px' }}
+              size={isMobile ? "sm" : undefined}
+              style={{ minHeight: isMobile ? '36px' : '48px' }}
             >
               <i className="bi bi-check-circle me-2"></i>
-              Save Notes
+              {isMobile ? 'Save' : 'Save Notes'}
             </Button>
           </div>
         </Modal.Footer>

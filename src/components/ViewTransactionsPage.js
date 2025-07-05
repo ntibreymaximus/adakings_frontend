@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Table, Card, Alert, Spinner, Button, Badge, Row, Col, Modal, Form } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
-import useAuth from '../hooks/useAuth';
+import { toast } from 'react-toastify';
+import { useAuth } from '../contexts/AuthContext';
+import { API_BASE_URL } from '../utils/api';
 import { 
   formatTransactionId, 
   getShortTransactionId
 } from '../utils/transactionUtils';
+import PullToRefreshWrapper from './PullToRefreshWrapper';
 const ViewTransactionsPage = () => {
     const { logout } = useAuth();
     const navigate = useNavigate();
@@ -68,54 +71,54 @@ const ViewTransactionsPage = () => {
         }
     };
 
+    // Function to fetch transactions (can be reused for refresh)
+    const fetchTransactions = async () => {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            setError('Authentication token not found. Please log in.');
+            setLoading(false);
+            logout();
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/payments/transaction-table/`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
+            });
+
+            if (!response.ok) {
+                if (response.status === 401) {
+                    logout();
+                }
+                throw new Error('Failed to fetch transactions');
+            }
+
+            const data = await response.json();
+            // Handle different API response formats
+            let transactionsArray = [];
+            if (Array.isArray(data)) {
+                transactionsArray = data;
+            } else if (data.transactions && Array.isArray(data.transactions)) {
+                transactionsArray = data.transactions;
+            } else if (data.data && Array.isArray(data.data)) {
+                transactionsArray = data.data;
+            } else if (data.results && Array.isArray(data.results)) {
+                transactionsArray = data.results;
+            } else {
+                transactionsArray = [];
+            }
+            
+            setAllTransactions(transactionsArray);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     useEffect(() => {
-        const fetchTransactions = async () => {
-            const token = localStorage.getItem('token');
-            if (!token) {
-                setError('Authentication token not found. Please log in.');
-                setLoading(false);
-                logout();
-                return;
-            }
-
-            try {
-                const response = await fetch('http://localhost:8000/api/payments/transaction-table/', {
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                    },
-                });
-
-                if (!response.ok) {
-                    if (response.status === 401) {
-                        logout();
-                    }
-                    throw new Error('Failed to fetch transactions');
-                }
-
-                const data = await response.json();
-                // Handle different API response formats
-                let transactionsArray = [];
-                if (Array.isArray(data)) {
-                    transactionsArray = data;
-                } else if (data.transactions && Array.isArray(data.transactions)) {
-                    transactionsArray = data.transactions;
-                } else if (data.data && Array.isArray(data.data)) {
-                    transactionsArray = data.data;
-                } else if (data.results && Array.isArray(data.results)) {
-                    transactionsArray = data.results;
-                } else {
-                    console.warn('Unexpected transaction data format:', data);
-                    transactionsArray = [];
-                }
-                
-                setAllTransactions(transactionsArray);
-            } catch (err) {
-                setError(err.message);
-            } finally {
-                setLoading(false);
-            }
-        };
-
         const handleResize = () => {
             setIsMobile(window.innerWidth < 768);
         };
@@ -203,7 +206,28 @@ const ViewTransactionsPage = () => {
     };
 
     if (loading) {
-        return <Spinner animation="border" />;
+        return (
+            <Container className="mt-4">
+                <div className="mb-3">
+                    <Button
+                        variant="outline-primary"
+                        size="sm"
+                        onClick={() => navigate('/dashboard')}
+                        className="d-flex align-items-center ada-shadow-sm"
+                        style={{ minHeight: '44px' }}
+                    >
+                        <i className="bi bi-arrow-left me-2"></i>
+                        <span>Return to Dashboard</span>
+                    </Button>
+                </div>
+                <div className="text-center">
+                    <div className="spinner-border" role="status">
+                        <span className="visually-hidden">Loading...</span>
+                    </div>
+                    <p className="mt-2">Loading transactions...</p>
+                </div>
+            </Container>
+        );
     }
 
     if (error) {
@@ -211,19 +235,27 @@ const ViewTransactionsPage = () => {
     }
 
   return (
-    <Container className="mt-4">
-      <div className="mb-3">
-        <Button
-          variant="outline-primary"
-          size="sm"
-          onClick={() => navigate('/dashboard')}
-          className="d-flex align-items-center ada-shadow-sm"
-          style={{ minHeight: '44px' }}
-        >
-          <i className="bi bi-arrow-left me-2"></i>
-          <span>Return to Dashboard</span>
-        </Button>
-      </div>
+    <PullToRefreshWrapper 
+      onRefresh={async () => {
+        toast.info('Refreshing transactions...');
+        setLoading(true);
+        await fetchTransactions();
+      }}
+      enabled={isMobile}
+    >
+      <Container className="mt-4">
+        <div className="mb-3">
+          <Button
+            variant="outline-primary"
+            size="sm"
+            onClick={() => navigate('/dashboard')}
+            className="d-flex align-items-center ada-shadow-sm"
+            style={{ minHeight: '44px' }}
+          >
+            <i className="bi bi-arrow-left me-2"></i>
+            <span>Return to Dashboard</span>
+          </Button>
+        </div>
       
       {/* Summary Cards - Hidden on mobile */}
       {!isMobile && allTransactions.length > 0 && (
@@ -685,7 +717,8 @@ const ViewTransactionsPage = () => {
           </div>
         </Modal.Footer>
       </Modal>
-    </Container>
+      </Container>
+    </PullToRefreshWrapper>
   );
 };
 

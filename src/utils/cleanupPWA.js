@@ -20,7 +20,6 @@ export const cleanupPWAData = () => {
     keysToRemove.forEach(key => {
       if (localStorage.getItem(key)) {
         localStorage.removeItem(key);
-        console.log(`Removed PWA data: ${key}`);
       }
     });
 
@@ -30,7 +29,6 @@ export const cleanupPWAData = () => {
         cacheNames.forEach(cacheName => {
           if (cacheName.includes('adakings') || cacheName.includes('pwa')) {
             caches.delete(cacheName);
-            console.log(`Removed cache: ${cacheName}`);
           }
         });
       });
@@ -41,15 +39,12 @@ export const cleanupPWAData = () => {
       navigator.serviceWorker.getRegistrations().then(registrations => {
         registrations.forEach(registration => {
           registration.unregister();
-          console.log('Unregistered service worker:', registration.scope);
         });
       });
     }
 
-    console.log('PWA cleanup completed');
-    
   } catch (error) {
-    console.error('Error during PWA cleanup:', error);
+    // Silent error for PWA cleanup
   }
 };
 

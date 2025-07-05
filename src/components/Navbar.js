@@ -5,7 +5,18 @@ import { Link, useNavigate } from 'react-router-dom';
 const NavbarComponent = ({ userData, onLogout }) => {
   const navigate = useNavigate();
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   
+  // Handle window resize for mobile detection
+  React.useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const handleLogout = () => {
     setShowProfileModal(false);
     onLogout();
@@ -54,7 +65,8 @@ const NavbarComponent = ({ userData, onLogout }) => {
         show={showProfileModal} 
         onHide={() => setShowProfileModal(false)} 
         centered
-        size="sm"
+        size={isMobile ? undefined : "sm"}
+        fullscreen={isMobile ? "sm-down" : false}
       >
         <Modal.Header closeButton>
           <Modal.Title>User Profile</Modal.Title>

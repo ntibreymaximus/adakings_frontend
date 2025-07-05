@@ -1,6 +1,6 @@
 {
   "name": "adakings_frontend",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "private": true,
   "dependencies": {
     "@testing-library/dom": "^10.4.0",
@@ -21,6 +21,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
+    "start:local": "cross-env HOST=localhost react-scripts start",
     "start:network": "cross-env HOST=0.0.0.0 react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
@@ -28,7 +29,21 @@
     "deploy:feature": "node smart-deploy.js feature",
     "deploy:dev": "node smart-deploy.js dev",
     "deploy:production": "node smart-deploy.js production",
-    "deploy:help": "node smart-deploy.js"
+    "deploy:help": "node smart-deploy.js",
+    "smart-deploy": "node smart-deploy.js",
+    "deploy:feature:patch": "node smart-deploy.js feature/codebaserefactor patch",
+    "deploy:feature:minor": "node smart-deploy.js feature/codebaserefactor minor",
+    "deploy:feature:major": "node smart-deploy.js feature/codebaserefactor major",
+    "deploy:dev:patch": "node smart-deploy.js dev patch",
+    "deploy:dev:minor": "node smart-deploy.js dev minor",
+    "deploy:dev:major": "node smart-deploy.js dev major",
+    "deploy:prod:patch": "node smart-deploy.js production patch",
+    "deploy:prod:minor": "node smart-deploy.js production minor",
+    "deploy:prod:major": "node smart-deploy.js production major",
+    "version:check": "node -e \"console.log('Current version:', require('./package.json').version)\";",
+    "pre-deploy": "npm test && npm run build",
+    "deploy:quick": "npm run deploy:feature:patch",
+    "deploy:status": "git branch --show-current && git status --porcelain"
   },
   "eslintConfig": {
     "extends": [

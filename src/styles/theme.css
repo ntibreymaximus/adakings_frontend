@@ -1099,3 +1099,77 @@ body {
     background-color: rgba(0, 0, 0, 0.05);
   }
 }
+
+/* ==================== PULL-TO-REFRESH STYLES ==================== */
+.pull-to-refresh-container {
+  position: relative;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  /* Disable native pull-to-refresh on iOS */
+  overscroll-behavior-y: contain;
+}
+
+.pull-to-refresh-indicator {
+  position: absolute;
+  top: -60px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: var(--ada-border-radius-lg);
+  box-shadow: var(--ada-shadow-md);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--ada-border-light);
+  pointer-events: none;
+  user-select: none;
+}
+
+.refresh-icon-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+}
+
+/* Pull-to-refresh mobile-specific styles */
+@media (max-width: 768px) {
+  .pull-to-refresh-container {
+    /* Ensure smooth scrolling on mobile */
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+  
+  .pull-to-refresh-indicator {
+    top: -50px;
+    padding: 0.75rem;
+    border-radius: var(--ada-border-radius-md);
+  }
+  
+  .refresh-icon-container {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+}
+
+/* Loading animation for pull-to-refresh */
+@keyframes pull-refresh-bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+.pull-to-refresh-indicator.refreshing {
+  animation: pull-refresh-bounce 1s ease-in-out infinite;
+}
+
+/* Haptic feedback class for supported devices */
+.pull-to-refresh-haptic {
+  /* This class can be used to trigger haptic feedback */
+}

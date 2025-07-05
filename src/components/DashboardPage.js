@@ -1,14 +1,34 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import RecentActivityCard from './RecentActivityCard';
+import PullToRefreshWrapper from './PullToRefreshWrapper';
 
 const DashboardPage = ({ userData }) => {
   const navigate = useNavigate();
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const handleDashboardAction = (actionTitle, route) => {
-    console.log(`${actionTitle} clicked, navigating to ${route}`);
     navigate(route);
+  };
+
+  // Refresh function for pull-to-refresh
+  const handleRefresh = async () => {
+    toast.info('Refreshing dashboard...');
+    // Force refresh of RecentActivityCard by adding a small delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+    // The RecentActivityCard component will handle its own refresh
+    window.dispatchEvent(new CustomEvent('dashboardRefresh'));
   };
 
   // Custom styles for mobile optimization
@@ -46,8 +66,12 @@ const DashboardPage = ({ userData }) => {
   ];
 
   return (
-    <Container className="my-3 my-md-4 px-3 px-md-4">
-      <Row className="g-3 g-md-4">
+    <PullToRefreshWrapper 
+      onRefresh={handleRefresh}
+      enabled={isMobile}
+    >
+      <Container className="my-3 my-md-4 px-3 px-md-4">
+        <Row className="g-3 g-md-4">
         {dashboardItems.map((item) => (
           <Col xs={12} sm={6} lg={3} key={item.title}>
             <Card 
@@ -74,13 +98,13 @@ const DashboardPage = ({ userData }) => {
           <RecentActivityCard 
             maxItems={5}
             showFullHistory={true}
-            refreshInterval={500}
+            refreshInterval={60000}
             className="ada-fade-in"
           />
         </Col>
-      </Row>
-      
-    </Container>
+        </Row>
+      </Container>
+    </PullToRefreshWrapper>
   );
 };
 

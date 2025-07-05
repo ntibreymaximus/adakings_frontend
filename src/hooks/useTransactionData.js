@@ -30,7 +30,6 @@ export const useTransactionData = (options = {}) => {
       setLoading(true);
       setError(null);
 
-      console.log('[useTransactionData] Fetching data, forceRefresh:', forceRefresh);
       
       // Add timeout to prevent infinite loading
       const timeoutPromise = new Promise((_, reject) => {
@@ -54,14 +53,8 @@ export const useTransactionData = (options = {}) => {
         onDataUpdate(result);
       }
 
-      console.log('[useTransactionData] Data updated:', {
-        transactionCount: result.transactions?.length || 0,
-        source: result.source,
-        lastUpdated: result.lastUpdated
-      });
 
     } catch (err) {
-      console.error('[useTransactionData] Error fetching data:', err);
       
       if (isMountedRef.current) {
         setError(err.message);
@@ -80,10 +73,8 @@ export const useTransactionData = (options = {}) => {
 
   // Subscribe to data service updates
   useEffect(() => {
-    console.log('[useTransactionData] Setting up subscription');
     
     const handleDataServiceUpdate = (event) => {
-      console.log('[useTransactionData] Data service event:', event.type);
       
       switch (event.type) {
         case 'data-updated':
@@ -100,14 +91,12 @@ export const useTransactionData = (options = {}) => {
           break;
           
         case 'network-online':
-          console.log('[useTransactionData] Network back online, refreshing data');
           // Use forceRefresh to avoid circular dependency
           transactionDataService.clearCache();
           transactionDataService.getTransactions(true);
           break;
           
         case 'network-offline':
-          console.log('[useTransactionData] Network offline');
           if (isMountedRef.current) {
             setSource('offline');
           }
@@ -123,7 +112,6 @@ export const useTransactionData = (options = {}) => {
           break;
           
         default:
-          console.log('[useTransactionData] Unknown event type:', event.type);
           break;
       }
     };
@@ -139,7 +127,6 @@ export const useTransactionData = (options = {}) => {
 
   // Initial data fetch
   useEffect(() => {
-    console.log('[useTransactionData] Initial data fetch');
     refreshData(false);
   }, [refreshData]); // Include refreshData in dependencies
 
@@ -149,7 +136,6 @@ export const useTransactionData = (options = {}) => {
       return;
     }
 
-    console.log('[useTransactionData] Setting up auto-refresh interval:', refreshInterval);
     
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible') {
@@ -182,7 +168,6 @@ export const useTransactionData = (options = {}) => {
 
   // Manual refresh that clears cache
   const forceRefresh = useCallback(() => {
-    console.log('[useTransactionData] Force refresh requested');
     transactionDataService.clearCache();
     refreshData(true);
   }, [refreshData]);
@@ -273,20 +258,5 @@ export const useTodayTransactions = (options = {}) => {
   };
 };
 
-/**
- * Hook for transaction data with real-time updates
- */
-export const useRealTimeTransactions = (refreshInterval = 10000) => {
-  return useTransactionData({
-    autoRefresh: true,
-    refreshInterval,
-    onDataUpdate: (data) => {
-      console.log('[useRealTimeTransactions] Real-time update received:', {
-        count: data.transactions?.length || 0,
-        source: data.source
-      });
-    }
-  });
-};
 
 export default useTransactionData;
