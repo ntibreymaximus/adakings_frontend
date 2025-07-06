@@ -15,7 +15,6 @@ import ViewTransactionsPage from './components/ViewTransactionsPage';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Navbar from './components/Navbar';
-import BottomNavBar from './components/BottomNavBar';
 import PWAStatusIndicator from './components/PWAStatusIndicator';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 import PWAUpdateNotification from './components/PWAUpdateNotification';
@@ -32,7 +31,6 @@ import './utils/cleanupPWA'; // Clean up any remaining PWA data
 function AppContent() {
   const { userData, logout, checkTokenValidity } = useAuth();
   const { 
-    shouldShowBottomNav, 
     shouldHideStandardNav, 
     getPWAClasses
   } = usePWA();
@@ -116,8 +114,6 @@ function AppContent() {
         <Route path="*" element={<Navigate to={userData ? "/dashboard" : "/login"} />} /> 
       </Routes>
       
-      {/* PWA-specific bottom navigation */}
-      {userData && shouldShowBottomNav() && <BottomNavBar />}
       
       {/* PWA status indicator */}
       <PWAStatusIndicator />

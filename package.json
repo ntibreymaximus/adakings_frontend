@@ -1,6 +1,6 @@
 {
   "name": "adakings_frontend",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "private": true,
   "dependencies": {
     "@testing-library/dom": "^10.4.0",
@@ -49,7 +49,10 @@
     "extends": [
       "react-app",
       "react-app/jest"
-    ]
+    ],
+    "globals": {
+      "gtag": "readonly"
+    }
   },
   "browserslist": {
     "production": [

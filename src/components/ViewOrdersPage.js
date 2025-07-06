@@ -1573,7 +1573,7 @@ const ViewOrdersPage = memo(() => {
                             if (!isRefundMode) {
                               const mode = paymentModes.find(m => m.value === selectedMode);
                               if (mode && mode.disabled) {
-                                toast.warning(`${mode.label} is currently not available. Please select a different payment method.`);
+                                optimizedToast.warning(`${mode.label} is currently not available. Please select a different payment method.`);
                                 return; // Don't set the disabled mode
                               }
                             }
@@ -2341,13 +2341,13 @@ const ViewOrdersPage = memo(() => {
               variant="danger" 
               onClick={async () => {
                 if (!cancellationReason.trim()) {
-                  toast.error('Please provide a reason for cancellation');
+                  optimizedToast.error('Please provide a reason for cancellation');
                   return;
                 }
                 
                 // Prevent multiple cancellation attempts
                 if (isCancellingOrder) {
-                  toast.warning('Order cancellation is in progress, please wait...');
+                  optimizedToast.warning('Order cancellation is in progress, please wait...');
                   return;
                 }
                 

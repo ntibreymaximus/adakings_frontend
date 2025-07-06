@@ -136,10 +136,6 @@ export const PWAProvider = ({ children }) => {
     return isPWA || showMobileUI;
   }, [isPWA, showMobileUI]);
 
-  // Check if should show bottom navigation
-  const shouldShowBottomNav = useCallback(() => {
-    return isPWA || (isMobile && window.innerWidth < 768);
-  }, [isPWA, isMobile]);
 
   // Check if should hide standard navbar
   const shouldHideStandardNav = useCallback(() => {
@@ -186,7 +182,6 @@ export const PWAProvider = ({ children }) => {
 
     // Helpers
     shouldShowPWAComponents,
-    shouldShowBottomNav,
     shouldHideStandardNav,
     getPWARoutes,
     getPWAClasses,

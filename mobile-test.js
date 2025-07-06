@@ -120,7 +120,7 @@ class MobileDeviceTester {
     }
 
     // Check navigation accessibility
-    const navbar = document.querySelector('nav, .navbar, .bottom-nav');
+    const navbar = document.querySelector('nav, .navbar');
     if (navbar) {
       const navRect = navbar.getBoundingClientRect();
       if (navRect.width > viewportWidth) {

@@ -21,7 +21,7 @@
 .App.display-mode-standalone .main-content {
   /* Adjust content area for PWA without browser chrome */
   padding-top: 0;
-  height: calc(100vh - 60px); /* Account for bottom nav */
+  height: 100vh;
   overflow-y: auto;
 }
 
@@ -42,23 +42,12 @@
   user-select: none;
 }
 
-.App.mobile-ui .main-content {
-  /* Ensure content doesn't overlap with bottom nav */
-  padding-bottom: 80px;
-}
 
 /* PWA-specific navigation adjustments */
 .App.pwa-mode.mobile-device .navbar {
   display: none !important;
 }
 
-.App.pwa-mode .bottom-nav-bar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 1000;
-}
 
 /* Content area adjustments for PWA */
 .App.pwa-mode .container-fluid,
@@ -96,10 +85,6 @@
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-.App.pwa-mode .bottom-nav-bar {
-  /* Ensure bottom nav respects safe areas */
-  padding-bottom: env(safe-area-inset-bottom);
-}
 
 /* PWA loading states */
 .App.pwa-mode .loading-overlay {
@@ -161,7 +146,7 @@
 /* PWA install prompt styles */
 .pwa-install-prompt {
   position: fixed;
-  bottom: 100px;
+  bottom: 20px;
   left: 20px;
   right: 20px;
   background: var(--bs-primary);
@@ -220,8 +205,7 @@
   transition: padding 0.3s ease;
 }
 
-.navbar,
-.bottom-nav-bar {
+.navbar {
   transition: transform 0.3s ease;
 }
 
@@ -275,7 +259,7 @@
 /* PWA content containers */
 .App.pwa-mode .pwa-content-container {
   background: transparent;
-  min-height: calc(100vh - 140px);
+  min-height: 100vh;
 }
 
 .App.pwa-mode .pwa-form-container {
@@ -315,9 +299,6 @@
   }
 }
 
-.App.pwa-mode .bottom-nav-bar {
-  animation: slideUpFromBottom 0.3s ease-out;
-}
 
 /* Responsive text sizing for PWA */
 .App.pwa-mode {

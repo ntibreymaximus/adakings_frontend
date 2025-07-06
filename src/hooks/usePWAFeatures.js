@@ -19,10 +19,6 @@ export const usePWAFeatures = () => {
     return pwaContext.isMobile || pwaContext.showMobileUI;
   };
 
-  // Check if bottom navigation should be visible
-  const isBottomNavVisible = () => {
-    return userData && pwaContext.shouldShowBottomNav();
-  };
 
   // Check if standard navbar should be hidden
   const isStandardNavHidden = () => {
@@ -48,10 +44,6 @@ export const usePWAFeatures = () => {
     return 'container';
   };
 
-  // Check if component needs bottom padding for navigation
-  const needsBottomPadding = () => {
-    return isBottomNavVisible();
-  };
 
   // Get PWA-safe margins and padding
   const getPWASafeSpacing = () => {
@@ -66,7 +58,7 @@ export const usePWAFeatures = () => {
 
     return {
       paddingTop: 'max(1rem, env(safe-area-inset-top))',
-      paddingBottom: needsBottomPadding() ? '5rem' : 'max(1rem, env(safe-area-inset-bottom))',
+      paddingBottom: 'max(1rem, env(safe-area-inset-bottom))',
       paddingLeft: 'max(1rem, env(safe-area-inset-left))',
       paddingRight: 'max(1rem, env(safe-area-inset-right))'
     };
@@ -117,11 +109,9 @@ export const usePWAFeatures = () => {
     // Helper functions
     shouldRenderPWAUI,
     shouldRenderMobileUI,
-    isBottomNavVisible,
     isStandardNavHidden,
     getPWAComponentClasses,
     getPWAContainerClasses,
-    needsBottomPadding,
     getPWASafeSpacing,
     shouldOptimizeForTouch,
     getButtonSize,
