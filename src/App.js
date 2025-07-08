@@ -19,6 +19,8 @@ import PWAStatusIndicator from './components/PWAStatusIndicator';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 import PWAUpdateNotification from './components/PWAUpdateNotification';
 import PWAManager from './components/PWAManager';
+import EnvironmentInfo from './components/EnvironmentInfo';
+import { logEnvironmentInfo } from './utils/envConfig';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 import 'bootstrap-icons/font/bootstrap-icons.css';
@@ -58,6 +60,11 @@ function AppContent() {
   // Initialize offline services
   useEffect(() => {
     initializeOfflineServices();
+  }, []);
+
+  // Log environment information on app start
+  useEffect(() => {
+    logEnvironmentInfo();
   }, []);
 
   // Setup keyboard shortcut for PWA manager (Ctrl+Shift+P)
@@ -128,6 +135,13 @@ function AppContent() {
       <PWAManager 
         isVisible={showPWAManager} 
         onClose={() => setShowPWAManager(false)} 
+      />
+      
+      {/* Environment Information Tag */}
+      <EnvironmentInfo 
+        position="top-left"
+        showBackendInfo={true}
+        expandable={true}
       />
       
       <ToastContainer
