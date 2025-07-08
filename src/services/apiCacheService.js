@@ -2,6 +2,7 @@
 // Provides intelligent caching strategies for API calls with offline support
 
 import { API_ENDPOINTS } from '../utils/api';
+import { getBackendServerInfo } from '../utils/envConfig';
 
 class ApiCacheService {
   constructor() {
@@ -165,9 +166,28 @@ class ApiCacheService {
     return await this.performFetch(endpoint, options);
   }
 
+  // Construct full URL for API calls
+  constructFullUrl(endpoint) {
+    // If endpoint already has a protocol, return as-is
+    if (endpoint.startsWith('http://') || endpoint.startsWith('https://')) {
+      return endpoint;
+    }
+    
+    // Get backend server info and construct full URL
+    const serverInfo = getBackendServerInfo();
+    const baseUrl = serverInfo.backendUrl || 'http://localhost:8000';
+    
+    // Ensure endpoint starts with /
+    const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    
+    return `${baseUrl}${normalizedEndpoint}`;
+  }
+
   // Perform the actual fetch operation
   async performFetch(endpoint, options = {}) {
-    const response = await fetch(endpoint, {
+    const fullUrl = this.constructFullUrl(endpoint);
+    
+    const response = await fetch(fullUrl, {
       ...options,
       headers: {
         'Content-Type': 'application/json',

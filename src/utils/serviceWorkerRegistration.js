@@ -12,6 +12,12 @@ const isLocalhost = Boolean(
 );
 
 export function register(config) {
+  // Disable service worker on Railway deployments due to MIME type issues
+  if (window.location.hostname.includes('railway.app')) {
+    console.log('Service Worker registration disabled on Railway deployment');
+    return;
+  }
+  
   if ('serviceWorker' in navigator) {
     // The URL constructor is available in all browsers that support SW.
     const publicUrl = new URL(process.env.PUBLIC_URL, window.location.href);
