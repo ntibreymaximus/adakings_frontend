@@ -41,12 +41,28 @@ export const getBackendServerInfo = () => {
   const backendUrl = process.env.REACT_APP_BACKEND_BASE_URL || process.env.REACT_APP_BACKEND_URL;
   const apiUrl = process.env.REACT_APP_API_BASE_URL;
   
+  // Extract host and port from backend URL if available
+  let host = process.env.REACT_APP_API_HOST || 'localhost';
+  let port = process.env.REACT_APP_API_PORT || '8000';
+  
+  // If we have a backend URL, try to extract host and port from it
+  if (backendUrl) {
+    try {
+      const url = new URL(backendUrl);
+      host = url.hostname;
+      port = url.port || (url.protocol === 'https:' ? '443' : '80');
+    } catch (error) {
+      // If URL parsing fails, keep the defaults or env vars
+      console.warn('Failed to parse backend URL:', backendUrl);
+    }
+  }
+  
   return {
     environment,
     backendUrl,
     apiUrl,
-    host: process.env.REACT_APP_API_HOST || 'localhost',
-    port: process.env.REACT_APP_API_PORT || '8000',
+    host,
+    port,
     websocketUrl: process.env.REACT_APP_WEBSOCKET_URL,
     mediaUrl: process.env.REACT_APP_MEDIA_URL,
   };
