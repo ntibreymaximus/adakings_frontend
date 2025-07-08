@@ -1,16 +1,15 @@
 #!/usr/bin/env node
 /**
- * Smart Deployment Script for Adakings Frontend React App - Branch-Specific Versioning
+ * Smart Deployment Script for Adakings Frontend React App - Enhanced Branch-Specific Versioning
  * Manages deployments with independent version tracking for feature, dev, and production branches
  * 
  * Features:
  * - Branch-Specific Versioning: Independent version sequences for each branch type
  * - Multi-Version Tracking: VERSION file maintains separate versions for feature/dev/production
- * - Smart Git Workflow: Feature→main merge, dev→dev only, production→dev+prod with tags
- * - Production Tagging: Tags production versions on dev branch for tracking
- * - Remote Version Detection: Scans branch-specific remote versions for highest version
- * - Intelligent Version Bumping: Automatic major.minor.patch increments per branch type
- * - React Build Integration: Automatic npm run build for production deployments
+ * - Smart Git Workflow: Enhanced workflows with continuous integration branches
+ * - Dev Workflow: dev/x.x.x + devtest branch (similar to backend)
+ * - Production Workflow: prod/x.x.x + live branch (similar to backend)
+ * - React Build Integration: Automatic npm run build for production/dev deployments
  * - Atomic Commit Handling: Includes uncommitted changes in deployment commit
  * - Comprehensive Logging: Detailed deployment history and changelogs
  * - Clean Git Workflow: Creates new branches and commits all changes together
@@ -20,24 +19,36 @@
  *     node smart-deploy.js production [major|minor|patch] ["commit message"]
  *     node smart-deploy.js dev [major|minor|patch] ["commit message"]
  *     node smart-deploy.js feature/name [major|minor|patch] ["commit message"]
+ *     node smart-deploy.js status
  *     
  * Examples:
  *     # Feature deployment - continuous versioning across all features
  *     node smart-deploy.js feature/auth patch "Add authentication components"
- *     # Result: feature/auth-1.0.0 (first feature)
+ *     # Result: feature/auth-x.x.x + merges with main
  *     
- *     # Dev deployment - independent dev versioning with build
+ *     # Dev deployment - independent dev versioning with devtest branch
  *     node smart-deploy.js dev minor "New UI components"
- *     # Result: dev/1.1.0 (builds app for testing)
+ *     # Result: dev/x.x.x + updates devtest branch
  *     
- *     # Production deployment - independent production versioning with optimized build
+ *     # Production deployment - independent production versioning with live branch
  *     node smart-deploy.js production major "Production release"
- *     # Result: pushes to dev with prod-x.x.x tag, then pushes to prod branch
+ *     # Result: prod/x.x.x + updates live branch
+ * 
+ * Git Workflow:
+ * - Feature deployments: Push to feature/name-x.x.x, then merge with main
+ * - Dev deployments: Push to dev/x.x.x and create/update devtest branch (no merge with main)
+ * - Production deployments: Push to prod/x.x.x and create/update live branch (no merge with main)
+ * 
+ * Branch Versioning Strategy:
+ * Each environment maintains its own versioned branches:
+ * - Feature: feature/name-x.x.x (merged with main)
+ * - Dev: dev/x.x.x (updates devtest branch)
+ * - Production: prod/x.x.x (updates live branch)
  */
 
 const fs = require('fs');
 const path = require('path');
-const { execSync, spawn } = require('child_process');
+const { execSync } = require('child_process');
 const readline = require('readline');
 
 class ReactSmartDeployer {
@@ -48,33 +59,29 @@ class ReactSmartDeployer {
         this.packageJsonFile = path.join(this.baseDir, 'package.json');
         this.buildDir = path.join(this.baseDir, 'build');
         
-        // React-specific version tracking
+        // React-specific version tracking with enhanced workflow
         this.versionConfig = {
             'production': { file: 'VERSION', initial: '1.0.0', build: true, optimize: true },
-            'dev': { file: 'VERSION', initial: '0.9.0', build: true, optimize: false },
-            'feature': { file: 'VERSION', initial: '0.8.0', build: false, optimize: false }
+            'dev': { file: 'VERSION', initial: '1.0.0', build: true, optimize: false },
+            'feature': { file: 'VERSION', initial: '1.0.0', build: false, optimize: false }
         };
         
-        // Git workflow configuration for React frontend
+        // Enhanced Git workflow configuration for React frontend
         this.gitConfig = {
             'production': {
                 targetBranch: 'prod',
-                mergeWith: null, // Production pushes to dev with tag, then to prod
-                pushToDev: true, // Special case: also push to dev with production tag
-                description: 'Production release with optimized build',
-                useVersionedBranch: false // Push directly to prod
+                mergeWith: null, // Production pushes to prod branch and updates live
+                description: 'Production release with live branch update'
             },
             'dev': {
                 targetBranch: 'dev',
-                mergeWith: null, // Dev only pushes to dev branch
-                description: 'Development release with test build',
-                useVersionedBranch: true // Keep versioned branches for dev
+                mergeWith: null, // Dev pushes to dev branch and updates devtest
+                description: 'Development release with devtest branch update'
             },
             'feature': {
                 targetBranch: null, // Will be set dynamically
                 mergeWith: 'main', // Feature branches merge with main after push
-                description: 'Feature branch development',
-                useVersionedBranch: true // Keep versioned branches for features
+                description: 'Feature branch development'
             }
         };
     }
@@ -120,6 +127,31 @@ class ReactSmartDeployer {
         }
     }
 
+    backupCurrentState() {
+        this.logInfo('Creating backup of current state...');
+        
+        const backupTime = new Date().toISOString().replace(/[:.]/g, '_').slice(0, 19);
+        const currentBackup = path.join(this.backupDir, `backup_${backupTime}`);
+        
+        if (!fs.existsSync(this.backupDir)) {
+            fs.mkdirSync(this.backupDir, { recursive: true });
+        }
+        
+        fs.mkdirSync(currentBackup, { recursive: true });
+        
+        // Backup key files
+        const keyFiles = ['.env', 'VERSION', 'CHANGELOG.md', 'package.json'];
+        for (const file of keyFiles) {
+            const filePath = path.join(this.baseDir, file);
+            if (fs.existsSync(filePath)) {
+                fs.copyFileSync(filePath, path.join(currentBackup, file));
+            }
+        }
+        
+        this.logSuccess(`Backup created at: ${currentBackup}`);
+        return currentBackup;
+    }
+
     checkNodeDependencies() {
         const nodeModules = path.join(this.baseDir, 'node_modules');
         if (!fs.existsSync(nodeModules)) {
@@ -129,6 +161,166 @@ class ReactSmartDeployer {
         } else {
             this.logInfo('Node dependencies found');
         }
+    }
+
+    syncWithRemote() {
+        this.logInfo('Syncing with remote repository...');
+        
+        // Fetch all remote branches and tags
+        this.runCommand('git fetch --all');
+        
+        // Prune remote tracking branches that no longer exist
+        this.runCommand('git remote prune origin');
+        
+        // Clean up local branches that no longer exist on remote
+        this.cleanupDeletedRemoteBranches();
+        
+        // Update current branch only if it exists remotely
+        const currentBranch = this.getCurrentBranch();
+        
+        // Check if current branch exists remotely
+        const remoteBranches = this.runCommand('git branch -r', { silent: true });
+        if (remoteBranches.includes(`origin/${currentBranch}`)) {
+            try {
+                this.runCommand(`git pull origin ${currentBranch}`);
+                this.logInfo(`Updated ${currentBranch} from remote`);
+            } catch (error) {
+                this.logWarning(`Could not pull from origin/${currentBranch}`);
+            }
+        } else {
+            this.logInfo(`Branch ${currentBranch} doesn't exist remotely - skipping pull`);
+        }
+    }
+
+    cleanupDeletedRemoteBranches() {
+        try {
+            this.logInfo('Cleaning up deleted remote branches...');
+            
+            // Get current branch to avoid deleting it
+            const currentBranch = this.getCurrentBranch();
+            
+            // Get all local branches
+            const localResult = this.runCommand('git branch', { silent: true });
+            const localBranches = [];
+            for (const line of localResult.split('\n')) {
+                if (line.trim()) {
+                    const branch = line.trim().replace('*', '').trim();
+                    if (branch && !['main', 'master'].includes(branch)) {
+                        localBranches.push(branch);
+                    }
+                }
+            }
+            
+            // Get all remote branches
+            const remoteResult = this.runCommand('git branch -r', { silent: true });
+            const remoteBranches = [];
+            for (const line of remoteResult.split('\n')) {
+                if (line.trim() && !line.includes('->')) {
+                    // Extract branch name from origin/branch-name
+                    const branch = line.trim().replace('origin/', '');
+                    if (branch) {
+                        remoteBranches.push(branch);
+                    }
+                }
+            }
+            
+            // Find local branches that don't exist remotely
+            const branchesToDelete = [];
+            for (const localBranch of localBranches) {
+                if (!remoteBranches.includes(localBranch) && localBranch !== currentBranch) {
+                    branchesToDelete.push(localBranch);
+                }
+            }
+            
+            // Delete branches that no longer exist remotely
+            if (branchesToDelete.length > 0) {
+                this.logInfo(`Found ${branchesToDelete.length} local branches to clean up:`);
+                for (const branch of branchesToDelete) {
+                    this.logInfo(`  - ${branch}`);
+                }
+                
+                for (const branch of branchesToDelete) {
+                    try {
+                        // Force delete the branch
+                        this.runCommand(`git branch -D ${branch}`, { silent: true });
+                        this.logSuccess(`Deleted local branch: ${branch}`);
+                    } catch (error) {
+                        this.logWarning(`Could not delete branch: ${branch}`);
+                    }
+                }
+            } else {
+                this.logInfo('No stale local branches found to clean up');
+            }
+                
+        } catch (error) {
+            this.logWarning(`Branch cleanup failed: ${error.message}`);
+        }
+    }
+
+    getVersionFromFile(branchType) {
+        if (!fs.existsSync(this.versionFile)) {
+            return '1.0.0';
+        }
+        
+        try {
+            const content = fs.readFileSync(this.versionFile, 'utf8').trim();
+            
+            // Handle legacy single version format
+            if (!content.includes('\n') && !content.includes('feature=') && !content.includes('dev=') && !content.includes('production=')) {
+                // Legacy format - return the single version for any branch type
+                return content;
+            }
+            
+            // Parse new multi-branch format
+            const versions = {
+                'feature': '1.0.0',
+                'dev': '1.0.0', 
+                'production': '1.0.0'
+            };
+            
+            for (const line of content.split('\n')) {
+                if (line.includes('=')) {
+                    const [key, value] = line.split('=', 2);
+                    const cleanKey = key.trim();
+                    const cleanValue = value.trim();
+                    if (cleanKey in versions) {
+                        versions[cleanKey] = cleanValue;
+                    }
+                }
+            }
+            
+            return versions[branchType] || '1.0.0';
+            
+        } catch (error) {
+            this.logWarning(`Error reading version file: ${error.message}`);
+            return '1.0.0';
+        }
+    }
+
+    updateVersionInFile(branchType, newVersion) {
+        // Get current versions for all branch types
+        const currentVersions = {
+            'feature': this.getVersionFromFile('feature'),
+            'dev': this.getVersionFromFile('dev'),
+            'production': this.getVersionFromFile('production')
+        };
+        
+        // Update the specific branch type
+        currentVersions[branchType] = newVersion;
+        
+        // Write the updated VERSION file
+        const versionContent = `feature=${currentVersions['feature']}
+dev=${currentVersions['dev']}
+production=${currentVersions['production']}`;
+        
+        fs.writeFileSync(this.versionFile, versionContent, 'utf8');
+        this.logSuccess(`Updated VERSION file - ${branchType}: ${newVersion}`);
+        
+        // Also log the complete state
+        this.logInfo('VERSION file now contains:');
+        this.logInfo(`  feature=${currentVersions['feature']}`);
+        this.logInfo(`  dev=${currentVersions['dev']}`);
+        this.logInfo(`  production=${currentVersions['production']}`);
     }
 
     updatePackageJsonVersion(newVersion) {
@@ -142,6 +334,124 @@ class ReactSmartDeployer {
         } catch (error) {
             this.logWarning(`Could not update package.json version: ${error.message}`);
         }
+    }
+
+    getHighestBranchVersion(targetEnv) {
+        try {
+            // Get all remote branches
+            const remoteBranches = this.runCommand('git branch -r', { silent: true });
+            const branches = remoteBranches.split('\n')
+                .map(branch => branch.trim())
+                .filter(branch => branch && !branch.includes('->'));
+            
+            const versions = [];
+            
+            if (targetEnv.startsWith('feature/')) {
+                // For feature branches, look for ALL feature branch versions (continuous across all features)
+                const pattern = 'origin/feature/';
+                this.logInfo('Scanning for all feature branch versions...');
+                
+                for (const branch of branches) {
+                    if (branch.startsWith(pattern) && branch.includes('-')) {
+                        // Extract version from feature/name-x.x.x pattern
+                        const versionPart = branch.split('-').pop();
+                        if (this.isValidVersion(versionPart)) {
+                            versions.push(versionPart);
+                            this.logInfo(`  Found version ${versionPart} in ${branch}`);
+                        }
+                    }
+                }
+                        
+            } else if (targetEnv === 'dev') {
+                // For dev branches, look for dev/x.x.x pattern
+                const pattern = 'origin/dev/';
+                this.logInfo('Scanning for dev branch versions...');
+                
+                for (const branch of branches) {
+                    if (branch.startsWith(pattern) && (branch.match(/\//g) || []).length === 2) {
+                        const versionPart = branch.replace(pattern, '');
+                        if (this.isValidVersion(versionPart)) {
+                            versions.push(versionPart);
+                            this.logInfo(`  Found version ${versionPart} in ${branch}`);
+                        }
+                    }
+                }
+                        
+            } else if (targetEnv === 'production') {
+                // For production branches, look for prod/x.x.x pattern
+                const pattern = 'origin/prod/';
+                this.logInfo('Scanning for production branch versions...');
+                
+                for (const branch of branches) {
+                    if (branch.startsWith(pattern) && (branch.match(/\//g) || []).length === 2) {
+                        const versionPart = branch.replace(pattern, '');
+                        if (this.isValidVersion(versionPart)) {
+                            versions.push(versionPart);
+                            this.logInfo(`  Found version ${versionPart} in ${branch}`);
+                        }
+                    }
+                }
+            }
+            
+            if (versions.length === 0) {
+                this.logInfo(`No versioned branches found for ${targetEnv} - starting from 1.0.0`);
+                return '1.0.0';
+            }
+            
+            // Sort versions and return the highest
+            versions.sort((a, b) => {
+                const aParts = a.split('.').map(Number);
+                const bParts = b.split('.').map(Number);
+                for (let i = 0; i < 3; i++) {
+                    if (aParts[i] !== bParts[i]) {
+                        return aParts[i] - bParts[i];
+                    }
+                }
+                return 0;
+            });
+            
+            const highestVersion = versions[versions.length - 1];
+            this.logInfo(`Highest version found for ${targetEnv}: ${highestVersion}`);
+            return highestVersion;
+            
+        } catch (error) {
+            this.logWarning(`Error scanning versions for ${targetEnv}: ${error.message}`);
+            return '1.0.0';
+        }
+    }
+
+    isValidVersion(versionStr) {
+        const parts = versionStr.split('.');
+        if (parts.length !== 3) return false;
+        
+        for (const part of parts) {
+            if (isNaN(parseInt(part))) return false;
+        }
+        return true;
+    }
+
+    bumpVersion(bumpType, currentVersion) {
+        const parts = currentVersion.split('.').map(Number);
+        let [major, minor, patch] = parts;
+        
+        switch (bumpType) {
+            case 'major':
+                major += 1;
+                minor = 0;
+                patch = 0;
+                break;
+            case 'minor':
+                minor += 1;
+                patch = 0;
+                break;
+            case 'patch':
+                patch += 1;
+                break;
+            default:
+                throw new Error(`Invalid bump type: ${bumpType}`);
+        }
+        
+        return `${major}.${minor}.${patch}`;
     }
 
     runReactBuild(targetEnv, optimize = false) {
@@ -201,271 +511,39 @@ class ReactSmartDeployer {
     }
 
     getDirSize(dirPath) {
-        if (!fs.existsSync(dirPath)) return 0;
-        
         let size = 0;
-        const items = fs.readdirSync(dirPath);
-        
-        for (const item of items) {
-            const itemPath = path.join(dirPath, item);
-            const stats = fs.statSync(itemPath);
-            
-            if (stats.isDirectory()) {
-                size += this.getDirSize(itemPath);
-            } else {
-                size += stats.size;
+        try {
+            const files = fs.readdirSync(dirPath);
+            for (const file of files) {
+                const filePath = path.join(dirPath, file);
+                const stats = fs.statSync(filePath);
+                if (stats.isDirectory()) {
+                    size += this.getDirSize(filePath);
+                } else {
+                    size += stats.size;
+                }
             }
+        } catch (error) {
+            // Ignore errors
         }
-        
         return size;
     }
 
     getFilesWithExtension(dirPath, extension) {
-        if (!fs.existsSync(dirPath)) return [];
-        
-        return fs.readdirSync(dirPath)
-            .filter(file => file.endsWith(extension))
-            .map(file => path.join(dirPath, file));
-    }
-
-    backupCurrentState() {
-        this.logInfo('Creating backup of current state...');
-        
-        const backupTime = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-        const currentBackup = path.join(this.backupDir, `backup_${backupTime}`);
-        
-        if (!fs.existsSync(this.backupDir)) {
-            fs.mkdirSync(this.backupDir, { recursive: true });
-        }
-        fs.mkdirSync(currentBackup, { recursive: true });
-        
-        // Backup key files including React-specific ones
-        const keyFiles = [
-            '.env', 'VERSION', 'CHANGELOG.md', 'package.json', 
-            'package-lock.json', 'src', 'public', 'README.md'
-        ];
-        
-        for (const file of keyFiles) {
-            const sourcePath = path.join(this.baseDir, file);
-            const targetPath = path.join(currentBackup, file);
-            
-            if (fs.existsSync(sourcePath)) {
-                const stats = fs.statSync(sourcePath);
-                if (stats.isDirectory()) {
-                    this.copyDir(sourcePath, targetPath);
-                } else {
-                    fs.copyFileSync(sourcePath, targetPath);
-                }
-            }
-        }
-        
-        // Backup build directory if it exists
-        if (fs.existsSync(this.buildDir)) {
-            this.copyDir(this.buildDir, path.join(currentBackup, 'build'));
-        }
-        
-        this.logSuccess(`Backup created at: ${currentBackup}`);
-        return currentBackup;
-    }
-
-    copyDir(src, dest) {
-        if (!fs.existsSync(dest)) {
-            fs.mkdirSync(dest, { recursive: true });
-        }
-        
-        const items = fs.readdirSync(src);
-        for (const item of items) {
-            const srcPath = path.join(src, item);
-            const destPath = path.join(dest, item);
-            
-            const stats = fs.statSync(srcPath);
-            if (stats.isDirectory()) {
-                this.copyDir(srcPath, destPath);
-            } else {
-                fs.copyFileSync(srcPath, destPath);
-            }
-        }
-    }
-
-    getVersionFromFile(branchType) {
-        if (!fs.existsSync(this.versionFile)) {
-            return '1.0.0';
-        }
-        
+        const files = [];
         try {
-            const content = fs.readFileSync(this.versionFile, 'utf8').trim();
-            
-            // Handle legacy single version format
-            if (!content.includes('\n') && !content.includes('feature=') && 
-                !content.includes('dev=') && !content.includes('production=')) {
-                return content;
-            }
-            
-            // Parse new multi-branch format
-            const versions = {
-                'feature': '1.0.0',
-                'dev': '1.0.0',
-                'production': '1.0.0'
-            };
-            
-            const lines = content.split('\n');
-            for (const line of lines) {
-                if (line.includes('=')) {
-                    const [key, value] = line.split('=', 2);
-                    const trimmedKey = key.trim();
-                    const trimmedValue = value.trim();
-                    if (versions.hasOwnProperty(trimmedKey)) {
-                        versions[trimmedKey] = trimmedValue;
+            if (fs.existsSync(dirPath)) {
+                const dirFiles = fs.readdirSync(dirPath);
+                for (const file of dirFiles) {
+                    if (file.endsWith(extension)) {
+                        files.push(file);
                     }
                 }
             }
-            
-            return versions[branchType] || '1.0.0';
         } catch (error) {
-            this.logWarning(`Error reading version file: ${error.message}`);
-            return '1.0.0';
+            // Ignore errors
         }
-    }
-
-    updateVersionInFile(branchType, newVersion) {
-        // Get current versions for all branch types
-        const currentVersions = {
-            'feature': this.getVersionFromFile('feature'),
-            'dev': this.getVersionFromFile('dev'),
-            'production': this.getVersionFromFile('production')
-        };
-        
-        // Update the specific branch type
-        currentVersions[branchType] = newVersion;
-        
-        // Write the updated VERSION file
-        const versionContent = `feature=${currentVersions.feature}\ndev=${currentVersions.dev}\nproduction=${currentVersions.production}`;
-        
-        fs.writeFileSync(this.versionFile, versionContent, 'utf8');
-        this.logSuccess(`Updated VERSION file - ${branchType}: ${newVersion}`);
-        
-        // Also update package.json version
-        this.updatePackageJsonVersion(newVersion);
-        
-        // Log the complete state
-        this.logInfo('VERSION file now contains:');
-        this.logInfo(`  feature=${currentVersions.feature}`);
-        this.logInfo(`  dev=${currentVersions.dev}`);
-        this.logInfo(`  production=${currentVersions.production}`);
-    }
-
-    getHighestBranchVersion(targetEnv) {
-        try {
-            // Get all remote branches
-            const remoteBranches = this.runCommand('git branch -r', { silent: true });
-            const branches = remoteBranches.split('\n')
-                .map(branch => branch.trim())
-                .filter(branch => branch && !branch.includes('->'));
-            
-            const versions = [];
-            
-            if (targetEnv.startsWith('feature/')) {
-                // For feature branches, look for ALL feature branch versions
-                const pattern = 'origin/feature/';
-                this.logInfo('Scanning for all feature branch versions...');
-                
-                for (const branch of branches) {
-                    if (branch.startsWith(pattern) && branch.includes('-')) {
-                        const versionPart = branch.split('-').pop();
-                        if (this.isValidVersion(versionPart)) {
-                            versions.push(versionPart);
-                            this.logInfo(`  Found version ${versionPart} in ${branch}`);
-                        }
-                    }
-                }
-            } else if (targetEnv === 'dev') {
-                // For dev branches, look for dev/x.x.x pattern
-                const pattern = 'origin/dev/';
-                this.logInfo('Scanning for dev branch versions...');
-                
-                for (const branch of branches) {
-                    if (branch.startsWith(pattern) && (branch.match(/\//g) || []).length === 2) {
-                        const versionPart = branch.replace(pattern, '');
-                        if (this.isValidVersion(versionPart)) {
-                            versions.push(versionPart);
-                            this.logInfo(`  Found version ${versionPart} in ${branch}`);
-                        }
-                    }
-                }
-            } else if (targetEnv === 'production') {
-                // For production branches, look for prod/x.x.x pattern
-                const pattern = 'origin/prod/';
-                this.logInfo('Scanning for production branch versions...');
-                
-                for (const branch of branches) {
-                    if (branch.startsWith(pattern) && (branch.match(/\//g) || []).length === 2) {
-                        const versionPart = branch.replace(pattern, '');
-                        if (this.isValidVersion(versionPart)) {
-                            versions.push(versionPart);
-                            this.logInfo(`  Found version ${versionPart} in ${branch}`);
-                        }
-                    }
-                }
-            }
-            
-            if (versions.length === 0) {
-                this.logInfo(`No versioned branches found for ${targetEnv} - starting from 1.0.0`);
-                return '1.0.0';
-            }
-            
-            // Sort versions and return the highest
-            versions.sort((a, b) => {
-                const aParts = a.split('.').map(Number);
-                const bParts = b.split('.').map(Number);
-                for (let i = 0; i < 3; i++) {
-                    if (aParts[i] !== bParts[i]) {
-                        return aParts[i] - bParts[i];
-                    }
-                }
-                return 0;
-            });
-            
-            const highestVersion = versions[versions.length - 1];
-            this.logInfo(`Highest version found for ${targetEnv}: ${highestVersion}`);
-            return highestVersion;
-        } catch (error) {
-            this.logWarning(`Error scanning versions for ${targetEnv}: ${error.message}`);
-            return '1.0.0';
-        }
-    }
-
-    isValidVersion(versionStr) {
-        const parts = versionStr.split('.');
-        if (parts.length !== 3) return false;
-        
-        for (const part of parts) {
-            if (isNaN(parseInt(part))) return false;
-        }
-        return true;
-    }
-
-    bumpVersion(bumpType, currentVersion) {
-        const parts = currentVersion.split('.').map(Number);
-        let [major, minor, patch] = parts;
-        
-        switch (bumpType) {
-            case 'major':
-                major += 1;
-                minor = 0;
-                patch = 0;
-                break;
-            case 'minor':
-                minor += 1;
-                patch = 0;
-                break;
-            case 'patch':
-                patch += 1;
-                break;
-            default:
-                throw new Error(`Invalid bump type: ${bumpType}`);
-        }
-        
-        return `${major}.${minor}.${patch}`;
+        return files;
     }
 
     async confirmAction(message) {
@@ -555,6 +633,180 @@ class ReactSmartDeployer {
         return true;
     }
 
+    // NEW: Create or update devtest branch (similar to backend)
+    async createOrUpdateDevtestBranch(newVersion, commitMessage) {
+        this.logInfo(`🧪 Managing devtest branch for dev version ${newVersion}...`);
+        
+        // The current branch should be the versioned dev branch: dev/{new_version}
+        const currentDevBranch = `dev/${newVersion}`;
+        const currentBranch = this.getCurrentBranch();
+        
+        // Verify we're on the correct dev branch
+        if (currentBranch !== currentDevBranch) {
+            this.logWarning(`Expected to be on ${currentDevBranch}, but currently on ${currentBranch}`);
+            // Checkout the correct dev branch
+            this.runCommand(`git checkout ${currentDevBranch}`);
+        }
+        
+        this.logInfo(`Working from versioned dev branch: ${currentBranch}`);
+        
+        // Check if devtest branch exists locally
+        const localBranches = this.runCommand('git branch', { silent: true });
+        const cleanLocalBranches = localBranches.split('\n')
+            .map(branch => branch.replace('*', '').trim())
+            .filter(branch => branch);
+        const localDevtestExists = cleanLocalBranches.includes('devtest');
+        
+        // Check if devtest branch exists remotely
+        const remoteBranches = this.runCommand('git branch -r', { silent: true });
+        const cleanRemoteBranches = remoteBranches.split('\n')
+            .map(branch => branch.trim())
+            .filter(branch => branch && !branch.includes('->'));
+        const remoteDevtestExists = cleanRemoteBranches.includes('origin/devtest');
+        
+        this.logInfo(`Local devtest exists: ${localDevtestExists}`);
+        this.logInfo(`Remote devtest exists: ${remoteDevtestExists}`);
+        
+        if (localDevtestExists) {
+            // Local devtest exists, checkout and update
+            this.runCommand('git checkout devtest');
+            if (remoteDevtestExists) {
+                // Pull latest changes from remote
+                try {
+                    this.runCommand('git pull origin devtest');
+                    this.logInfo('Updated local devtest with remote changes');
+                } catch (error) {
+                    this.logWarning('Could not pull from origin/devtest - continuing...');
+                }
+            }
+        } else if (remoteDevtestExists) {
+            // Remote devtest exists but not locally - create local tracking branch
+            this.runCommand('git checkout -b devtest origin/devtest');
+            this.logInfo('Created local devtest branch tracking origin/devtest');
+        } else {
+            // No devtest branch exists - create new one from the versioned dev branch
+            this.runCommand(`git checkout -b devtest ${currentDevBranch}`);
+            this.logInfo(`Created new devtest branch from ${currentDevBranch}`);
+        }
+        
+        // Merge the versioned dev branch changes into devtest
+        try {
+            this.runCommand(`git merge ${currentDevBranch}`);
+            this.logInfo(`Merged ${currentDevBranch} into devtest`);
+        } catch (error) {
+            // If there are conflicts, resolve them by taking the dev branch version
+            this.logWarning('Merge conflicts detected. Resolving by taking dev branch changes...');
+            this.runCommand(`git merge -X theirs ${currentDevBranch}`);
+            this.logInfo(`Resolved conflicts by taking ${currentDevBranch} changes`);
+        }
+        
+        // Check if there are any changes to commit
+        const statusResult = this.runCommand('git status --porcelain', { silent: true });
+        
+        if (statusResult.trim()) {
+            // Add and commit any remaining changes
+            this.runCommand('git add .');
+            const devtestCommitMsg = `test(devtest): Update devtest with dev/${newVersion} changes - ${commitMessage || 'Dev deployment'}`;
+            this.runCommand(`git commit -m "${devtestCommitMsg}"`);
+            this.logInfo('Committed additional changes to devtest');
+        }
+        
+        // Push devtest branch
+        this.runCommand('git push origin devtest');
+        this.logSuccess(`✅ Devtest branch updated and pushed with dev/${newVersion} changes`);
+        
+        // Return to the versioned dev branch
+        this.runCommand(`git checkout ${currentDevBranch}`);
+        this.logInfo(`Returned to ${currentDevBranch}`);
+    }
+
+    // NEW: Create or update live branch (similar to backend)
+    async createOrUpdateLiveBranch(newVersion, commitMessage) {
+        this.logInfo(`🔴 Managing live branch for production version ${newVersion}...`);
+        
+        // The current branch should be the versioned prod branch: prod/{new_version}
+        const currentProdBranch = `prod/${newVersion}`;
+        const currentBranch = this.getCurrentBranch();
+        
+        // Verify we're on the correct prod branch
+        if (currentBranch !== currentProdBranch) {
+            this.logWarning(`Expected to be on ${currentProdBranch}, but currently on ${currentBranch}`);
+            // Checkout the correct prod branch
+            this.runCommand(`git checkout ${currentProdBranch}`);
+        }
+        
+        this.logInfo(`Working from versioned prod branch: ${currentBranch}`);
+        
+        // Check if live branch exists locally
+        const localBranches = this.runCommand('git branch', { silent: true });
+        const cleanLocalBranches = localBranches.split('\n')
+            .map(branch => branch.replace('*', '').trim())
+            .filter(branch => branch);
+        const localLiveExists = cleanLocalBranches.includes('live');
+        
+        // Check if live branch exists remotely
+        const remoteBranches = this.runCommand('git branch -r', { silent: true });
+        const cleanRemoteBranches = remoteBranches.split('\n')
+            .map(branch => branch.trim())
+            .filter(branch => branch && !branch.includes('->'));
+        const remoteLiveExists = cleanRemoteBranches.includes('origin/live');
+        
+        this.logInfo(`Local live exists: ${localLiveExists}`);
+        this.logInfo(`Remote live exists: ${remoteLiveExists}`);
+        
+        if (localLiveExists) {
+            // Local live exists, checkout and update
+            this.runCommand('git checkout live');
+            if (remoteLiveExists) {
+                // Pull latest changes from remote
+                try {
+                    this.runCommand('git pull origin live');
+                    this.logInfo('Updated local live with remote changes');
+                } catch (error) {
+                    this.logWarning('Could not pull from origin/live - continuing...');
+                }
+            }
+        } else if (remoteLiveExists) {
+            // Remote live exists but not locally - create local tracking branch
+            this.runCommand('git checkout -b live origin/live');
+            this.logInfo('Created local live branch tracking origin/live');
+        } else {
+            // No live branch exists - create new one from the versioned prod branch
+            this.runCommand(`git checkout -b live ${currentProdBranch}`);
+            this.logInfo(`Created new live branch from ${currentProdBranch}`);
+        }
+        
+        // Merge the versioned prod branch changes into live
+        try {
+            this.runCommand(`git merge ${currentProdBranch}`);
+            this.logInfo(`Merged ${currentProdBranch} into live`);
+        } catch (error) {
+            // If there are conflicts, resolve them by taking the prod branch version
+            this.logWarning('Merge conflicts detected. Resolving by taking prod branch changes...');
+            this.runCommand(`git merge -X theirs ${currentProdBranch}`);
+            this.logInfo(`Resolved conflicts by taking ${currentProdBranch} changes`);
+        }
+        
+        // Check if there are any changes to commit
+        const statusResult = this.runCommand('git status --porcelain', { silent: true });
+        
+        if (statusResult.trim()) {
+            // Add and commit any remaining changes
+            this.runCommand('git add .');
+            const liveCommitMsg = `deploy(live): Update live with prod/${newVersion} changes - ${commitMessage || 'Production deployment'}`;
+            this.runCommand(`git commit -m "${liveCommitMsg}"`);
+            this.logInfo('Committed additional changes to live');
+        }
+        
+        // Push live branch
+        this.runCommand('git push origin live');
+        this.logSuccess(`✅ Live branch updated and pushed with prod/${newVersion} changes`);
+        
+        // Return to the versioned prod branch
+        this.runCommand(`git checkout ${currentProdBranch}`);
+        this.logInfo(`Returned to ${currentProdBranch}`);
+    }
+
     generateReactChangelog(newVersion, targetEnv, commitMessage = '') {
         const changelogFile = path.join(this.baseDir, 'CHANGELOG.md');
         
@@ -598,35 +850,22 @@ class ReactSmartDeployer {
         if (targetEnv.startsWith('feature/')) {
             releaseType = '🔧 Feature Development';
             const featureName = targetEnv.replace('feature/', '');
-            releaseDescription = `React feature branch for '${featureName}' development (no build)`;
+            releaseDescription = `Feature branch for '${featureName}' development`;
             branchInfo = `feature/${featureName}-${newVersion}`;
-            buildInfo = 'No build process (development only)';
+            buildInfo = 'No build process';
         } else if (targetEnv === 'dev') {
             releaseType = '🚀 Development Release';
-            releaseDescription = 'React development environment with test build';
+            releaseDescription = 'Development environment deployment with latest React components';
             branchInfo = `dev/${newVersion}`;
-            buildInfo = 'Development build with source maps enabled';
+            buildInfo = config.build ? 'Development build with source maps' : 'No build process';
         } else if (targetEnv === 'production') {
             releaseType = '🎯 Production Release';
-            releaseDescription = 'React production deployment with optimized build';
-            branchInfo = 'prod';
-            buildInfo = 'Optimized production build (minified, no source maps)';
+            releaseDescription = 'Production deployment - optimized React build';
+            branchInfo = `prod/${newVersion}`;
+            buildInfo = config.optimize ? 'Optimized production build' : 'Standard build';
         }
         
-        // Get build size info if build directory exists
-        let buildInfoDetail = buildInfo;
-        if (fs.existsSync(this.buildDir)) {
-            try {
-                const buildSize = this.getDirSize(this.buildDir);
-                const buildSizeMB = (buildSize / (1024 * 1024)).toFixed(2);
-                const jsFiles = this.getFilesWithExtension(path.join(this.buildDir, 'static', 'js'), '.js');
-                const cssFiles = this.getFilesWithExtension(path.join(this.buildDir, 'static', 'css'), '.css');
-                buildInfoDetail += ` (${buildSizeMB} MB, ${jsFiles.length} JS files, ${cssFiles.length} CSS files)`;
-            } catch (error) {
-                // Ignore errors in build size calculation
-            }
-        }
-        
+        // Build comprehensive changelog entry
         const newEntry = `# Changelog
 
 All notable changes to this project will be documented in this file.
@@ -648,37 +887,156 @@ ${commitMessage || `Automated React deployment to ${targetEnv} environment`}
 **📁 Files Modified:**
 ${changedFiles.length > 0 ? changedFiles.join('\n') : '- No file changes detected'}
 
-**🔄 React Build Details:**
-- **Build Process**: ${buildInfoDetail}
-- **Environment**: ${targetEnv}
-- **Optimization**: ${config.optimize ? 'Enabled' : 'Disabled'}
-- **Source Maps**: ${config.optimize ? 'Disabled' : 'Enabled'}
-
 **🔄 Deployment Details:**
 - **Source Branch**: \`${currentBranch}\`
 - **Target Branch**: \`${branchInfo}\`
-- **Merge Strategy**: Automatic merge with main branch
+- **Build Process**: ${buildInfo}
+- **React Version**: Latest
 
-**🎯 React Environment Notes:**
-${this.getReactEnvironmentNotes(targetEnv)}
+**🎯 Environment Specific Notes:**
+${this.getEnvironmentNotes(targetEnv)}
 
 ---
 
-${currentContent.replace('# Changelog', '').replace('All notable changes to this project will be documented in this file.', '').trim()}
-`;
+${currentContent.replace('# Changelog', '').replace('All notable changes to this project will be documented in this file.', '').trim()}`;
         
+        // Write updated changelog
         fs.writeFileSync(changelogFile, newEntry, 'utf8');
     }
 
-    getReactEnvironmentNotes(targetEnv) {
+    getEnvironmentNotes(targetEnv) {
         if (targetEnv.startsWith('feature/')) {
-            return '- React feature branch for component development and testing\n- No build process (fastest deployment for development)\n- Changes are isolated and will be merged after review\n- Use `npm start` for local development server';
+            return '- This is a feature branch deployment for development and testing\n- Changes are isolated and will be merged after review\n- Not suitable for production use';
         } else if (targetEnv === 'dev') {
-            return '- React development environment with test build\n- Development build includes source maps for debugging\n- Used for integration testing of React components\n- Build artifacts generated for testing purposes';
+            return '- Development environment deployment\n- Contains latest React components and changes\n- Used for integration testing before production\n- Devtest branch updated for continuous testing';
         } else if (targetEnv === 'production') {
-            return '- React production environment with optimized build\n- Minified and optimized build for best performance\n- Source maps disabled for security and performance\n- Ready for end users with optimized bundle size';
+            return '- Production environment deployment\n- Optimized React build for performance\n- Ready for end users\n- Live branch updated for continuous deployment';
         } else {
-            return `- React deployment to ${targetEnv} environment\n- See React documentation for environment details`;
+            return `- Deployment to ${targetEnv} environment\n- See deployment documentation for environment details`;
+        }
+    }
+
+    generateComprehensiveCommitMessage(targetEnv, version, commitMessage = '') {
+        try {
+            // Get changed files with their status
+            const result = this.runCommand('git status --porcelain', { silent: true });
+            const changes = result.trim() ? result.trim().split('\n') : [];
+            
+            // Categorize changes by type and file extension
+            const fileCategories = {
+                'components': [],
+                'styles': [],
+                'config': [],
+                'docs': [],
+                'tests': [],
+                'build': [],
+                'other': []
+            };
+            
+            const actionCounts = { modified: 0, added: 0, deleted: 0, renamed: 0 };
+            
+            for (const change of changes) {
+                if (!change.trim()) continue;
+                
+                const status = change.slice(0, 2);
+                const filename = change.slice(3).trim();
+                
+                // Count actions
+                if (status.includes('M')) actionCounts.modified++;
+                else if (status.includes('A')) actionCounts.added++;
+                else if (status.includes('D')) actionCounts.deleted++;
+                else if (status.includes('R')) actionCounts.renamed++;
+                
+                // Categorize by file type
+                if (filename.match(/\.(js|jsx|ts|tsx)$/)) {
+                    fileCategories.components.push(filename);
+                } else if (filename.match(/\.(css|scss|less|sass)$/)) {
+                    fileCategories.styles.push(filename);
+                } else if (filename.match(/\.(json|env|config)$/) || filename.includes('package')) {
+                    fileCategories.config.push(filename);
+                } else if (filename.match(/\.(md|txt|pdf)$/)) {
+                    fileCategories.docs.push(filename);
+                } else if (filename.includes('test') || filename.includes('spec')) {
+                    fileCategories.tests.push(filename);
+                } else if (filename.includes('build') || filename === 'public' || filename.includes('dist')) {
+                    fileCategories.build.push(filename);
+                } else {
+                    fileCategories.other.push(filename);
+                }
+            }
+            
+            // Build comprehensive commit message
+            const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
+            
+            // Header with conventional commit format
+            const commitType = targetEnv.startsWith('feature/') ? 'feat' : 
+                             targetEnv === 'production' ? 'release' : 'deploy';
+            let header = `${commitType}(${targetEnv}): Deploy React v${version}`;
+            
+            if (commitMessage) {
+                header += ` - ${commitMessage}`;
+            }
+            
+            // Build detailed body
+            const bodyParts = [];
+            
+            // Summary of changes
+            const totalFiles = Object.values(actionCounts).reduce((a, b) => a + b, 0);
+            if (totalFiles > 0) {
+                const changeSummary = [];
+                if (actionCounts.modified > 0) changeSummary.push(`${actionCounts.modified} modified`);
+                if (actionCounts.added > 0) changeSummary.push(`${actionCounts.added} added`);
+                if (actionCounts.deleted > 0) changeSummary.push(`${actionCounts.deleted} deleted`);
+                if (actionCounts.renamed > 0) changeSummary.push(`${actionCounts.renamed} renamed`);
+                
+                bodyParts.push(`📊 Summary: ${changeSummary.join(', ')} files (${totalFiles} total)`);
+            }
+            
+            // File categories
+            for (const [category, files] of Object.entries(fileCategories)) {
+                if (files.length > 0) {
+                    const icons = {
+                        'components': '⚛️',
+                        'styles': '🎨',
+                        'config': '⚙️',
+                        'docs': '📚',
+                        'tests': '🧪',
+                        'build': '📦',
+                        'other': '📁'
+                    };
+                    const icon = icons[category];
+                    
+                    if (files.length <= 3) {
+                        bodyParts.push(`${icon} ${category.charAt(0).toUpperCase() + category.slice(1)}: ${files.join(', ')}`);
+                    } else {
+                        bodyParts.push(`${icon} ${category.charAt(0).toUpperCase() + category.slice(1)}: ${files.slice(0, 3).join(', ')} and ${files.length - 3} more`);
+                    }
+                }
+            }
+            
+            // Deployment details
+            bodyParts.push(`🎯 Target: ${targetEnv} environment`);
+            bodyParts.push(`📦 Version: ${version}`);
+            bodyParts.push(`⏰ Deployed: ${timestamp}`);
+            
+            // React-specific info
+            const config = this.versionConfig[targetEnv] || {};
+            if (config.build) {
+                const buildType = config.optimize ? 'Production' : 'Development';
+                bodyParts.push(`⚛️  Build: ${buildType} React build`);
+            }
+            
+            // Combine header and body
+            let fullMessage = header;
+            if (bodyParts.length > 0) {
+                fullMessage += '\n\n' + bodyParts.join('\n');
+            }
+            
+            return fullMessage;
+            
+        } catch (error) {
+            // Fallback to basic message
+            return `${targetEnv.startsWith('feature/') ? 'feat' : 'deploy'}(${targetEnv}): Deploy React v${version} - ${commitMessage || 'Automated deployment'}`;
         }
     }
 
@@ -689,14 +1047,14 @@ ${currentContent.replace('# Changelog', '').replace('All notable changes to this
         try {
             const remoteBranches = this.runCommand('git branch -r', { silent: true });
             const prodBranchesExist = remoteBranches.split('\n').some(branch => 
-                branch.trim().includes('origin/prod'));
+                branch.trim().includes('origin/prod/'));
             
             if (!prodBranchesExist && newVersion === '1.0.0') {
                 this.logInfo('First production deployment - allowing version 1.0.0');
                 return true;
             }
         } catch (error) {
-            // Ignore error and continue with version comparison
+            // Continue with normal validation
         }
         
         // Compare versions to ensure new version is actually higher
@@ -715,6 +1073,7 @@ ${currentContent.replace('# Changelog', '').replace('All notable changes to this
             
             // Versions are equal - not allowed for production (except first deployment)
             return false;
+            
         } catch (error) {
             this.logWarning(`Error comparing versions: ${error.message}`);
             return false;
@@ -737,11 +1096,11 @@ ${currentContent.replace('# Changelog', '').replace('All notable changes to this
             this.logError('   Production version must be incremented for deployment.');
             this.logError(`   Current production version: ${currentProdVersion}`);
             this.logError(`   Proposed version: ${newVersion}`);
-            this.logError('');
+            this.logError('   ');
             this.logError('   📋 To fix this issue:');
             this.logError('   1. Use \'major\', \'minor\', or \'patch\' bump type');
             this.logError(`   2. Ensure the new version is higher than ${currentProdVersion}`);
-            this.logError('');
+            this.logError('   ');
             this.logError('   Examples:');
             this.logError('   node smart-deploy.js production patch "Bug fixes"');
             this.logError('   node smart-deploy.js production minor "New features"');
@@ -751,142 +1110,6 @@ ${currentContent.replace('# Changelog', '').replace('All notable changes to this
         
         this.logSuccess(`✅ Production version validation passed: ${currentProdVersion} → ${newVersion}`);
         return true;
-    }
-
-    generateComprehensiveCommitMessage(targetEnv, version, commitMessage = '') {
-        try {
-            // Get changed files with their status
-            const gitStatus = this.runCommand('git status --porcelain', { silent: true });
-            const changes = gitStatus.trim() ? gitStatus.trim().split('\n') : [];
-            
-            // Categorize changes by type and file extension
-            const fileCategories = {
-                react: [],
-                frontend: [],
-                config: [],
-                docs: [],
-                tests: [],
-                deployment: [],
-                other: []
-            };
-            
-            const actionCounts = { modified: 0, added: 0, deleted: 0, renamed: 0 };
-            
-            for (const change of changes) {
-                if (!change.trim()) continue;
-                
-                const status = change.slice(0, 2);
-                const filename = change.slice(3).trim();
-                
-                // Count actions
-                if (status.includes('M')) {
-                    actionCounts.modified += 1;
-                } else if (status.includes('A')) {
-                    actionCounts.added += 1;
-                } else if (status.includes('D')) {
-                    actionCounts.deleted += 1;
-                } else if (status.includes('R')) {
-                    actionCounts.renamed += 1;
-                }
-                
-                // Categorize by file type
-                if (filename.endsWith('.jsx') || filename.endsWith('.tsx') || 
-                    filename.includes('/components/') || filename.includes('/pages/')) {
-                    fileCategories.react.push(filename);
-                } else if (filename.endsWith('.js') || filename.endsWith('.ts') || 
-                         filename.endsWith('.css') || filename.endsWith('.scss') || 
-                         filename.endsWith('.html')) {
-                    fileCategories.frontend.push(filename);
-                } else if (filename.endsWith('.env') || filename.endsWith('.json') || 
-                         filename.endsWith('.yml') || filename.endsWith('.yaml') || 
-                         filename.endsWith('.config.js')) {
-                    fileCategories.config.push(filename);
-                } else if (filename.endsWith('.md') || filename.endsWith('.txt')) {
-                    fileCategories.docs.push(filename);
-                } else if (filename.includes('test') || filename.includes('spec') || 
-                         filename.endsWith('.test.js') || filename.endsWith('.spec.js')) {
-                    fileCategories.tests.push(filename);
-                } else if (['package.json', 'package-lock.json', 'smart-deploy.js', 'Dockerfile'].includes(filename)) {
-                    fileCategories.deployment.push(filename);
-                } else {
-                    fileCategories.other.push(filename);
-                }
-            }
-            
-            // Build comprehensive commit message
-            const timestamp = new Date().toISOString().replace('T', ' ').slice(0, 19);
-            
-            // Header with conventional commit format
-            const commitType = targetEnv.startsWith('feature/') ? 'feat' : 
-                              targetEnv === 'production' ? 'release' : 'deploy';
-            let header = `${commitType}(${targetEnv}): Deploy React v${version}`;
-            
-            if (commitMessage) {
-                header += ` - ${commitMessage}`;
-            }
-            
-            // Build detailed body
-            const bodyParts = [];
-            
-            // Summary of changes
-            const totalFiles = Object.values(actionCounts).reduce((sum, count) => sum + count, 0);
-            if (totalFiles > 0) {
-                const changeSummary = [];
-                if (actionCounts.modified > 0) changeSummary.push(`${actionCounts.modified} modified`);
-                if (actionCounts.added > 0) changeSummary.push(`${actionCounts.added} added`);
-                if (actionCounts.deleted > 0) changeSummary.push(`${actionCounts.deleted} deleted`);
-                if (actionCounts.renamed > 0) changeSummary.push(`${actionCounts.renamed} renamed`);
-                
-                bodyParts.push(`📊 Summary: ${changeSummary.join(', ')} files (${totalFiles} total)`);
-            }
-            
-            // File categories
-            const iconMap = {
-                react: '⚛️',
-                frontend: '🎨',
-                config: '⚙️',
-                docs: '📚',
-                tests: '🧪',
-                deployment: '🚀',
-                other: '📁'
-            };
-            
-            for (const [category, files] of Object.entries(fileCategories)) {
-                if (files.length > 0) {
-                    const icon = iconMap[category];
-                    if (files.length <= 3) {
-                        bodyParts.push(`${icon} ${category}: ${files.join(', ')}`);
-                    } else {
-                        bodyParts.push(`${icon} ${category}: ${files.slice(0, 3).join(', ')} and ${files.length - 3} more`);
-                    }
-                }
-            }
-            
-            // Deployment details
-            bodyParts.push(`🎯 Target: ${targetEnv} environment`);
-            bodyParts.push(`📦 Version: ${version}`);
-            bodyParts.push(`⏰ Deployed: ${timestamp}`);
-            
-            // React-specific info
-            const config = this.versionConfig[targetEnv] || {};
-            if (config.build) {
-                const buildType = config.optimize ? 'Optimized production build' : 'Development build';
-                bodyParts.push(`⚛️ Build: ${buildType}`);
-            } else {
-                bodyParts.push('⚛️ Build: No build process (development only)');
-            }
-            
-            // Combine header and body
-            let fullMessage = header;
-            if (bodyParts.length > 0) {
-                fullMessage += '\n\n' + bodyParts.join('\n');
-            }
-            
-            return fullMessage;
-        } catch (error) {
-            // Fallback to basic message
-            return `deploy(${targetEnv}): Deploy React v${version} - ${commitMessage || 'Automated deployment'}`;
-        }
     }
 
     showVersionSummary(targetEnv, currentVersion, newVersion) {
@@ -910,262 +1133,51 @@ ${currentContent.replace('# Changelog', '').replace('All notable changes to this
         this.logInfo('');
     }
 
-    checkWorkingDirectory() {
-        // Check if git working directory has uncommitted changes without committing them
+    mergeWithMain(sourceBranch) {
+        this.logInfo(`Merging ${sourceBranch} with main...`);
+        
+        // Checkout main
+        this.runCommand('git checkout main');
+        
+        // Pull latest main
+        this.runCommand('git pull origin main');
+        
+        // Merge source branch with strategy to favor incoming changes (theirs)
         try {
-            const result = this.runCommand('git status --porcelain', { silent: true });
-            if (result.trim()) {
-                this.logInfo('Working directory has uncommitted changes that will be included in deployment:');
-                console.log(result);
-                return true; // Has changes
-            }
-            return false; // No changes
+            this.runCommand(`git merge ${sourceBranch}`);
         } catch (error) {
-            this.logWarning('Could not check working directory status');
-            return false;
+            // If there are conflicts, resolve them by taking the source branch version
+            this.logWarning('Merge conflicts detected. Resolving by taking source branch changes...');
+            this.runCommand(`git merge -X theirs ${sourceBranch}`);
         }
+        
+        // Push updated main
+        this.runCommand('git push origin main');
+        
+        this.logSuccess(`Successfully merged ${sourceBranch} with main`);
     }
 
-    pushProductionToDev(version) {
-        this.logInfo(`Pushing production version ${version} to dev branch with tag...`);
-        
-        // Get the highest dev version and ALWAYS do a MAJOR version bump for production deployments
-        const currentDevVersion = this.getHighestBranchVersion('dev');
-        
-        // Check if this is the first dev deployment (no versioned dev branches exist)
-        let newDevVersion;
-        if (currentDevVersion === '1.0.0') {
-            // Check if there are actually any dev branches in remote
-            try {
-                const remoteBranches = this.runCommand('git branch -r', { silent: true });
-                const devBranchesExist = remoteBranches.split('\n').some(branch => 
-                    branch.trim().includes('origin/dev/'));
-                
-                if (!devBranchesExist) {
-                    // No dev branches exist - start from 1.0.0
-                    newDevVersion = '1.0.0';
-                    this.logInfo(`No existing dev branches found - starting dev versioning from ${newDevVersion}`);
-                } else {
-                    // Dev branches exist but we got 1.0.0 as highest - do major bump
-                    newDevVersion = this.bumpVersion('major', currentDevVersion);
-                    this.logInfo(`Production deployment: MAJOR dev version bump ${currentDevVersion} → ${newDevVersion}`);
-                }
-            } catch (error) {
-                // Error checking branches - start from 1.0.0
-                newDevVersion = '1.0.0';
-                this.logInfo(`Could not check existing dev branches - starting from ${newDevVersion}`);
-            }
-        } else {
-            // Always do MAJOR version bump for production deployments to dev
-            newDevVersion = this.bumpVersion('major', currentDevVersion);
-            this.logInfo(`Production deployment: MAJOR dev version bump ${currentDevVersion} → ${newDevVersion}`);
-        }
-        
-        const devBranchName = `dev/${newDevVersion}`;
-        
-        this.logSuccess(`🎯 Production → Dev: Always performing MAJOR version upgrade`);
-        this.logInfo(`Creating new dev branch: ${devBranchName}`);
-        
-        // Check if the versioned dev branch exists
-        const localBranches = this.runCommand('git branch', { silent: true });
-        const cleanLocalBranches = localBranches.split('\n')
-            .map(branch => branch.replace('*', '').trim())
-            .filter(branch => branch);
-        const localDevExists = cleanLocalBranches.includes(devBranchName);
-        
-        // Check remote branches
-        const remoteBranches = this.runCommand('git branch -r', { silent: true });
-        const cleanRemoteBranches = remoteBranches.split('\n')
-            .map(branch => branch.trim())
-            .filter(branch => branch && !branch.includes('->'));
-        const remoteDevExists = cleanRemoteBranches.includes(`origin/${devBranchName}`);
-        
-        if (localDevExists) {
-            // Local versioned dev branch exists, just checkout
-            this.runCommand(`git checkout ${devBranchName}`);
-        } else if (remoteDevExists) {
-            // Remote versioned dev branch exists but not locally - create local tracking branch
-            this.runCommand(`git checkout -b ${devBranchName} origin/${devBranchName}`);
-            this.logInfo(`Created local dev branch tracking origin/${devBranchName}`);
-        } else {
-            // No versioned dev branch exists - create new dev branch from current branch
-            const currentBranch = this.getCurrentBranch();
-            this.runCommand(`git checkout -b ${devBranchName}`);
-            this.logInfo(`Created new versioned dev branch ${devBranchName} from ${currentBranch}`);
-        }
-        
-        // Pull latest dev to avoid conflicts (only if remote branch exists)
-        try {
-            const remoteBranches = this.runCommand('git branch -r', { silent: true });
-            if (remoteBranches.includes(`origin/${devBranchName}`)) {
-                this.runCommand(`git pull origin ${devBranchName}`);
-            } else {
-                this.logInfo(`Remote branch origin/${devBranchName} doesn't exist yet - skipping pull`);
-            }
-        } catch (error) {
-            this.logWarning(`Could not pull from origin/${devBranchName} - continuing...`);
-        }
-        
-        // Check if prod branch exists before trying to merge
-        try {
-            const remoteBranches = this.runCommand('git branch -r', { silent: true });
-            const prodBranchExists = remoteBranches.split('\n').some(branch => 
-                branch.trim().includes('origin/prod') && !branch.trim().includes('origin/prod/'));
-            
-            if (prodBranchExists) {
-                // Merge existing prod branch into dev
-                try {
-                    this.runCommand('git merge prod');
-                } catch (error) {
-                    // If there are conflicts, resolve them by taking the prod version
-                    this.logWarning('Merge conflicts detected. Resolving by taking prod changes...');
-                    this.runCommand('git merge -X theirs prod');
-                }
-            } else {
-                // No prod branch exists yet - this is the first production deployment
-                this.logInfo('No existing prod branch found - first production deployment, skipping merge');
-            }
-        } catch (error) {
-            this.logWarning(`Error checking for prod branch: ${error.message} - continuing without merge`);
-        }
-        
-        // Create production tag on dev to mark this as a production version
-        const productionTag = `prod-${version}`;
-        try {
-            // Delete tag if it already exists (suppress error output)
-            this.runCommand(`git tag -d ${productionTag}`, { silent: true, stdio: 'ignore' });
-            this.runCommand(`git push origin --delete ${productionTag}`, { silent: true, stdio: 'ignore' });
-        } catch (error) {
-            // Tag might not exist, that's fine
-        }
-        
-        // Create new production tag
-        this.runCommand(`git tag -a ${productionTag} -m "Production version ${version} deployed to dev"`);
-        
-        // Update VERSION file with the new dev version
-        this.updateVersionInFile('dev', newDevVersion);
-        
-        // Commit the version update
-        this.runCommand('git add .');
-        this.runCommand(`git commit -m "update(dev): Bump dev version to ${newDevVersion} for production ${version}"`);
-        
-        // Push dev branch and tag
-        this.runCommand(`git push origin ${devBranchName}`);
-        this.runCommand(`git push origin ${productionTag}`);
-        
-        this.logSuccess(`Pushed production version ${version} to ${devBranchName} branch with tag ${productionTag}`);
-    }
-
-    cleanupDeletedRemoteBranches() {
-        try {
-            this.logInfo('Cleaning up deleted remote branches...');
-            
-            const currentBranch = this.getCurrentBranch();
-            
-            // Get all local branches
-            const localResult = this.runCommand('git branch', { silent: true });
-            const localBranches = [];
-            const localLines = localResult.split('\n');
-            for (const line of localLines) {
-                if (line.trim()) {
-                    const branch = line.trim().replace('*', '').trim();
-                    if (branch && !['main', 'master'].includes(branch)) {
-                        localBranches.push(branch);
-                    }
-                }
-            }
-            
-            // Get all remote branches
-            const remoteResult = this.runCommand('git branch -r', { silent: true });
-            const remoteBranches = [];
-            const remoteLines = remoteResult.split('\n');
-            for (const line of remoteLines) {
-                if (line.trim() && !line.includes('->')) {
-                    const branch = line.trim().replace('origin/', '');
-                    if (branch) {
-                        remoteBranches.push(branch);
-                    }
-                }
-            }
-            
-            // Find local branches that don't exist remotely
-            const branchesToDelete = [];
-            for (const localBranch of localBranches) {
-                if (!remoteBranches.includes(localBranch) && localBranch !== currentBranch) {
-                    branchesToDelete.push(localBranch);
-                }
-            }
-            
-            // Delete branches that no longer exist remotely
-            if (branchesToDelete.length > 0) {
-                this.logInfo(`Found ${branchesToDelete.length} local branches to clean up:`);
-                for (const branch of branchesToDelete) {
-                    this.logInfo(`  - ${branch}`);
-                }
-                
-                for (const branch of branchesToDelete) {
-                    try {
-                        this.runCommand(`git branch -D ${branch}`, { silent: true });
-                        this.logSuccess(`Deleted local branch: ${branch}`);
-                    } catch (error) {
-                        this.logWarning(`Could not delete branch: ${branch}`);
-                    }
-                }
-            } else {
-                this.logInfo('No stale local branches found to clean up');
-            }
-        } catch (error) {
-            this.logWarning(`Branch cleanup failed: ${error.message}`);
-        }
-    }
-
-    syncWithRemote() {
-        this.logInfo('Syncing with remote repository...');
-        
-        // Fetch all remote branches and tags
-        this.runCommand('git fetch --all');
-        
-        // Prune remote tracking branches that no longer exist
-        this.runCommand('git remote prune origin');
-        
-        // Clean up local branches that no longer exist on remote
-        this.cleanupDeletedRemoteBranches();
-        
-        // Update current branch only if it exists remotely
-        const currentBranch = this.getCurrentBranch();
-        
-        // Check if current branch exists remotely
-        const remoteBranches = this.runCommand('git branch -r', { silent: true });
-        if (remoteBranches.includes(`origin/${currentBranch}`)) {
-            try {
-                this.runCommand(`git pull origin ${currentBranch}`);
-                this.logInfo(`Updated ${currentBranch} from remote`);
-            } catch (error) {
-                this.logWarning(`Could not pull from origin/${currentBranch}`);
-            }
-        } else {
-            this.logInfo(`Branch ${currentBranch} doesn't exist remotely - skipping pull`);
-        }
-    }
-
-    async deploy(targetEnv, bumpType = 'patch', commitMessage = '') {
+    async deploy(targetEnv, bumpType, commitMessage = '') {
         this.logInfo(`🚀 Starting React deployment to ${targetEnv} environment`);
         
-        // Pre-deployment checks - just check for changes, don't commit them yet
-        const hasUncommittedChanges = this.checkWorkingDirectory();
-        
-        // Check Node dependencies
-        this.checkNodeDependencies();
+        // Pre-deployment checks
+        const gitStatus = this.runCommand('git status --porcelain', { silent: true });
+        if (gitStatus.trim()) {
+            this.logInfo('Working directory has uncommitted changes that will be included in deployment:');
+            console.log(gitStatus);
+        }
 
         // Backup current state
         const backupPath = this.backupCurrentState();
 
         try {
+            // Check Node dependencies
+            this.checkNodeDependencies();
+            
             // Sync with remote first to get latest remote branches
             this.syncWithRemote();
             
             // ALWAYS get current version by scanning remote branches for ALL environment types
-            // This ensures we have the true current state, not what's in VERSION file
             let currentVersion;
             if (targetEnv === 'production') {
                 currentVersion = this.getHighestBranchVersion('production');
@@ -1180,7 +1192,6 @@ ${currentContent.replace('# Changelog', '').replace('All notable changes to this
             }
             
             // For first deployment of any branch type, use 1.0.0 as starting point
-            // For subsequent deployments, bump the version
             let newVersion;
             if (currentVersion === '1.0.0') {
                 // Check if any branches actually exist for this environment type
@@ -1196,7 +1207,7 @@ ${currentContent.replace('# Changelog', '').replace('All notable changes to this
                             branch.trim().includes('origin/dev/'));
                     } else if (targetEnv === 'production') {
                         branchesExist = remoteBranches.split('\n').some(branch => 
-                            branch.trim().includes('origin/prod'));
+                            branch.trim().includes('origin/prod/'));
                     }
                     
                     if (!branchesExist) {
@@ -1210,7 +1221,7 @@ ${currentContent.replace('# Changelog', '').replace('All notable changes to this
                     }
                 } catch (error) {
                     // Error checking branches - start from 1.0.0
-                    this.logInfo(`Could not check existing branches - starting from version 1.0.0`);
+                    this.logInfo('Could not check existing branches - starting from version 1.0.0');
                     newVersion = '1.0.0';
                 }
             } else {
@@ -1239,7 +1250,7 @@ ${currentContent.replace('# Changelog', '').replace('All notable changes to this
                 branchName = `dev/${newVersion}`;
             } else if (targetEnv === 'production') {
                 envType = 'production';
-                branchName = 'prod'; // Direct push to prod branch (not versioned)
+                branchName = `prod/${newVersion}`; // NEW: Versioned prod branch
             } else {
                 this.logError(`Invalid target environment: ${targetEnv}`);
                 return false;
@@ -1247,59 +1258,19 @@ ${currentContent.replace('# Changelog', '').replace('All notable changes to this
             
             this.logInfo(`Target branch: ${branchName}`);
             this.logInfo(`Version: ${currentVersion} → ${newVersion}`);
-            
-            // Special handling for production deployments - two-step process
+
+            // Production deployment - simplified single-step process with versioned branches
             if (targetEnv === 'production') {
-                // Calculate what the dev version will be
-                const currentDevVersion = this.getHighestBranchVersion('dev');
-                let nextDevVersion;
-                try {
-                    const remoteBranches = this.runCommand('git branch -r', { silent: true });
-                    const devBranchesExist = remoteBranches.split('\n').some(branch => 
-                        branch.trim().includes('origin/dev/'));
-                    
-                    if (currentDevVersion === '1.0.0' && !devBranchesExist) {
-                        nextDevVersion = '1.0.0';
-                    } else {
-                        nextDevVersion = this.bumpVersion('major', currentDevVersion);
-                    }
-                } catch (error) {
-                    nextDevVersion = '1.0.0';
-                }
-                
-                console.log('\n🎯 PRODUCTION DEPLOYMENT - TWO-STEP PROCESS:');
+                console.log('\n🎯 PRODUCTION DEPLOYMENT:');
                 console.log(`   📦 Production Version: ${currentVersion} → ${newVersion}`);
-                console.log(`   🚀 Dev Version: ${currentDevVersion} → ${nextDevVersion} (MAJOR BUMP)`);
+                console.log(`   🌿 Branch: ${branchName}`);
+                console.log(`   🔴 Live Branch: Will be updated with production changes`);
                 console.log(`   📝 Message: ${commitMessage || 'Automated React production deployment'}`);
                 console.log('');
-                console.log('   🔄 Process:');
-                console.log(`   1️⃣  Create dev/${nextDevVersion} branch first`);
-                console.log('   2️⃣  Then create prod branch');
-                console.log('');
                 
-                // STEP 1: Create dev branch first
-                console.log('\n🚀 STEP 1: DEV BRANCH CREATION');
-                console.log(`   Creating dev/${nextDevVersion} with production tag prod-${newVersion}`);
-                
-                const confirmed1 = await this.confirmAction(`Create dev/${nextDevVersion} branch first?`);
-                if (!confirmed1) {
+                const confirmed = await this.confirmAction(`Create production branch ${branchName} and update live branch?`);
+                if (!confirmed) {
                     this.logWarning('Production deployment cancelled by user');
-                    return false;
-                }
-                
-                // Execute dev branch creation
-                this.pushProductionToDev(newVersion);
-                this.logSuccess(`✅ Step 1 completed: dev/${nextDevVersion} created with tag prod-${newVersion}`);
-                
-                // STEP 2: Confirm production branch creation
-                console.log('\n🎯 STEP 2: PRODUCTION BRANCH CREATION');
-                console.log(`   Now creating production branch: ${branchName}`);
-                console.log('   ⚠️  This is the FINAL step for PRODUCTION deployment!');
-                
-                const confirmed2 = await this.confirmAction('Proceed with PRODUCTION branch creation?');
-                if (!confirmed2) {
-                    this.logWarning('Production branch creation cancelled by user');
-                    this.logInfo('Note: Dev branch was already created and pushed');
                     return false;
                 }
             }
@@ -1313,6 +1284,7 @@ ${currentContent.replace('# Changelog', '').replace('All notable changes to this
             // Update version file for specific branch type and changelog
             const finalCommitMessage = commitMessage || `React v${newVersion}: Deploy to ${targetEnv} environment`;
             this.updateVersionInFile(envType, newVersion);
+            this.updatePackageJsonVersion(newVersion);
             
             // Run React build if required for this environment
             const config = this.versionConfig[envType] || {};
@@ -1331,18 +1303,26 @@ ${currentContent.replace('# Changelog', '').replace('All notable changes to this
             const comprehensiveCommitMsg = this.generateComprehensiveCommitMessage(targetEnv, newVersion, commitMessage);
             
             // Commit and push changes
-            const gitStatus = this.runCommand('git status --porcelain', { silent: true });
-            if (gitStatus.trim()) {
+            const statusResult = this.runCommand('git status --porcelain', { silent: true });
+            if (statusResult.trim()) {
                 this.runCommand('git add .');
                 this.runCommand(`git commit -m "${comprehensiveCommitMsg}"`);
                 this.runCommand(`git push origin ${branchName}`);
                 this.logSuccess(`Pushed React changes to ${branchName}`);
             }
             
-            // Handle special production workflow
+            // Handle special dev workflow - create/update devtest branch
+            if (targetEnv === 'dev') {
+                this.logInfo('\n🧪 DEV DEPLOYMENT - DEVTEST BRANCH MANAGEMENT');
+                this.logInfo(`   Creating/updating devtest branch with dev/${newVersion} changes`);
+                await this.createOrUpdateDevtestBranch(newVersion, commitMessage);
+            }
+
+            // Handle special production workflow - create/update live branch
             if (targetEnv === 'production') {
-                // Dev branch was already created in the two-step confirmation process above
-                this.logSuccess(`🏷️  Production version ${newVersion} tagged on dev branch (completed in step 1)`);
+                this.logInfo('\n🔴 PRODUCTION DEPLOYMENT - LIVE BRANCH MANAGEMENT');
+                this.logInfo(`   Creating/updating live branch with prod/${newVersion} changes`);
+                await this.createOrUpdateLiveBranch(newVersion, commitMessage);
             }
             
             // Merge with main if configured (only for features now)
@@ -1364,15 +1344,18 @@ ${currentContent.replace('# Changelog', '').replace('All notable changes to this
                 this.logSuccess(`🔀 Merged with ${mergeTarget}`);
             }
             
-            if (targetEnv === 'production') {
-                // Get the actual dev version that was created
-                const currentDevVersion = this.getVersionFromFile('dev');
+            if (targetEnv === 'dev') {
                 this.logSuccess('');
-                this.logSuccess('🎆 PRODUCTION DEPLOYMENT COMPLETED - TWO-STEP PROCESS:');
-                this.logSuccess(`   ✅ Step 1: Dev branch created with MAJOR version bump (${currentDevVersion})`);
-                this.logSuccess(`   ✅ Step 2: Production branch created (${newVersion})`);
-                this.logSuccess(`   🏷️  Tagged: prod-${newVersion} on dev branch`);
-                this.logSuccess('🚀 Both dev and prod branches successfully deployed!');
+                this.logSuccess('🧪 DEV DEPLOYMENT COMPLETED:');
+                this.logSuccess(`   ✅ Dev branch created: dev/${newVersion}`);
+                this.logSuccess('   ✅ Devtest branch updated with latest changes');
+                this.logSuccess('🚀 Both dev and devtest branches successfully deployed!');
+            } else if (targetEnv === 'production') {
+                this.logSuccess('');
+                this.logSuccess('🎆 PRODUCTION DEPLOYMENT COMPLETED:');
+                this.logSuccess(`   ✅ Production branch created: prod/${newVersion}`);
+                this.logSuccess('   ✅ Live branch updated with latest changes');
+                this.logSuccess('🚀 Both prod and live branches successfully deployed!');
             }
 
             return true;
@@ -1383,30 +1366,6 @@ ${currentContent.replace('# Changelog', '').replace('All notable changes to this
             this.logInfo(`Backup location: ${backupPath}`);
             return false;
         }
-    }
-
-    mergeWithMain(sourceBranch) {
-        this.logInfo(`Merging ${sourceBranch} with main...`);
-        
-        // Checkout main
-        this.runCommand('git checkout main');
-        
-        // Pull latest main
-        this.runCommand('git pull origin main');
-        
-        // Merge source branch with strategy to favor incoming changes (theirs)
-        try {
-            this.runCommand(`git merge ${sourceBranch}`);
-        } catch (error) {
-            // If there are conflicts, resolve them by taking the source branch version
-            this.logWarning('Merge conflicts detected. Resolving by taking source branch changes...');
-            this.runCommand(`git merge -X theirs ${sourceBranch}`);
-        }
-        
-        // Push updated main
-        this.runCommand('git push origin main');
-        
-        this.logSuccess(`Successfully merged ${sourceBranch} with main`);
     }
 
     showVersionStatus() {
@@ -1452,28 +1411,30 @@ ${currentContent.replace('# Changelog', '').replace('All notable changes to this
 
 // Main execution
 async function main() {
-    const args = process.argv.slice(2);
+    const deployer = new ReactSmartDeployer();
     
-    if (args.length < 1) {
-        console.log('Usage: node smart-deploy.js <environment> [bump-type] [commit-message]');
+    if (process.argv.length < 3) {
+        console.log('Usage: node smart-deploy.js <environment> [bump_type] ["commit message"]');
+        console.log('Environments: production, dev, feature/name');
+        console.log('Bump types: major, minor, patch');
+        console.log('');
         console.log('Examples:');
-        console.log('  node smart-deploy.js feature/auth patch "Add authentication"');
-        console.log('  node smart-deploy.js dev minor "New components"');
-        console.log('  node smart-deploy.js production major "Major release"');
-        console.log('  node smart-deploy.js status  # Show version status');
+        console.log('  node smart-deploy.js production major "Breaking changes"');
+        console.log('  node smart-deploy.js dev minor "New features"');
+        console.log('  node smart-deploy.js feature/auth patch "Auth improvements"');
+        console.log('  node smart-deploy.js status');
         process.exit(1);
     }
 
     // Check for special commands
-    if (['status', 'version', '--status', '--version'].includes(args[0])) {
-        const deployer = new ReactSmartDeployer();
+    if (['status', 'version', '--status', '--version'].includes(process.argv[2])) {
         deployer.showVersionStatus();
         process.exit(0);
     }
 
-    const targetEnv = args[0];
-    const bumpType = args[1] || 'patch';
-    const commitMessage = args.slice(2).join(' ');
+    const targetEnv = process.argv[2];
+    const bumpType = process.argv[3] || 'patch';
+    const commitMessage = process.argv.slice(4).join(' ') || '';
 
     // Validate bump type
     const validBumpTypes = ['major', 'minor', 'patch'];
@@ -1492,7 +1453,6 @@ async function main() {
     }
 
     // Initialize deployer and run deployment
-    const deployer = new ReactSmartDeployer();
     const success = await deployer.deploy(targetEnv, bumpType, commitMessage);
     
     if (!success) {
@@ -1500,10 +1460,10 @@ async function main() {
     }
 }
 
-// Only run main if this script is executed directly
+// Run the script
 if (require.main === module) {
     main().catch(error => {
-        console.error('❌ Deployment failed:', error.message);
+        console.error('❌ Deployment script failed:', error.message);
         process.exit(1);
     });
 }
