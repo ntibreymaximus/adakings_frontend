@@ -1,8 +1,7 @@
 // Enhanced API Caching Service
 // Provides intelligent caching strategies for API calls with offline support
 
-import { API_ENDPOINTS } from '../utils/api';
-import { getBackendServerInfo } from '../utils/envConfig';
+import { API_ENDPOINTS, API_BASE_URL, BACKEND_BASE_URL } from '../utils/api';
 
 class ApiCacheService {
   constructor() {
@@ -173,14 +172,17 @@ class ApiCacheService {
       return endpoint;
     }
     
-    // Get backend server info and construct full URL
-    const serverInfo = getBackendServerInfo();
-    const baseUrl = serverInfo.backendUrl || 'http://localhost:8000';
-    
-    // Ensure endpoint starts with /
-    const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-    
-    return `${baseUrl}${normalizedEndpoint}`;
+    // Use the existing API base URL logic
+    if (endpoint.startsWith('/api/')) {
+      // If it's an API endpoint, use BACKEND_BASE_URL + endpoint
+      return `${BACKEND_BASE_URL}${endpoint}`;
+    } else if (endpoint.startsWith('/')) {
+      // If it starts with / but not /api/, assume it's an API endpoint
+      return `${API_BASE_URL}${endpoint.replace('/api', '')}`;
+    } else {
+      // Relative endpoint, add to API_BASE_URL
+      return `${API_BASE_URL}/${endpoint}`;
+    }
   }
 
   // Perform the actual fetch operation

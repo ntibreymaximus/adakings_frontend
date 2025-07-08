@@ -23,7 +23,7 @@ async function refreshAccessToken() {
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/token/refresh/`, {
+    const response = await fetch(`${getApiBaseUrl()}/token/refresh/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -87,10 +87,22 @@ const getApiBaseUrl = () => {
     return process.env.REACT_APP_API_BASE_URL;
   }
   
-  // Fallback: dynamically determine based on how the frontend is accessed
+  // Railway dev environment - use Railway backend URL from environment variables
+  if (window.location.hostname.includes('railway.app')) {
+    // On Railway, backend and frontend are separate services
+    // Environment variables MUST be set on Railway
+    if (process.env.REACT_APP_BACKEND_BASE_URL) {
+      return `${process.env.REACT_APP_BACKEND_BASE_URL}/api`;
+    }
+    throw new Error('REACT_APP_BACKEND_BASE_URL must be set on Railway');
+  }
+  
+  // Production environment - use production backend
   if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
     return `http://${window.location.hostname}:8000/api`;
   }
+  
+  // Local development
   return 'http://localhost:8000/api';
 };
 
@@ -101,10 +113,22 @@ const getBackendBaseUrl = () => {
     return process.env.REACT_APP_BACKEND_BASE_URL;
   }
   
-  // Fallback: dynamically determine based on how the frontend is accessed
+  // Railway dev environment - use Railway backend URL from environment variables
+  if (window.location.hostname.includes('railway.app')) {
+    // On Railway, backend and frontend are separate services
+    // Environment variables MUST be set on Railway
+    if (process.env.REACT_APP_BACKEND_BASE_URL) {
+      return process.env.REACT_APP_BACKEND_BASE_URL;
+    }
+    throw new Error('REACT_APP_BACKEND_BASE_URL must be set on Railway');
+  }
+  
+  // Production environment - use production backend
   if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
     return `http://${window.location.hostname}:8000`;
   }
+  
+  // Local development
   return 'http://localhost:8000';
 };
 
