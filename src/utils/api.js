@@ -80,9 +80,14 @@ async function getAuthHeaders() {
 // Note: authenticatedFetch has been replaced with tokenFetch utility
 // All API calls now use the simpler tokenFetch from ../utils/tokenFetch.js
 
-// API endpoints - dynamically determine based on how the frontend is accessed
+// API endpoints - use environment variables with fallback
 const getApiBaseUrl = () => {
-  // If accessing from network (not localhost), use network IP
+  // Use environment variable if available
+  if (process.env.REACT_APP_API_BASE_URL) {
+    return process.env.REACT_APP_API_BASE_URL;
+  }
+  
+  // Fallback: dynamically determine based on how the frontend is accessed
   if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
     return `http://${window.location.hostname}:8000/api`;
   }
@@ -91,7 +96,12 @@ const getApiBaseUrl = () => {
 
 // Base URL without /api suffix for direct backend access
 const getBackendBaseUrl = () => {
-  // If accessing from network (not localhost), use network IP
+  // Use environment variable if available
+  if (process.env.REACT_APP_BACKEND_BASE_URL) {
+    return process.env.REACT_APP_BACKEND_BASE_URL;
+  }
+  
+  // Fallback: dynamically determine based on how the frontend is accessed
   if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
     return `http://${window.location.hostname}:8000`;
   }

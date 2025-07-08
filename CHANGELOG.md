@@ -2,6 +2,43 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.1] - 2025-07-08
+
+### 🎯 Production Release
+
+**📋 Release Information:**
+- **Environment**: production
+- **Branch**: `prod/1.0.1`
+- **Version**: `1.0.1`
+- **Deployment Time**: 2025-07-08 11:45:40
+- **Description**: Production deployment - optimized React build
+
+**📝 Changes Made:**
+Add three environment configuration setup (local, dev, prod) with environment-specific API configurations and debugging controls
+
+**📁 Files Modified:**
+  - Modified: `ERSION`
+  - Modified: `package.json`
+  - Modified: `src/utils/api.js`
+  - Changed: `.env.dev`
+  - Changed: `.env.production`
+  - Changed: `ENVIRONMENTS.md`
+  - Changed: `src/utils/envConfig.js`
+
+**🔄 Deployment Details:**
+- **Source Branch**: `prod/1.0.1`
+- **Target Branch**: `prod/1.0.1`
+- **Build Process**: Optimized production build
+- **React Version**: Latest
+
+**🎯 Environment Specific Notes:**
+- Production environment deployment
+- Optimized React build for performance
+- Ready for end users
+- Live branch updated for continuous deployment
+
+---
+
 ## [1.0.0] - 2025-07-08
 
 ### 🎯 Production Release
