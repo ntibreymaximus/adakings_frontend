@@ -46,7 +46,7 @@ export const getBackendServerInfo = () => {
   let port = process.env.REACT_APP_API_PORT || '8000';
   
   // If we have a backend URL, try to extract host and port from it
-  if (backendUrl) {
+  if (backendUrl && backendUrl !== 'undefined') {
     try {
       const url = new URL(backendUrl);
       host = url.hostname;

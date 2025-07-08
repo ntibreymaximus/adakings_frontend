@@ -133,6 +133,10 @@ function registerValidSW(swUrl, config) {
     })
     .catch((error) => {
       console.error('Error during service worker registration:', error);
+      // Don't throw error for Railway deployment issues
+      if (error.message.includes('MIME type') || error.message.includes('SecurityError')) {
+        console.warn('Service Worker registration failed on Railway - this is expected in some deployment environments');
+      }
     });
 }
 
