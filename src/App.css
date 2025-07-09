@@ -8,7 +8,6 @@
   overflow-x: hidden;
   width: 100%;
   position: relative;
-  background-color: #fafafa; /* Fallback */
   background-color: var(--ada-off-white, #fafafa);
   min-height: 100vh;
 }
