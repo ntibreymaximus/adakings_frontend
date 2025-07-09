@@ -1,6 +1,6 @@
 {
   "name": "adakings_frontend",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "private": true,
   "dependencies": {
     "@testing-library/dom": "^10.4.0",
@@ -21,15 +21,15 @@
     "web-vitals": "^2.1.4"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "start:local": "cross-env REACT_APP_ENVIRONMENT=local react-scripts start",
-    "start:dev": "cross-env REACT_APP_ENVIRONMENT=development react-scripts start",
-    "start:network": "cross-env HOST=0.0.0.0 react-scripts start",
-    "build": "react-scripts build",
-    "build:local": "cross-env REACT_APP_ENVIRONMENT=local react-scripts build",
-    "build:dev": "cross-env REACT_APP_ENVIRONMENT=development react-scripts build",
-    "build:prod": "cross-env REACT_APP_ENVIRONMENT=production react-scripts build",
-    "test": "react-scripts test",
+    "start": "react-app-rewired start",
+    "start:local": "cross-env REACT_APP_ENVIRONMENT=local react-app-rewired start",
+    "start:dev": "cross-env REACT_APP_ENVIRONMENT=development react-app-rewired start",
+    "start:network": "cross-env HOST=0.0.0.0 react-app-rewired start",
+    "build": "react-app-rewired build",
+    "build:local": "cross-env REACT_APP_ENVIRONMENT=local react-app-rewired build",
+    "build:dev": "cross-env REACT_APP_ENVIRONMENT=development react-app-rewired build",
+    "build:prod": "cross-env REACT_APP_ENVIRONMENT=production react-app-rewired build",
+    "test": "react-app-rewired test",
     "eject": "react-scripts eject",
     "deploy:feature": "node smart-deploy.js feature",
     "deploy:dev": "node smart-deploy.js dev",
@@ -72,6 +72,8 @@
     ]
   },
   "devDependencies": {
-    "cross-env": "^7.0.3"
+    "cross-env": "^7.0.3",
+    "customize-cra": "^1.0.0",
+    "react-app-rewired": "^2.2.1"
   }
 }

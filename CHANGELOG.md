@@ -2,6 +2,40 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.10] - 2025-07-09
+
+### 🚀 Development Release
+
+**📋 Release Information:**
+- **Environment**: dev
+- **Branch**: `dev/1.0.10`
+- **Version**: `1.0.10`
+- **Deployment Time**: 2025-07-09 08:18:42
+- **Description**: Development environment deployment with latest React components
+
+**📝 Changes Made:**
+React v1.0.10: Deploy to dev environment
+
+**📁 Files Modified:**
+  - Modified: `ERSION`
+  - Modified: `package-lock.json`
+  - Modified: `package.json`
+  - Changed: `config-overrides.js`
+
+**🔄 Deployment Details:**
+- **Source Branch**: `dev/1.0.10`
+- **Target Branch**: `dev/1.0.10`
+- **Build Process**: Development build with source maps
+- **React Version**: Latest
+
+**🎯 Environment Specific Notes:**
+- Development environment deployment
+- Contains latest React components and changes
+- Used for integration testing before production
+- Devtest branch updated for continuous testing
+
+---
+
 ## [1.0.9] - 2025-07-09
 
 ### 🚀 Development Release
