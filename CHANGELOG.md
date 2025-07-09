@@ -2,60 +2,34 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.0.16] - 2025-07-09
+## [1.0.17] - 2025-07-09
 
 ### 🚀 Development Release
 
 **📋 Release Information:**
 - **Environment**: dev
-- **Branch**: `dev/1.0.16`
-- **Version**: `1.0.16`
-- **Deployment Time**: 2025-07-09 11:34:33
+- **Branch**: `dev/1.0.17`
+- **Version**: `1.0.17`
+- **Deployment Time**: 2025-07-09 12:20:44
 - **Description**: Development environment deployment with latest React components
 
 **📝 Changes Made:**
-React v1.0.16: Deploy to dev environment
+React v1.0.17: Deploy to dev environment
 
 **📁 Files Modified:**
-  - Modified: `ERSION`
+  - Modified: `VERSION`
   - Modified: `package.json`
+  - Modified: `src/hooks/useOffline.js`
+  - Modified: `src/services/apiCacheService.js`
+  - Modified: `src/services/backgroundSyncService.js`
   - Modified: `src/utils/api.js`
+  - Modified: `src/utils/serviceWorkerRegistration.js`
+  - Changed: `clear_cache.js`
+  - Changed: `debug_endpoints.js`
 
 **🔄 Deployment Details:**
-- **Source Branch**: `dev/1.0.16`
-- **Target Branch**: `dev/1.0.16`
-- **Build Process**: Development build with source maps
-- **React Version**: Latest
-
-**🎯 Environment Specific Notes:**
-- Development environment deployment
-- Contains latest React components and changes
-- Used for integration testing before production
-- Devtest branch updated for continuous testing
-
----
-
-## [1.0.15] - 2025-07-09
-
-### 🚀 Development Release
-
-**📋 Release Information:**
-- **Environment**: dev
-- **Branch**: `dev/1.0.15`
-- **Version**: `1.0.15`
-- **Deployment Time**: 2025-07-09 10:57:25
-- **Description**: Development environment deployment with latest React components
-
-**📝 Changes Made:**
-React v1.0.15: Deploy to dev environment
-
-**📁 Files Modified:**
-  - Modified: `ERSION`
-  - Modified: `package.json`
-
-**🔄 Deployment Details:**
-- **Source Branch**: `dev/1.0.15`
-- **Target Branch**: `dev/1.0.15`
+- **Source Branch**: `dev/1.0.17`
+- **Target Branch**: `dev/1.0.17`
 - **Build Process**: Development build with source maps
 - **React Version**: Latest
 

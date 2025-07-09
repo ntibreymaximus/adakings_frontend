@@ -173,7 +173,7 @@ class BackgroundSyncService {
     console.log('👤 Background Sync: Updating profile offline');
     
     const operationId = await this.queueOperation('profile-update', {
-      endpoint: '/api/profile/',
+      endpoint: '/api/users/profile/',
       method: 'PUT',
       body: profileData,
       timestamp: Date.now()
@@ -229,6 +229,7 @@ class BackgroundSyncService {
     const response = await fetch(endpoint, {
       method,
       headers: {
+        'Accept': 'application/json',
         'Content-Type': 'application/json',
         ...this.getAuthHeaders(),
         ...headers
