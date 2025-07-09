@@ -57,13 +57,20 @@ export const getBackendServerInfo = () => {
     }
   }
   
+  // WebSocket URL configuration
+  let websocketUrl = process.env.REACT_APP_WEBSOCKET_URL;
+  if (!websocketUrl && backendUrl) {
+    // Construct WebSocket URL from backend URL
+    websocketUrl = backendUrl.replace('https://', 'wss://').replace('http://', 'ws://') + '/ws/';
+  }
+  
   return {
     environment,
     backendUrl,
     apiUrl,
     host,
     port,
-    websocketUrl: process.env.REACT_APP_WEBSOCKET_URL,
+    websocketUrl,
     mediaUrl: process.env.REACT_APP_MEDIA_URL,
   };
 };

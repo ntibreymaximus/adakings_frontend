@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { PWAProvider, usePWA } from './contexts/PWAContext';
 import { setAuthContext, setupAutoLogoutTimer, setupVisibilityCheck } from './utils/authInterceptor';
 import { initializeOfflineServices } from './utils/serviceWorkerRegistration';
+import websocketService from './services/websocketService';
 import LoginPage from './components/LoginPage';
 import UserProfilePage from './components/UserProfilePage';
 import DashboardPage from './components/DashboardPage';
@@ -20,6 +21,7 @@ import PWAInstallPrompt from './components/PWAInstallPrompt';
 import PWAUpdateNotification from './components/PWAUpdateNotification';
 import PWAManager from './components/PWAManager';
 import EnvironmentInfo from './components/EnvironmentInfo';
+import WebSocketStatus from './components/WebSocketStatus';
 import { logEnvironmentInfo } from './utils/envConfig';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
@@ -63,6 +65,33 @@ function AppContent() {
   useEffect(() => {
     initializeOfflineServices();
   }, []);
+
+  // Initialize WebSocket connection when user is authenticated
+  useEffect(() => {
+    if (userData) {
+      // Connect to WebSocket
+      websocketService.connect();
+      
+      // Authenticate WebSocket connection
+      const token = localStorage.getItem('token');
+      if (token) {
+        websocketService.addEventListener('connected', () => {
+          websocketService.send({
+            type: 'authenticate',
+            token: token
+          });
+        });
+      }
+    } else {
+      // Disconnect WebSocket when user logs out
+      websocketService.disconnect();
+    }
+    
+    // Cleanup on unmount
+    return () => {
+      websocketService.disconnect();
+    };
+  }, [userData]);
 
   // Log environment information on app start
   useEffect(() => {

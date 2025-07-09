@@ -1,6 +1,6 @@
 {
   "name": "adakings_frontend",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "private": true,
   "dependencies": {
     "@testing-library/dom": "^10.4.0",
@@ -17,6 +17,7 @@
     "react-router-dom": "^6.28.0",
     "react-scripts": "5.0.1",
     "react-toastify": "^11.0.5",
+    "socket.io-client": "^4.8.1",
     "web-vitals": "^2.1.4"
   },
   "scripts": {

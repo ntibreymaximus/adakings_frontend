@@ -2,6 +2,45 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.9] - 2025-07-09
+
+### 🚀 Development Release
+
+**📋 Release Information:**
+- **Environment**: dev
+- **Branch**: `dev/1.0.9`
+- **Version**: `1.0.9`
+- **Deployment Time**: 2025-07-09 06:54:28
+- **Description**: Development environment deployment with latest React components
+
+**📝 Changes Made:**
+React v1.0.9: Deploy to dev environment
+
+**📁 Files Modified:**
+  - Modified: `ERSION`
+  - Modified: `package-lock.json`
+  - Modified: `package.json`
+  - Modified: `src/App.js`
+  - Modified: `src/utils/envConfig.js`
+  - Changed: `src/components/WebSocketStatus.js`
+  - Changed: `src/hooks/useWebSocket.js`
+  - Changed: `src/services/websocketService.js`
+  - Changed: `src/utils/websocketConfig.js`
+
+**🔄 Deployment Details:**
+- **Source Branch**: `dev/1.0.9`
+- **Target Branch**: `dev/1.0.9`
+- **Build Process**: Development build with source maps
+- **React Version**: Latest
+
+**🎯 Environment Specific Notes:**
+- Development environment deployment
+- Contains latest React components and changes
+- Used for integration testing before production
+- Devtest branch updated for continuous testing
+
+---
+
 ## [1.0.8] - 2025-07-09
 
 ### 🚀 Development Release
