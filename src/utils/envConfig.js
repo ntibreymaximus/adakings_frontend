@@ -2,7 +2,25 @@
 
 // Get current environment
 export const getCurrentEnvironment = () => {
-  return process.env.REACT_APP_ENVIRONMENT || process.env.NODE_ENV || 'development';
+  // Check for explicit environment variables first
+  const reactAppEnv = process.env.REACT_APP_ENVIRONMENT || process.env.REACT_APP_ENV;
+  if (reactAppEnv) {
+    return reactAppEnv;
+  }
+  
+  // Check if we're running locally (not on Railway)
+  const hostname = window?.location?.hostname;
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname?.startsWith('192.168.') || hostname?.includes('local')) {
+    return 'local';
+  }
+  
+  // If we're not local, check NODE_ENV for Railway deployments
+  if (process.env.NODE_ENV === 'production') {
+    return 'prod';
+  }
+  
+  // Default to dev for Railway development deployments
+  return 'dev';
 };
 
 // Check if we're in a specific environment
@@ -11,9 +29,12 @@ export const isEnvironment = (env) => {
 };
 
 // Environment checks
-export const isLocal = () => isEnvironment('local');
-export const isDevelopment = () => isEnvironment('development');
-export const isProduction = () => isEnvironment('production');
+export const isLocal = () => {
+  const env = getCurrentEnvironment();
+  return env === 'local';
+};
+export const isDevelopment = () => isEnvironment('dev');
+export const isProduction = () => isEnvironment('prod');
 
 // Debug mode check
 export const isDebugMode = () => {

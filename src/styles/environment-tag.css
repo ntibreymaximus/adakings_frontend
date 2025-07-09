@@ -1,0 +1,102 @@
+/* Environment Tag Styles */
+.environment-tag {
+  position: fixed;
+  bottom: 10px;
+  right: 10px;
+  z-index: 9999;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: bold;
+  color: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  font-family: 'Courier New', monospace;
+  user-select: none;
+  cursor: default;
+  transition: all 0.3s ease;
+  opacity: 0.9;
+}
+
+.environment-tag:hover {
+  opacity: 1;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Environment-specific colors */
+.environment-tag.local {
+  background: linear-gradient(135deg, #4CAF50, #45a049);
+}
+
+.environment-tag.development,
+.environment-tag.dev {
+  background: linear-gradient(135deg, #FF9800, #f57c00);
+}
+
+.environment-tag.staging {
+  background: linear-gradient(135deg, #9C27B0, #8e24aa);
+}
+
+.environment-tag.production,
+.environment-tag.prod {
+  background: linear-gradient(135deg, #f44336, #d32f2f);
+}
+
+.environment-tag.default {
+  background: linear-gradient(135deg, #607D8B, #546e7a);
+}
+
+/* Animation for tag appearance */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 0.9;
+    transform: translateY(0);
+  }
+}
+
+.environment-tag {
+  animation: fadeInUp 0.5s ease-out;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .environment-tag {
+    bottom: 15px;
+    right: 15px;
+    font-size: 11px;
+    padding: 3px 6px;
+  }
+}
+
+@media (max-width: 480px) {
+  .environment-tag {
+    bottom: 20px;
+    right: 20px;
+    font-size: 10px;
+    padding: 2px 5px;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .environment-tag {
+    border: 2px solid white;
+    font-weight: 900;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .environment-tag {
+    animation: none;
+    transition: none;
+  }
+  
+  .environment-tag:hover {
+    transform: none;
+  }
+}

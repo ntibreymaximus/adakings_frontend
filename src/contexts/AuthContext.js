@@ -119,6 +119,7 @@ export const AuthProvider = ({ children }) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
         body: JSON.stringify({
           refresh: refreshTokenValue
@@ -126,7 +127,18 @@ export const AuthProvider = ({ children }) => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to refresh token');
+        let errorData = {};
+        const contentType = response.headers.get('content-type');
+        
+        if (contentType && contentType.includes('application/json')) {
+          try {
+            errorData = await response.json();
+          } catch (e) {
+            console.error('Failed to parse refresh token error response as JSON:', e);
+          }
+        }
+        
+        throw new Error(errorData.detail || errorData.message || 'Failed to refresh token');
       }
 
       const data = await response.json();
@@ -186,13 +198,32 @@ export const AuthProvider = ({ children }) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
         body: JSON.stringify({ username: email, password }),
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || errorData.message || 'Login failed');
+        let errorData = {};
+        const contentType = response.headers.get('content-type');
+        
+        if (contentType && contentType.includes('application/json')) {
+          try {
+            errorData = await response.json();
+          } catch (e) {
+            console.error('Failed to parse error response as JSON:', e);
+          }
+        } else {
+          // If response is not JSON (e.g., HTML error page), get text for debugging
+          try {
+            const errorText = await response.text();
+            console.error('Non-JSON error response:', errorText.substring(0, 200));
+          } catch (e) {
+            console.error('Failed to read error response:', e);
+          }
+        }
+        
+        throw new Error(errorData.detail || errorData.message || `Login failed (${response.status})`);
       }
 
       const data = await response.json();
