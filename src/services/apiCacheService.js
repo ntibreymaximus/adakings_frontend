@@ -16,7 +16,7 @@ class ApiCacheService {
       essential: {
         maxAge: 24 * 60 * 60 * 1000, // 24 hours
         strategy: 'cache-first',
-        endpoints: ['/api/menu', '/api/profile', '/api/orders']
+        endpoints: ['/api/menu/items/', '/api/users/profile/', '/api/orders/']
       },
       
       // Frequently accessed data
