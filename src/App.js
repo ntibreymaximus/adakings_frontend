@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { PWAProvider, usePWA } from './contexts/PWAContext';
+import { EnvironmentProvider } from './contexts/EnvironmentContext';
 import { setAuthContext, setupAutoLogoutTimer, setupVisibilityCheck } from './utils/authInterceptor';
 import { initializeOfflineServices } from './utils/serviceWorkerRegistration';
 import LoginPage from './components/LoginPage';
@@ -19,6 +20,7 @@ import PWAStatusIndicator from './components/PWAStatusIndicator';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 import PWAUpdateNotification from './components/PWAUpdateNotification';
 import PWAManager from './components/PWAManager';
+import EnvironmentTag from './components/EnvironmentTag';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 import 'bootstrap-icons/font/bootstrap-icons.css';
@@ -130,6 +132,9 @@ function AppContent() {
         onClose={() => setShowPWAManager(false)} 
       />
       
+      {/* Environment Tag */}
+      <EnvironmentTag />
+      
       <ToastContainer
         position="top-right"
         autoClose={3000}
@@ -149,14 +154,16 @@ function AppContent() {
   );
 }
 
-// Main App component wrapped with AuthProvider and PWAProvider
+// Main App component wrapped with AuthProvider, PWAProvider, and EnvironmentProvider
 function App() {
   return (
-    <AuthProvider>
-      <PWAProvider>
-        <AppContent />
-      </PWAProvider>
-    </AuthProvider>
+    <EnvironmentProvider>
+      <AuthProvider>
+        <PWAProvider>
+          <AppContent />
+        </PWAProvider>
+      </AuthProvider>
+    </EnvironmentProvider>
   );
 }
 
