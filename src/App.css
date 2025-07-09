@@ -8,6 +8,9 @@
   overflow-x: hidden;
   width: 100%;
   position: relative;
+  background-color: #fafafa; /* Fallback */
+  background-color: var(--ada-off-white, #fafafa);
+  min-height: 100vh;
 }
 
 /* Set up smooth scrolling behavior */
@@ -15,6 +18,8 @@ html {
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch; /* For iOS devices */
   height: -webkit-fill-available; /* Mobile viewport fix */
+  background-color: #fafafa; /* Fallback */
+  background-color: var(--ada-off-white, #fafafa);
 }
 
 body {
@@ -24,6 +29,10 @@ body {
   min-height: -webkit-fill-available;
   touch-action: manipulation; /* Disable double-tap zoom on touch devices */
   -webkit-text-size-adjust: 100%; /* Prevent font size adjustment on orientation change */
+  background-color: #fafafa; /* Fallback */
+  background-color: var(--ada-off-white, #fafafa);
+  margin: 0;
+  padding: 0;
 }
 
 /* Mobile-first typography - fluid font scaling */
