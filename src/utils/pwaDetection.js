@@ -5,36 +5,31 @@
 
 /**
  * Checks if the app is running in PWA mode based on display mode
+ * PWA mode is ONLY when the app is actually installed and running in standalone mode
+ * This ensures clear separation: PWA ≠ Mobile Web ≠ Desktop Web
  * @returns {boolean} True if running as PWA, false otherwise
  */
 export const isPWAMode = () => {
-  // Check if running in standalone mode (primary PWA indicator)
+  // STRICT PWA detection - only return true for actual PWA standalone mode
+  // This ensures PWA does not interfere with web and mobile views
+  
+  // Primary check: running in standalone mode (installed PWA)
   if (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) {
     return true;
   }
   
-  // Check if running in fullscreen mode
+  // Secondary check: running in fullscreen mode (some PWA implementations)
   if (window.matchMedia && window.matchMedia('(display-mode: fullscreen)').matches) {
     return true;
   }
   
-  // Check if running in minimal-ui mode
-  if (window.matchMedia && window.matchMedia('(display-mode: minimal-ui)').matches) {
-    return true;
-  }
-  
-  // Fallback: Check for navigator.standalone (iOS Safari)
+  // iOS Safari PWA check
   if (window.navigator && window.navigator.standalone) {
     return true;
   }
   
-  // Additional check: Window location doesn't have browser UI
-  if (window.location.protocol === 'https:' && 
-      window.outerHeight - window.innerHeight < 100 && 
-      window.outerWidth - window.innerWidth < 100) {
-    return true;
-  }
-  
+  // For all other cases (including mobile web browsers), return false
+  // This ensures mobile web view is treated as web, not PWA
   return false;
 };
 
@@ -95,10 +90,29 @@ export const isMobileDevice = () => {
 
 /**
  * Checks if the app should show mobile-optimized UI
+ * This is separate from PWA mode - mobile web browsers should show mobile UI
  * @returns {boolean} True if should show mobile UI, false otherwise
  */
 export const shouldShowMobileUI = () => {
-  return isPWAMode() || (isMobileDevice() && window.innerWidth < 768);
+  // Show mobile UI for mobile devices with narrow screens
+  // This is independent of PWA mode - mobile web browsers get mobile UI
+  return isMobileDevice() && window.innerWidth < 768;
+};
+
+/**
+ * Checks if the current view is mobile web (not PWA)
+ * @returns {boolean} True if mobile web browser, false otherwise
+ */
+export const isMobileWeb = () => {
+  return isMobileDevice() && !isPWAMode();
+};
+
+/**
+ * Checks if the current view is desktop web (not PWA)
+ * @returns {boolean} True if desktop web browser, false otherwise
+ */
+export const isDesktopWeb = () => {
+  return !isMobileDevice() && !isPWAMode();
 };
 
 /**
@@ -125,14 +139,27 @@ export const onDisplayModeChange = (callback) => {
  */
 export const logPWAInfo = () => {
   console.log('PWA Detection Info:', {
+    // Core PWA Detection
     isPWAMode: isPWAMode(),
     isPWAInstalled: isPWAInstalled(),
     isPWAInstallable: isPWAInstallable(),
     displayMode: getDisplayMode(),
+    
+    // Device Detection
     isMobileDevice: isMobileDevice(),
     shouldShowMobileUI: shouldShowMobileUI(),
+    
+    // View Type Detection
+    isMobileWeb: isMobileWeb(),
+    isDesktopWeb: isDesktopWeb(),
+    
+    // Technical Info
     userAgent: navigator.userAgent,
     screenSize: `${window.innerWidth}x${window.innerHeight}`,
-    standalone: window.navigator?.standalone
+    standalone: window.navigator?.standalone,
+    
+    // Environment Info
+    environment: process.env.REACT_APP_ENVIRONMENT || 'unknown',
+    debugMode: process.env.REACT_APP_DEBUG_MODE || 'false'
   });
 };

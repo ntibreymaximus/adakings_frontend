@@ -10,6 +10,8 @@ import {
   getDisplayMode, 
   isMobileDevice, 
   shouldShowMobileUI, 
+  isMobileWeb,
+  isDesktopWeb,
   onDisplayModeChange,
   logPWAInfo 
 } from '../utils/pwaDetection';
@@ -139,7 +141,26 @@ export const PWAProvider = ({ children }) => {
 
   // Check if should hide standard navbar
   const shouldHideStandardNav = useCallback(() => {
-    return isPWA && isMobile;
+    // Clear separation of concerns:
+    // - PWA mode (standalone/fullscreen): Hide navbar
+    // - Mobile web browser: Show navbar
+    // - Desktop web browser: Show navbar
+    
+    const shouldHide = isPWA; // Only hide in actual PWA mode
+    
+    if (process.env.REACT_APP_DEBUG_MODE === 'true') {
+      console.log('PWA Debug: Navbar visibility check:', {
+        isPWA,
+        isMobile,
+        isMobileWeb: isMobileWeb(),
+        isDesktopWeb: isDesktopWeb(),
+        displayMode: getDisplayMode(),
+        shouldHide,
+        viewType: isPWA ? 'PWA' : isMobileWeb() ? 'Mobile Web' : 'Desktop Web'
+      });
+    }
+    
+    return shouldHide;
   }, [isPWA, isMobile]);
 
   // Get PWA-specific routes
@@ -185,6 +206,10 @@ export const PWAProvider = ({ children }) => {
     shouldHideStandardNav,
     getPWARoutes,
     getPWAClasses,
+
+    // View Type Detection
+    isMobileWeb: isMobileWeb(),
+    isDesktopWeb: isDesktopWeb(),
 
     // Utilities (re-exported for convenience)
     logPWAInfo

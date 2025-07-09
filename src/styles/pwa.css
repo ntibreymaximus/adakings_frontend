@@ -44,8 +44,17 @@
 
 
 /* PWA-specific navigation adjustments */
-.App.pwa-mode.mobile-device .navbar {
-  display: none !important;
+/* PWA Mode: Hide navbar ONLY in actual PWA standalone/fullscreen mode */
+@media (display-mode: standalone) {
+  .App.pwa-mode .navbar {
+    display: none !important;
+  }
+}
+
+@media (display-mode: fullscreen) {
+  .App.pwa-mode .navbar {
+    display: none !important;
+  }
 }
 
 

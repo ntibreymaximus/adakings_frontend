@@ -193,10 +193,19 @@ body {
 }
 
 /* ==================== NAVBAR STYLES ==================== */
+
+/* Navbar Fix - Ensures proper separation between PWA, Mobile Web, and Desktop Web */
+
+/* DEFAULT: Show navbar in all web views (mobile web and desktop web) */
 .navbar {
   background-color: var(--ada-white) !important;
   border-bottom: 1px solid var(--ada-border-light);
   box-shadow: var(--ada-shadow-sm);
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: relative !important;
+  z-index: 1030 !important;
 }
 
 .navbar-brand {
@@ -207,6 +216,78 @@ body {
 
 .navbar-brand:hover {
   color: var(--ada-primary-dark) !important;
+}
+
+/* Mobile Web: Ensure navbar is properly styled for mobile browsers */
+@media (max-width: 767.98px) {
+  .navbar {
+    display: flex !important;
+    padding: 0.5rem 1rem;
+    background-color: var(--ada-white);
+    border-bottom: 1px solid var(--ada-border-light);
+  }
+  
+  .navbar-brand {
+    font-size: 1.125rem;
+  }
+  
+  .navbar-toggler {
+    display: block !important;
+    padding: 0.25rem 0.5rem;
+    font-size: 1rem;
+    border: 1px solid rgba(0,0,0,.1);
+  }
+  
+  .navbar-toggler:focus {
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+  }
+  
+  .navbar-collapse {
+    flex-grow: 1;
+  }
+  
+  .navbar .btn {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+  }
+}
+
+/* Mobile Web: Ensure navbar is always visible in mobile web browsers */
+.mobile-web .navbar {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  background-color: var(--ada-white);
+  border-bottom: 1px solid var(--ada-border-light);
+}
+
+/* Desktop Web: Ensure navbar is always visible in desktop web browsers */
+.desktop-web .navbar {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  background-color: var(--ada-white);
+  border-bottom: 1px solid var(--ada-border-light);
+}
+
+
+/* Fix for Bootstrap navbar collapse on mobile */
+.navbar-collapse.show {
+  display: block !important;
+}
+
+.navbar-collapse.collapsing {
+  display: block !important;
+}
+
+/* Ensure navbar toggle button works properly on mobile web */
+.mobile-web .navbar-toggler {
+  display: block !important;
+  border: 1px solid rgba(0,0,0,.1);
+}
+
+.mobile-web .navbar-toggler:focus {
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
 }
 
 /* ==================== FORM STYLES ==================== */
