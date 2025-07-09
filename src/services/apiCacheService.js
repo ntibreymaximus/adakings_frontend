@@ -189,20 +189,50 @@ class ApiCacheService {
   async performFetch(endpoint, options = {}) {
     const fullUrl = this.constructFullUrl(endpoint);
     
+    // Add authentication token if available
+    const token = localStorage.getItem('token');
+    const headers = {
+      'Content-Type': 'application/json',
+      ...options.headers
+    };
+    
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
     const response = await fetch(fullUrl, {
       ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers
-      }
+      headers
     });
 
     if (!response.ok) {
+      // Handle authentication errors
+      if (response.status === 401) {
+        console.warn('🔐 Authentication error - token may be expired');
+        // Clear expired token
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('userData');
+      }
       throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
-    const data = await response.json();
-    return data;
+    // Check content type to ensure we got JSON
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await response.text();
+      if (text.includes('<!DOCTYPE') || text.includes('<html')) {
+        throw new Error('Server returned HTML instead of JSON - backend may be down or misconfigured');
+      }
+      throw new Error(`Expected JSON but got ${contentType}`);
+    }
+
+    try {
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      throw new Error(`Invalid JSON response: ${error.message}`);
+    }
   }
 
   // Fetch from network and cache the result

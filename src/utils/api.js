@@ -80,56 +80,64 @@ async function getAuthHeaders() {
 // Note: authenticatedFetch has been replaced with tokenFetch utility
 // All API calls now use the simpler tokenFetch from ../utils/tokenFetch.js
 
-// API endpoints - use environment variables with fallback
+// API endpoints - always prioritize Railway environment variables
 const getApiBaseUrl = () => {
-  // Use environment variable if available
+  // PRIORITY 1: Railway environment variables (for both dev and prod)
+  // Always check Railway environment variables first
   if (process.env.REACT_APP_API_BASE_URL) {
+    console.log('🔗 Using REACT_APP_API_BASE_URL:', process.env.REACT_APP_API_BASE_URL);
     return process.env.REACT_APP_API_BASE_URL;
   }
   
-  // Railway dev environment - use Railway backend URL from environment variables
+  if (process.env.REACT_APP_BACKEND_BASE_URL) {
+    const apiUrl = `${process.env.REACT_APP_BACKEND_BASE_URL}/api`;
+    console.log('🔗 Using REACT_APP_BACKEND_BASE_URL + /api:', apiUrl);
+    return apiUrl;
+  }
+  
+  // PRIORITY 2: Railway hostname detection (fallback)
   if (window.location.hostname.includes('railway.app')) {
-    // On Railway, backend and frontend are separate services
-    // Environment variables MUST be set on Railway
-    if (process.env.REACT_APP_BACKEND_BASE_URL) {
-      return `${process.env.REACT_APP_BACKEND_BASE_URL}/api`;
-    }
-    throw new Error('REACT_APP_BACKEND_BASE_URL must be set on Railway');
+    console.error('❌ Railway deployment detected but no environment variables set!');
+    console.error('Required: REACT_APP_BACKEND_BASE_URL or REACT_APP_API_BASE_URL');
+    throw new Error('Railway deployment requires REACT_APP_BACKEND_BASE_URL or REACT_APP_API_BASE_URL to be set in Railway dashboard');
   }
   
-  // Production environment - use production backend
-  if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-    return `http://${window.location.hostname}:8000/api`;
+  // PRIORITY 3: Local development fallback
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    console.log('🔗 Using local development API URL');
+    return 'http://localhost:8000/api';
   }
   
-  // Local development
-  return 'http://localhost:8000/api';
+  // PRIORITY 4: Generic production fallback (should not be used for Railway)
+  console.warn('⚠️ Using generic production fallback - this should not happen for Railway deployments');
+  return `http://${window.location.hostname}:8000/api`;
 };
 
 // Base URL without /api suffix for direct backend access
 const getBackendBaseUrl = () => {
-  // Use environment variable if available
+  // PRIORITY 1: Railway environment variables (for both dev and prod)
+  // Always check Railway environment variables first
   if (process.env.REACT_APP_BACKEND_BASE_URL) {
+    console.log('🔗 Using REACT_APP_BACKEND_BASE_URL:', process.env.REACT_APP_BACKEND_BASE_URL);
     return process.env.REACT_APP_BACKEND_BASE_URL;
   }
   
-  // Railway dev environment - use Railway backend URL from environment variables
+  // PRIORITY 2: Railway hostname detection (fallback)
   if (window.location.hostname.includes('railway.app')) {
-    // On Railway, backend and frontend are separate services
-    // Environment variables MUST be set on Railway
-    if (process.env.REACT_APP_BACKEND_BASE_URL) {
-      return process.env.REACT_APP_BACKEND_BASE_URL;
-    }
-    throw new Error('REACT_APP_BACKEND_BASE_URL must be set on Railway');
+    console.error('❌ Railway deployment detected but no REACT_APP_BACKEND_BASE_URL set!');
+    console.error('Required: REACT_APP_BACKEND_BASE_URL must be set in Railway dashboard');
+    throw new Error('Railway deployment requires REACT_APP_BACKEND_BASE_URL to be set in Railway dashboard');
   }
   
-  // Production environment - use production backend
-  if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-    return `http://${window.location.hostname}:8000`;
+  // PRIORITY 3: Local development fallback
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    console.log('🔗 Using local development backend URL');
+    return 'http://localhost:8000';
   }
   
-  // Local development
-  return 'http://localhost:8000';
+  // PRIORITY 4: Generic production fallback (should not be used for Railway)
+  console.warn('⚠️ Using generic production fallback - this should not happen for Railway deployments');
+  return `http://${window.location.hostname}:8000`;
 };
 
 export const API_BASE_URL = getApiBaseUrl();

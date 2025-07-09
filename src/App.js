@@ -28,6 +28,8 @@ import './styles/theme.css';
 import './styles/pwa.css';
 import './App.css';
 import './utils/cleanupPWA'; // Clean up any remaining PWA data
+import './utils/railwayStartup'; // Railway-specific startup configuration
+import './utils/railwayEnvCheck'; // Railway environment validation
 
 // Inner App component that uses authentication context
 function AppContent() {
