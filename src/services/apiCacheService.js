@@ -16,7 +16,7 @@ class ApiCacheService {
       essential: {
         maxAge: 24 * 60 * 60 * 1000, // 24 hours
         strategy: 'cache-first',
-        endpoints: ['/api/menu', '/api/profile', '/api/orders']
+        endpoints: [API_ENDPOINTS.MENU_ITEMS, API_ENDPOINTS.USERS, API_ENDPOINTS.ORDERS]
       },
       
       // Frequently accessed data
@@ -167,10 +167,16 @@ class ApiCacheService {
 
   // Perform the actual fetch operation
   async performFetch(endpoint, options = {}) {
+    // Get authentication token
+    const token = localStorage.getItem('token');
+    const authHeaders = token ? { 'Authorization': `Bearer ${token}` } : {};
+    
     const response = await fetch(endpoint, {
       ...options,
       headers: {
+        'Accept': 'application/json',
         'Content-Type': 'application/json',
+        ...authHeaders,
         ...options.headers
       }
     });
@@ -290,8 +296,19 @@ class ApiCacheService {
   // Preload essential API data for offline use
   async preloadEssentialData() {
     console.log('🚀 API Cache: Preloading essential data for offline use');
+    console.log('🔍 DEBUG: API_ENDPOINTS.MENU_ITEMS =', API_ENDPOINTS.MENU_ITEMS);
+    console.log('🔍 DEBUG: API_ENDPOINTS.USERS =', API_ENDPOINTS.USERS);
+    console.log('🔍 DEBUG: API_ENDPOINTS.ORDERS =', API_ENDPOINTS.ORDERS);
+    
+    // Check if user is authenticated before preloading
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.log('🔐 API Cache: No auth token, skipping preload');
+      return;
+    }
     
     const essentialEndpoints = this.cacheConfig.essential.endpoints;
+    console.log('🔍 DEBUG: Essential endpoints configured:', essentialEndpoints);
     const promises = essentialEndpoints.map(async (endpoint) => {
       try {
         await this.fetch(endpoint);
@@ -308,6 +325,13 @@ class ApiCacheService {
   // Refresh essential data when back online
   async refreshEssentialData() {
     if (!navigator.onLine) return;
+
+    // Check if user is authenticated before refreshing
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.log('🔐 API Cache: No auth token, skipping refresh');
+      return;
+    }
 
     console.log('🔄 API Cache: Refreshing essential data');
     

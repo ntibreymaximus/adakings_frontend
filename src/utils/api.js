@@ -116,7 +116,10 @@ export const API_ENDPOINTS = {
   ORDERS: `${API_BASE_URL}/orders/`,
   NEXT_ORDER_NUMBER: `${API_BASE_URL}/orders/next-order-number/`,
   TRANSACTIONS: `${API_BASE_URL}/transactions/`,
-  USERS: `${API_BASE_URL}/users/`,
-  LOGIN: `${API_BASE_URL}/users/login/`,
+  USERS: `${API_BASE_URL}/users/all/`,
+  LOGIN: `${API_BASE_URL}/token/`,
+  PROFILE: `${API_BASE_URL}/users/profile/`,
+  PAYMENTS: `${API_BASE_URL}/payments/`,
+  HEALTH: `${API_BASE_URL}/health/`,
 };
 

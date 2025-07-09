@@ -139,6 +139,7 @@ export function useOffline() {
         const response = await fetch('/api/orders/', {
           method: 'POST',
           headers: {
+            'Accept': 'application/json',
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           },
@@ -165,9 +166,10 @@ export function useOffline() {
   const updateProfileOffline = useCallback(async (profileData) => {
     if (isOnline) {
       try {
-        const response = await fetch('/api/profile/', {
+        const response = await fetch('/api/users/profile/', {
           method: 'PUT',
           headers: {
+            'Accept': 'application/json',
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${localStorage.getItem('token')}`
           },
