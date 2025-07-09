@@ -2,19 +2,13 @@ const { override } = require('customize-cra');
 
 module.exports = override(
   (config, env) => {
-    console.log('🔧 Webpack Override - Railway Environment:', process.env.RAILWAY_ENVIRONMENT);
     console.log('🔧 Webpack Override - Node Environment:', process.env.NODE_ENV);
     console.log('🔧 Webpack Override - Build Environment:', env);
     
-    // Always disable webpack dev server client in Railway environment
-    // Railway sets multiple environment variables we can detect
-    const isRailway = process.env.RAILWAY_ENVIRONMENT || 
-                      process.env.RAILWAY_PROJECT_ID || 
-                      process.env.RAILWAY_SERVICE_ID ||
-                      process.env.RAILWAY_PUBLIC_DOMAIN;
-    
-    if (isRailway) {
-      console.log('🔧 Disabling webpack dev server client for Railway deployment');
+    // For production builds, always remove webpack dev server client
+    // This prevents the WebSocket security error on HTTPS deployments
+    if (env === 'production' || process.env.NODE_ENV === 'production') {
+      console.log('🔧 Production build detected - removing webpack dev server client');
       
       // Remove webpack dev server client entry
       if (config.entry && Array.isArray(config.entry)) {
@@ -23,7 +17,9 @@ module.exports = override(
           const shouldRemove = typeof entry === 'string' && (
             entry.includes('webpack-dev-server/client') ||
             entry.includes('webpack/hot/dev-server') ||
-            entry.includes('react-dev-utils/webpackHotDevClient')
+            entry.includes('react-dev-utils/webpackHotDevClient') ||
+            entry.includes('webpack-dev-server') ||
+            entry.includes('sockjs-client')
           );
           if (shouldRemove) {
             console.log('🔧 Removing entry:', entry);
