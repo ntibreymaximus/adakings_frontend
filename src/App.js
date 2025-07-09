@@ -73,8 +73,12 @@ function AppContent() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Add view type classes for better CSS targeting
+  const { isMobileWeb, isDesktopWeb } = usePWA();
+  const viewTypeClasses = `${isMobileWeb ? 'mobile-web' : ''} ${isDesktopWeb ? 'desktop-web' : ''}`;
+  
   return (
-    <div className={`App ${getPWAClasses()}`}>
+    <div className={`App ${getPWAClasses()} ${viewTypeClasses}`}>
       {/* Conditional navigation based on PWA mode */}
       {userData && !shouldHideStandardNav() && <Navbar userData={userData} onLogout={() => logout('manual')} />}
       
