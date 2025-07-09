@@ -1,6 +1,6 @@
 {
   "name": "adakings_frontend",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "private": true,
   "dependencies": {
     "@testing-library/dom": "^10.4.0",
@@ -25,10 +25,12 @@
     "start:local": "cross-env REACT_APP_ENVIRONMENT=local react-app-rewired start",
     "start:dev": "cross-env REACT_APP_ENVIRONMENT=development react-app-rewired start",
     "start:network": "cross-env HOST=0.0.0.0 react-app-rewired start",
-    "build": "react-app-rewired build",
+    "build": "node scripts/railway-build.js",
     "build:local": "cross-env REACT_APP_ENVIRONMENT=local react-app-rewired build",
     "build:dev": "cross-env REACT_APP_ENVIRONMENT=development react-app-rewired build",
     "build:prod": "cross-env REACT_APP_ENVIRONMENT=production react-app-rewired build",
+    "build:railway": "node scripts/railway-build.js",
+    "build:production": "node scripts/build-production.js",
     "test": "react-app-rewired test",
     "eject": "react-scripts eject",
     "deploy:feature": "node smart-deploy.js feature",
