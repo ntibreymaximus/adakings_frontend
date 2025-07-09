@@ -62,36 +62,12 @@
   --ada-transition-slow: 0.5s ease-in-out;
 }
 
-/* ==================== GLOBAL RESET ==================== */
-* {
-  box-sizing: border-box;
-}
-
-/* Ensure no black backgrounds anywhere */
-*:not(.bg-dark):not(.bg-black):not(.navbar-dark):not(.alert-dark) {
-  background-color: inherit;
-}
-
 /* ==================== BASE STYLES ==================== */
 body {
   font-family: var(--ada-font-family);
   font-size: var(--ada-font-size-base);
   line-height: 1.6;
-  color: var(--ada-charcoal, #343a40);
-  background-color: var(--ada-off-white, #fafafa);
-  margin: 0;
-  padding: 0;
-}
-
-/* Ensure html and body have proper background */
-html {
-  background-color: var(--ada-off-white, #fafafa);
-}
-
-/* Ensure App container has proper background */
-.App {
-background-color: var(--ada-off-white, #fafafa);
-  min-height: 100vh;
+  color: var(--ada-charcoal);
 }
 
 /* ==================== UTILITY CLASSES ==================== */

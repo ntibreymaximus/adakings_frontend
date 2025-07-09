@@ -2,6 +2,40 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.23] - 2025-07-09
+
+### 🚀 Development Release
+
+**📋 Release Information:**
+- **Environment**: dev
+- **Branch**: `dev/1.0.23`
+- **Version**: `1.0.23`
+- **Deployment Time**: 2025-07-09 13:40:52
+- **Description**: Development environment deployment with latest React components
+
+**📝 Changes Made:**
+React v1.0.23: Deploy to dev environment
+
+**📁 Files Modified:**
+  - Modified: `ERSION`
+  - Modified: `package.json`
+  - Modified: `src/App.css`
+  - Modified: `src/styles/theme.css`
+
+**🔄 Deployment Details:**
+- **Source Branch**: `dev/1.0.23`
+- **Target Branch**: `dev/1.0.23`
+- **Build Process**: Development build with source maps
+- **React Version**: Latest
+
+**🎯 Environment Specific Notes:**
+- Development environment deployment
+- Contains latest React components and changes
+- Used for integration testing before production
+- Devtest branch updated for continuous testing
+
+---
+
 ## [1.0.22] - 2025-07-09
 
 ### 🚀 Development Release
