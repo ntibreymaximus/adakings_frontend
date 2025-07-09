@@ -1,6 +1,6 @@
 {
   "name": "adakings_frontend",
-  "version": "1.2.0",
+  "version": "4.0.0",
   "private": true,
   "dependencies": {
     "@testing-library/dom": "^10.4.0",
