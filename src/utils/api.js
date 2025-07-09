@@ -87,7 +87,15 @@ const getApiBaseUrl = () => {
     return process.env.REACT_APP_API_BASE_URL;
   }
   
-  // Fallback: dynamically determine based on how the frontend is accessed
+  // Railway environment detection and smart fallback
+  if (window.location.hostname.includes('railway.app')) {
+    // For Railway environments, construct backend URL based on naming convention
+    const frontendUrl = window.location.hostname;
+    const backendUrl = frontendUrl.replace('adakingsfrontend-', 'adakingsbackend-');
+    return `https://${backendUrl}/api`;
+  }
+  
+  // Local development fallback
   if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
     return `http://${window.location.hostname}:8000/api`;
   }
@@ -101,7 +109,15 @@ const getBackendBaseUrl = () => {
     return process.env.REACT_APP_BACKEND_BASE_URL;
   }
   
-  // Fallback: dynamically determine based on how the frontend is accessed
+  // Railway environment detection and smart fallback
+  if (window.location.hostname.includes('railway.app')) {
+    // For Railway environments, construct backend URL based on naming convention
+    const frontendUrl = window.location.hostname;
+    const backendUrl = frontendUrl.replace('adakingsfrontend-', 'adakingsbackend-');
+    return `https://${backendUrl}`;
+  }
+  
+  // Local development fallback
   if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
     return `http://${window.location.hostname}:8000`;
   }
