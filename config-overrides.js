@@ -7,7 +7,13 @@ module.exports = override(
     console.log('🔧 Webpack Override - Build Environment:', env);
     
     // Always disable webpack dev server client in Railway environment
-    if (process.env.RAILWAY_ENVIRONMENT) {
+    // Railway sets multiple environment variables we can detect
+    const isRailway = process.env.RAILWAY_ENVIRONMENT || 
+                      process.env.RAILWAY_PROJECT_ID || 
+                      process.env.RAILWAY_SERVICE_ID ||
+                      process.env.RAILWAY_PUBLIC_DOMAIN;
+    
+    if (isRailway) {
       console.log('🔧 Disabling webpack dev server client for Railway deployment');
       
       // Remove webpack dev server client entry
