@@ -9,6 +9,7 @@ import {
   formatTransactionId, 
   getShortTransactionId
 } from '../utils/transactionUtils';
+import PaymentLogs from './PaymentLogs';
 const ViewTransactionsPage = () => {
     const { logout } = useAuth();
     const navigate = useNavigate();
@@ -22,6 +23,7 @@ const ViewTransactionsPage = () => {
     const [selectedDate, setSelectedDate] = useState(() => {
         return new Date().toISOString().split('T')[0]; // Default to today
     });
+    const [showTransactionStatsModal, setShowTransactionStatsModal] = useState(false);
 
     // Format currency
     const formatCurrency = (amount) => {
@@ -236,7 +238,7 @@ const ViewTransactionsPage = () => {
 
   return (
       <Container className="mt-4">
-        <div className="mb-3">
+        <div className="mb-3 d-flex gap-2">
           <Button
             variant="outline-primary"
             size="sm"
@@ -247,6 +249,18 @@ const ViewTransactionsPage = () => {
             <i className="bi bi-arrow-left me-2"></i>
             <span>Return to Dashboard</span>
           </Button>
+          {isMobile && (
+            <Button
+              variant="outline-secondary"
+              size="sm"
+              onClick={() => setShowTransactionStatsModal(true)}
+              className="d-flex align-items-center ada-shadow-sm"
+              style={{ minHeight: '44px' }}
+            >
+              <i className="bi bi-bar-chart-line me-2"></i>
+              <span>View Stats</span>
+            </Button>
+          )}
         </div>
       
       {/* Summary Cards - Hidden on mobile */}
@@ -697,12 +711,113 @@ const ViewTransactionsPage = () => {
                   </Card.Body>
                 </Card>
               </div>
+              
+              {/* Payment Logs */}
+              <div className="mb-4">
+                <PaymentLogs 
+                  transactionId={(() => {
+                    const possibleIds = [
+                      selectedTransaction.custom_transaction_id,
+                      selectedTransaction.transaction_id,
+                      selectedTransaction.txn_id,
+                      selectedTransaction.id
+                    ].filter(Boolean);
+                    
+                    let primaryId = possibleIds.find(id => id && id.startsWith('TXN-')) || possibleIds[0];
+                    
+                    if (!primaryId || !primaryId.startsWith('TXN-')) {
+                      const timestamp = selectedTransaction.created_at || selectedTransaction.date || new Date().toISOString();
+                      const date = new Date(timestamp);
+                      const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
+                      const timeStr = date.toTimeString().slice(0, 8).replace(/:/g, '');
+                      const suffix = String(selectedTransaction.id).padStart(3, '0').slice(-3);
+                      primaryId = `TXN-${dateStr}-${timeStr}-${suffix}`;
+                    }
+                    
+                    return primaryId;
+                  })()}
+                  orderNumber={selectedTransaction.order_number}
+                  transactionData={selectedTransaction}
+                  showTitle={true}
+                  maxHeight="250px"
+                />
+              </div>
             </>
           )}
         </Modal.Body>
         <Modal.Footer className="p-3">
           <div className="d-grid w-100">
             <Button variant="danger" onClick={closeTransactionModal}>
+              <i className="bi bi-x-circle me-2"></i>
+              Close
+            </Button>
+          </div>
+        </Modal.Footer>
+      </Modal>
+      
+      {/* Stats Modal for Mobile */}
+      <Modal 
+        show={showTransactionStatsModal} 
+        onHide={() => setShowTransactionStatsModal(false)} 
+        centered
+        fullscreen="sm-down"
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>
+            <i className="bi bi-bar-chart-line me-2"></i>
+            Transaction Statistics
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Row className="g-3">
+            <Col xs={6}>
+              <Card className="text-center h-100">
+                <Card.Body>
+                  <i className="bi bi-credit-card text-primary" style={{ fontSize: '2rem' }}></i>
+                  <h4 className="mt-2">{filteredStats.total_transactions}</h4>
+                  <p className="mb-0 text-muted">Total Transactions</p>
+                </Card.Body>
+              </Card>
+            </Col>
+            <Col xs={6}>
+              <Card className="text-center h-100">
+                <Card.Body>
+                  <i className="bi bi-cash-stack text-success" style={{ fontSize: '2rem' }}></i>
+                  <h4 className="mt-2 text-success">{formatCurrency(filteredStats.total_amount)}</h4>
+                  <p className="mb-0 text-muted">Total Amount</p>
+                </Card.Body>
+              </Card>
+            </Col>
+            <Col xs={6}>
+              <Card className="text-center h-100">
+                <Card.Body>
+                  <i className="bi bi-check-circle text-success" style={{ fontSize: '2rem' }}></i>
+                  <h4 className="mt-2">{filteredStats.successful_transactions}</h4>
+                  <p className="mb-0 text-muted">Successful</p>
+                </Card.Body>
+              </Card>
+            </Col>
+            <Col xs={6}>
+              <Card className="text-center h-100">
+                <Card.Body>
+                  <i className="bi bi-x-circle text-danger" style={{ fontSize: '2rem' }}></i>
+                  <h4 className="mt-2">{filteredStats.failed_transactions}</h4>
+                  <p className="mb-0 text-muted">Failed</p>
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
+          
+          <div className="mt-4 text-center text-muted">
+            <small>
+              <i className="bi bi-info-circle me-1"></i>
+              Statistics for {new Date(selectedDate).toLocaleDateString()}
+            </small>
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <div className="d-grid w-100">
+            <Button variant="secondary" onClick={() => setShowTransactionStatsModal(false)}>
               <i className="bi bi-x-circle me-2"></i>
               Close
             </Button>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, memo, useMemo, useCallback, useRef } from 'react';
 import { Container, Table, Card, Modal, Form, Button, Row, Col } from 'react-bootstrap';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import optimizedToast, { contextToast } from '../utils/toastUtils';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -13,11 +13,13 @@ import {
     formatPaymentError
 } from '../services/paymentService';
 import { API_BASE_URL } from '../utils/api';
+import SimpleUserTracking from './SimpleUserTracking';
 
 // Optimized ViewOrdersPage with instant loading
 const ViewOrdersPage = memo(() => {
-    const { logout } = useAuth();
+    const { logout, userData } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const [loading, setLoading] = useState(true);
     const [showStatusModal, setShowStatusModal] = useState(false);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -58,6 +60,9 @@ const ViewOrdersPage = memo(() => {
   const [currentPage, setCurrentPage] = useState(1);
   const ordersPerPage = 10;
   const [paginatedOrders, setPaginatedOrders] = useState([]);
+  
+  // Ref to track if we're already handling a modal opening
+  const isHandlingModalRef = useRef(false);
 
     // Fetch orders from API - with consistent loading
     const fetchOrders = useCallback(async (showLoader = true) => {
@@ -162,6 +167,71 @@ const ViewOrdersPage = memo(() => {
             }
         }
     }, [logout, selectedDate]);
+
+    // Fetch a specific order by ID (for when order is not in current date filter)
+    const fetchSpecificOrder = useCallback(async (orderId) => {
+        try {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                logout();
+                return;
+            }
+
+            console.log('🔍 Fetching specific order:', orderId);
+
+            const response = await fetch(`${API_BASE_URL}/orders/${orderId}/`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            if (!response.ok) {
+                if (response.status === 401) {
+                    logout();
+                    return;
+                }
+                if (response.status === 404) {
+                    optimizedToast.error('Order not found');
+                    isHandlingModalRef.current = false;
+                    return;
+                }
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const order = await response.json();
+            
+            console.log('✅ Specific order fetched:', order);
+            
+            // Set the selected order and open modal with proper initialization
+            console.log('✅ Order data received:', {
+                id: order.id,
+                order_number: order.order_number,
+                status: order.status,
+                total_price: order.total_price,
+                customer_phone: order.customer_phone
+            });
+            
+            // Clear any existing modal state first
+            setShowOrderDetailsModal(false);
+            setSelectedOrder(null);
+            
+            // Small delay to ensure state is clear before setting new values
+            setTimeout(() => {
+                setSelectedOrder(order);
+                setShowOrderDetailsModal(true);
+                isHandlingModalRef.current = false; // Reset the ref
+            }, 100);
+            
+        } catch (error) {
+            console.error('Error fetching specific order:', error);
+            optimizedToast.error('Failed to load order details');
+            
+            // Reset the ref on error
+            isHandlingModalRef.current = false;
+        }
+    }, [logout]);
 
     useEffect(() => {
         const fetchPaymentModes = async () => {
@@ -285,6 +355,57 @@ const ViewOrdersPage = memo(() => {
         setPaginatedOrders(paginatedData);
     }, [allOrders, currentPage, ordersPerPage]);
 
+    // Handle URL parameter for auto-opening order details
+    useEffect(() => {
+        const urlParams = new URLSearchParams(location.search);
+        const orderIdToOpen = urlParams.get('openOrder');
+        
+        if (orderIdToOpen && !loading && !isHandlingModalRef.current) {
+            console.log('🎯 Attempting to open order:', orderIdToOpen);
+            isHandlingModalRef.current = true;
+            
+            // Clear the URL parameter immediately to prevent re-triggering
+            const newUrl = new URL(window.location);
+            newUrl.searchParams.delete('openOrder');
+            window.history.replaceState({}, '', newUrl);
+            
+            // First try to find the order in current loaded orders
+            let orderToOpen = allOrders.find(order => 
+                order.id.toString() === orderIdToOpen || 
+                order.order_number?.toString() === orderIdToOpen
+            );
+            
+            if (orderToOpen) {
+                console.log('✅ Order found in current orders:', orderToOpen);
+                
+                // Clear any existing modal state first
+                setShowOrderDetailsModal(false);
+                setSelectedOrder(null);
+                
+                // Small delay to ensure state is clear before setting new values
+                setTimeout(() => {
+                    setSelectedOrder(orderToOpen);
+                    setShowOrderDetailsModal(true);
+                    isHandlingModalRef.current = false; // Reset the ref
+                }, 50);
+            } else if (allOrders.length > 0) {
+                // If order not found in current orders, try to fetch it directly from API
+                console.log('⚠️ Order not found in current orders, fetching from API...');
+                fetchSpecificOrder(orderIdToOpen);
+            } else {
+                // No orders loaded yet, reset the ref
+                isHandlingModalRef.current = false;
+            }
+        }
+    }, [allOrders, location.search, loading, fetchSpecificOrder]);
+
+    // Cleanup effect to reset ref on unmount
+    useEffect(() => {
+        return () => {
+            isHandlingModalRef.current = false;
+        };
+    }, []);
+
     const handleDateChange = useCallback((e) => {
         const newDate = e.target.value;
         setSelectedDate(newDate);
@@ -383,7 +504,12 @@ const ViewOrdersPage = memo(() => {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({ 
+          status: newStatus,
+          modified_by: userData?.id || userData?.user_id,
+          modified_by_username: userData?.username,
+          modified_by_role: userData?.role || userData?.user_role
+        }),
       });
 
       if (response.ok) {
@@ -483,7 +609,11 @@ const ViewOrdersPage = memo(() => {
                 order_number: selectedOrder.order_number || selectedOrder.id,
                 amount: amount,
                 payment_method: newPaymentMode, // Send the method directly
-                payment_type: isRefundMode ? 'refund' : 'payment' // Set correct type based on mode
+                payment_type: isRefundMode ? 'refund' : 'payment', // Set correct type based on mode
+                // User tracking information
+                processed_by: userData?.id || userData?.user_id,
+                processed_by_username: userData?.username,
+                processed_by_role: userData?.role || userData?.user_role
             };
             
             
@@ -637,6 +767,9 @@ const ViewOrdersPage = memo(() => {
     };
 
     const openOrderDetailsModal = (order) => {
+        // Clear any previous selection
+        setSelectedOrder(null);
+        // Set order and show modal
         setSelectedOrder(order);
         setShowOrderDetailsModal(true);
     };
@@ -644,6 +777,8 @@ const ViewOrdersPage = memo(() => {
     const closeOrderDetailsModal = () => {
         setShowOrderDetailsModal(false);
         setSelectedOrder(null);
+        // Reset the handling ref when modal is closed
+        isHandlingModalRef.current = false;
     };
     
     const refreshOrderData = useCallback(async () => {
@@ -879,7 +1014,7 @@ const ViewOrdersPage = memo(() => {
   return (
       <Container className="my-3 my-md-4 px-3 px-md-4">
         {/* Return to Dashboard Button */}
-        <div className="mb-3">
+        <div className="mb-3 d-flex gap-2">
           <Button
             variant="outline-primary"
             size="sm"
@@ -890,6 +1025,18 @@ const ViewOrdersPage = memo(() => {
             <i className="bi bi-arrow-left me-2"></i>
             <span>Return to Dashboard</span>
           </Button>
+          {isMobile && (
+            <Button
+              variant="outline-secondary"
+              size="sm"
+              onClick={() => setShowStatsModal(true)}
+              className="d-flex align-items-center ada-shadow-sm"
+              style={{ minHeight: '44px' }}
+            >
+              <i className="bi bi-bar-chart-line me-2"></i>
+              <span>View Stats</span>
+            </Button>
+          )}
         </div>
       
       {/* Order Stats Cards - only shown on desktop */}
@@ -1215,26 +1362,39 @@ const ViewOrdersPage = memo(() => {
                   >
                     <Card.Body className="p-2">
                       <div className="d-flex align-items-center">
-                        {/* Left: Order number and badges */}
+                        {/* Left: Order info */}
                         <div className="flex-grow-1">
                           <div className="d-flex align-items-center mb-1">
-                            <span className="ada-text-primary fw-medium me-2" style={{ fontSize: '0.95rem' }}>
-                              #{order.order_number || order.id}
-                            </span>
+                              <span className="ada-text-primary fw-bold me-2" style={{ fontSize: '0.95rem' }}>
+                                #{order.order_number || order.id}
+                              </span>
                             <span 
                               className="badge rounded-pill"
                               style={{ 
                                 fontSize: '0.7rem', 
                                 padding: '0.15rem 0.5rem',
-                                background: order.delivery_type === 'Delivery' ? '#f0f4ff' : '#edf7ed',
-                                color: order.delivery_type === 'Delivery' ? '#3b65cc' : '#1e8e3e',
+                                background: order.delivery_type === 'Delivery' ? '#d1e9ff' : '#c8f7c5',
+                                color: '#333',
                                 border: 'none'
                               }}
                             >
                               <i className={`bi ${order.delivery_type === 'Delivery' ? 'bi-truck' : 'bi-shop'} me-1`}></i>
-                              {order.delivery_type === 'Delivery' ? 'Delivery' : 'Pickup'}
+                              {order.delivery_type === 'Delivery' && (order.delivery_location || order.custom_delivery_location)
+                                ? `To ${order.effective_delivery_location_name || order.delivery_location || order.custom_delivery_location}`
+                                : order.delivery_type === 'Delivery' ? 'Delivery' : 'Pickup'
+                              }
                             </span>
                           </div>
+                          
+                          {/* Customer Phone Number - Only show for delivery orders */}
+                          {order.delivery_type === 'Delivery' && order.customer_phone && (
+                            <div className="d-flex align-items-center mb-1">
+                              <span className="text-dark fw-semibold" style={{ fontSize: '0.85rem', color: '#333' }}>
+                                <i className="bi bi-phone me-1" style={{ color: '#007bff' }}></i>
+                                {order.customer_phone}
+                              </span>
+                            </div>
+                          )}
                           
                           <div className="d-flex align-items-center">
                             <span 
@@ -1266,7 +1426,7 @@ const ViewOrdersPage = memo(() => {
                         
                         {/* Right: Price and icon */}
                         <div className="d-flex flex-column align-items-end">
-                          <span className="text-dark fw-medium" style={{ fontSize: '0.95rem' }}>₵{parseFloat(order.total_price || 0).toFixed(2)}</span>
+                          <span className="text-dark fw-bold" style={{ fontSize: '0.95rem' }}>₵{parseFloat(order.total_price || 0).toFixed(2)}</span>
                           <button 
                             className="btn btn-sm p-0 mt-1" 
                             style={{ color: '#4285F4', background: 'transparent' }}
@@ -1913,6 +2073,22 @@ const ViewOrdersPage = memo(() => {
                                     {payment.reference.slice(0, 8)}...{payment.reference.slice(-4)}
                                   </small>
                                 )}
+                                {payment.processed_by_username && (
+                                  <small className="text-muted d-block">
+                                    <i className="bi bi-person me-1"></i>
+                                    Processed by: {payment.processed_by_username}
+                                  </small>
+                                )}
+                                {/* Add minimal activity tracking for this payment */}
+                                <div className="mt-1">
+                                  <SimpleUserTracking 
+                                    orderId={selectedOrder.id}
+                                    orderNumber={selectedOrder.order_number}
+                                    className=""
+                                    showTitle={false}
+                                    size="minimal"
+                                  />
+                                </div>
                               </div>
                             </Col>
                           </Row>
@@ -2116,6 +2292,22 @@ const ViewOrdersPage = memo(() => {
                 </Col>
               </Row>
 
+              {/* Simplified User Tracking Information */}
+              <div className="mb-2">
+                <div className="bg-light p-2 rounded">
+                  <small className="text-muted d-block mb-1">
+                    <i className="bi bi-clock-history me-1"></i>
+                    Activity Log
+                  </small>
+                  <SimpleUserTracking 
+                    orderId={selectedOrder.id}
+                    orderNumber={selectedOrder.order_number}
+                    className=""
+                    showTitle={false}
+                    size="minimal"
+                  />
+                </div>
+              </div>
 
               {/* Order Notes Section */}
               {selectedOrder.notes && (

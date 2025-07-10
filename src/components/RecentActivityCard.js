@@ -365,10 +365,12 @@ let allActivities = [];
 
   // Handle activity item click
   const handleActivityClick = (activity) => {
-    if (activity.eventType === 'order' && (activity.orderId || activity.orderNumber)) {
-      navigate(`/order-details/${activity.orderNumber || activity.orderId}`);
+    if (activity.eventType === 'order' && activity.orderId) {
+      // Navigate to view orders page with order ID to auto-open the modal
+      navigate(`/view-orders?openOrder=${activity.orderId}`);
     } else if (activity.eventType === 'payment' && activity.orderId) {
-      navigate(`/order-details/${activity.orderId}`);
+      // Navigate to view orders page with order ID for payment-related activity
+      navigate(`/view-orders?openOrder=${activity.orderId}`);
     } else {
       // Fallback navigation
       if (activity.eventType === 'payment') {

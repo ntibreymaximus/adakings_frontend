@@ -5,11 +5,13 @@ import optimizedToast, { contextToast } from '../utils/toastUtils';
 import { API_ENDPOINTS } from '../utils/api';
 import { apiFirstService } from '../services/apiFirstService';
 import { menuCacheService } from '../services/menuCacheService';
+import { useAuth } from '../contexts/AuthContext';
 
 // Delivery locations will be fetched from backend
 
 const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber = null }) => {
   const navigate = useNavigate();
+  const { userData } = useAuth();
   const [allMenuItems, setAllMenuItems] = useState([]);
   const [customerPhone, setCustomerPhone] = useState('');
   const [deliveryType, setDeliveryType] = useState('Pickup');
@@ -31,6 +33,7 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
   const [locationSearchTerm, setLocationSearchTerm] = useState('');
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   
   // Refs for cleanup and debouncing
   const searchTimeoutRef = useRef(null);
@@ -313,6 +316,10 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
       if (deliveryLocations.length === 0 && !loadingLocations) {
         fetchDeliveryLocations();
       }
+      // Show delivery modal on mobile
+      if (isMobile) {
+        setShowDeliveryModal(true);
+      }
     }
   };
 
@@ -433,6 +440,13 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
         delivery_type: deliveryType,
         notes: notes.trim(),
         items: allItems,
+        // User tracking information
+        created_by: userData?.id || userData?.user_id,
+        created_by_username: userData?.username,
+        created_by_role: userData?.role || userData?.user_role,
+        modified_by: userData?.id || userData?.user_id,
+        modified_by_username: userData?.username,
+        modified_by_role: userData?.role || userData?.user_role,
       };
 
       if (deliveryType === 'Delivery') {
@@ -762,9 +776,109 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
                       <option value="Pickup">🏪 Pickup</option>
                       <option value="Delivery">🚚 Delivery</option>
                     </Form.Select>
+                    {/* Show delivery info on mobile when delivery is selected */}
+                    {isMobile && deliveryType === 'Delivery' && (
+                      <div className="mt-3">
+                        <Card className="border-0 shadow-sm">
+                          <Card.Body className="p-3">
+                            <div className="d-flex justify-content-between align-items-center mb-3">
+                              <h6 className="mb-0 text-muted" style={{ fontSize: '0.9rem', fontWeight: '600' }}>
+                                <i className="bi bi-info-circle-fill me-2"></i>
+                                Delivery Details
+                              </h6>
+                              <button
+                                type="button"
+                                className="btn btn-sm p-1 border-0 bg-light rounded-circle"
+                                onClick={() => setShowDeliveryModal(true)}
+                                style={{ 
+                                  width: '32px',
+                                  height: '32px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  transition: 'all 0.2s ease'
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.backgroundColor = '#e9ecef';
+                                  e.currentTarget.style.transform = 'scale(1.1)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.backgroundColor = '#f8f9fa';
+                                  e.currentTarget.style.transform = 'scale(1)';
+                                }}
+                              >
+                                <i className="bi bi-pencil-square text-primary" style={{ fontSize: '0.9rem' }}></i>
+                              </button>
+                            </div>
+                            
+                            {deliveryLocation && (
+                              <div className="mb-2">
+                                <div className="d-flex align-items-start">
+                                  <i className="bi bi-geo-alt-fill text-primary me-2" style={{ fontSize: '1rem' }}></i>
+                                  <div className="flex-grow-1">
+                                    <small className="text-muted d-block mb-1">Location</small>
+                                    <p className="mb-0 fw-semibold" style={{ fontSize: '0.95rem' }}>
+                                      {deliveryLocation === 'Other' ? (customLocationName || 'Custom Location') : deliveryLocation}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {customerPhone && (
+                              <div className="mb-2">
+                                <div className="d-flex align-items-start">
+                                  <i className="bi bi-telephone-fill text-primary me-2" style={{ fontSize: '1rem' }}></i>
+                                  <div className="flex-grow-1">
+                                    <small className="text-muted d-block mb-1">Phone</small>
+                                    <p className="mb-0 fw-semibold" style={{ fontSize: '0.95rem' }}>
+                                      {customerPhone}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {currentDeliveryFee > 0 && (
+                              <div className="mt-3 pt-2 border-top">
+                                <div className="d-flex justify-content-between align-items-center">
+                                  <span className="text-muted" style={{ fontSize: '0.9rem' }}>
+                                    <i className="bi bi-cash me-1"></i>
+                                    Delivery Fee
+                                  </span>
+                                  <span className="fw-bold text-success" style={{ fontSize: '0.95rem' }}>
+                                    ₵{currentDeliveryFee.toFixed(2)}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {!deliveryLocation && (
+                              <div className="text-center py-3">
+                                <i className="bi bi-truck text-muted mb-2" style={{ fontSize: '2rem', display: 'block' }}></i>
+                                <p className="text-muted mb-3" style={{ fontSize: '0.9rem' }}>No delivery details set</p>
+                                <Button 
+                                  variant="primary" 
+                                  size="sm" 
+                                  className="px-4 py-2" 
+                                  onClick={() => setShowDeliveryModal(true)}
+                                  style={{ 
+                                    borderRadius: '20px',
+                                    fontWeight: '500'
+                                  }}
+                                >
+                                  <i className="bi bi-plus-circle me-2"></i>
+                                  Add Delivery Details
+                                </Button>
+                              </div>
+                            )}
+                          </Card.Body>
+                        </Card>
+                      </div>
+                    )}
                   </Form.Group>
                 </Col>
-                {deliveryType === 'Delivery' && (
+                {deliveryType === 'Delivery' && !isMobile && (
                   <Col md={4}>
                     <Form.Group controlId="deliveryLocation">
                       <Form.Label className="fw-semibold">Delivery Location <span className="text-danger">*</span></Form.Label>
@@ -817,55 +931,59 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
                           }
                           disabled={loadingLocations || deliveryLocation === 'Other'}
                         />
-                        {showLocationDropdown && !loadingLocations && deliveryLocation !== 'Other' && (
-                          <div 
-                            className="position-absolute w-100 bg-white border rounded shadow-lg" 
-                            style={{ 
-                              zIndex: 1050, 
-                              top: '100%', 
-                              maxHeight: '200px', 
-                              overflowY: 'auto',
-                              border: '1px solid #dee2e6'
-                            }}
-                          >
-                            {filteredDeliveryLocations.length > 0 ? (
-                              filteredDeliveryLocations.map(location => (
-                                <div
-                                  key={location.id || location.name}
-                                  className="p-2 border-bottom cursor-pointer"
-                                  style={{ 
-                                    cursor: 'pointer',
-                                    '&:hover': { backgroundColor: '#f8f9fa' }
-                                  }}
-                                  onMouseEnter={(e) => e.target.style.backgroundColor = '#f8f9fa'}
-                                  onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
-                                  onClick={() => handleLocationSelect(location)}
-                                >
-                                  <div className="fw-semibold">{location.name}</div>
-                                  <small className="text-muted">Fee: ₵{parseFloat(location.fee || 0).toFixed(2)}</small>
-                                </div>
-                              ))
-                            ) : (
-                              <div className="p-2 text-muted text-center">
-                                {locationSearchTerm ? 'No locations found' : 'Type to search locations'}
-                              </div>
-                            )}
-                            <div
-                              className="p-2 border-top cursor-pointer text-primary"
-                              style={{ 
-                                cursor: 'pointer',
-                                backgroundColor: '#f8f9fa'
-                              }}
-                              onClick={() => {
-                                setDeliveryLocation('Other');
-                                setLocationSearchTerm('');
-                                setShowLocationDropdown(false);
-                              }}
-                            >
-                              🏠 Other (Custom Location)
-                            </div>
-                          </div>
-                        )}
+                {showLocationDropdown && !loadingLocations && deliveryLocation !== 'Other' && (
+                  <div 
+                    className="position-absolute w-100 bg-white border rounded shadow-lg" 
+                    style={{ 
+                      zIndex: 1050, 
+                      top: '100%', 
+                      maxHeight: '200px', 
+                      overflowY: 'auto',
+                      border: '1px solid #dee2e6'
+                    }}
+                  >
+                    {/* Show delivery locations first */}
+                    {deliveryLocations.length > 0 && filteredDeliveryLocations.length > 0 && (
+                      filteredDeliveryLocations.map(location => (
+                        <div
+                          key={location.id || location.name}
+                          className="p-2 border-bottom cursor-pointer"
+                          style={{ 
+                            cursor: 'pointer',
+                            '&:hover': { backgroundColor: '#f8f9fa' }
+                          }}
+                          onMouseEnter={(e) => e.target.style.backgroundColor = '#f8f9fa'}
+                          onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
+                          onClick={() => handleLocationSelect(location)}
+                        >
+                          <div className="fw-semibold">{location.name}</div>
+                          <small className="text-muted">Fee: ₵{parseFloat(location.fee || 0).toFixed(2)}</small>
+                        </div>
+                      ))
+                    )}
+                    {/* Show "Other" option at the bottom */}
+                    <div
+                      className="p-2 border-top cursor-pointer text-primary"
+                      style={{ 
+                        cursor: 'pointer',
+                        backgroundColor: '#f8f9fa'
+                      }}
+                      onClick={() => {
+                        setDeliveryLocation('Other');
+                        setLocationSearchTerm('');
+                        setShowLocationDropdown(false);
+                      }}
+                    >
+                      🏠 Other (Custom Location)
+                    </div>
+                    {/* Show no results message if needed */}
+                    {filteredDeliveryLocations.length === 0 && locationSearchTerm && (
+                      <div className="p-2 text-muted text-center">
+                        No locations found
+                      </div>
+                    )}
+                  </div>
+                )}
                       </div>
                       <Form.Control.Feedback type="invalid">{errors.deliveryLocation}</Form.Control.Feedback>
                     </Form.Group>
@@ -873,7 +991,7 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
                 )}
                 
                 {/* Custom Location Fields - Show when "Other" is selected */}
-                {deliveryType === 'Delivery' && deliveryLocation === 'Other' && (
+                {deliveryType === 'Delivery' && deliveryLocation === 'Other' && !isMobile && (
                   <>
                     <Col md={6}>
                       <Form.Group controlId="customLocationName">
@@ -911,7 +1029,7 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
                   </>
                 )}
                 
-                {deliveryType === 'Delivery' && (
+                {deliveryType === 'Delivery' && !isMobile && (
                   <Col md={4}>
                     <Form.Group controlId="customerPhone">
                       <Form.Label className="fw-semibold">
@@ -1371,6 +1489,292 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
               {isMobile ? 'Save' : 'Save Notes'}
             </Button>
           </div>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Delivery Details Modal for Mobile */}
+      <Modal 
+        show={showDeliveryModal && isMobile} 
+        onHide={() => {
+          // Reset to pickup if no location selected
+          if (!deliveryLocation && !customerPhone) {
+            setDeliveryType('Pickup');
+          }
+          setShowDeliveryModal(false);
+        }} 
+        centered
+        size="lg"
+        fullscreen="sm-down"
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>
+            <i className="bi bi-truck me-2"></i>
+            Delivery Details
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form>
+            {/* Delivery Location */}
+            <Form.Group className="mb-3" controlId="deliveryModalLocation">
+              <Form.Label className="fw-semibold">
+                Delivery Location <span className="text-danger">*</span>
+              </Form.Label>
+              <div className="position-relative" data-location-search>
+                <Form.Control
+                  type="text"
+                  value={locationSearchTerm}
+                  onChange={(e) => {
+                    const newValue = e.target.value;
+                    setLocationSearchTerm(newValue);
+                    
+                    // Clear any existing timeout
+                    if (searchTimeoutRef.current) {
+                      clearTimeout(searchTimeoutRef.current);
+                    }
+                    
+                    // Debounce dropdown showing to prevent erratic behavior
+                    searchTimeoutRef.current = setTimeout(() => {
+                      // Only show dropdown if not setting up custom location and locations are loaded
+                      if (deliveryLocation !== 'Other' && !loadingLocations && newValue.length > 0) {
+                        setShowLocationDropdown(true);
+                      } else if (newValue.length === 0) {
+                        setShowLocationDropdown(false);
+                      }
+                    }, 150); // 150ms debounce
+                    
+                    // Clear delivery location if search term is cleared
+                    if (newValue === '') {
+                      setDeliveryLocation('');
+                      setShowLocationDropdown(false);
+                    }
+                  }}
+                  onFocus={() => {
+                    // Only show dropdown if not setting up custom location and locations are loaded
+                    if (deliveryLocation !== 'Other' && !loadingLocations) {
+                      setShowLocationDropdown(true);
+                    }
+                  }}
+                  isInvalid={!!errors.deliveryLocation}
+                  className="ada-shadow-sm"
+                  style={{ minHeight: '44px', fontSize: '16px' }}
+                  placeholder={
+                    loadingLocations 
+                      ? '⏳ Loading locations...' 
+                      : deliveryLocation === 'Other'
+                        ? '🏠 Custom location - use fields below'
+                        : deliveryLocations.length === 0
+                          ? '📍 No locations available'
+                          : '📍 Search locations...'
+                  }
+                  disabled={loadingLocations || deliveryLocation === 'Other'}
+                />
+                {showLocationDropdown && !loadingLocations && deliveryLocation !== 'Other' && (
+                  <div 
+                    className="position-absolute w-100 bg-white border rounded shadow-lg" 
+                    style={{ 
+                      zIndex: 1050, 
+                      top: '100%', 
+                      maxHeight: '200px', 
+                      overflowY: 'auto',
+                      border: '1px solid #dee2e6'
+                    }}
+                  >
+                    {/* Show delivery locations first */}
+                    {deliveryLocations.length > 0 && filteredDeliveryLocations.length > 0 && (
+                      filteredDeliveryLocations.map(location => (
+                        <div
+                          key={location.id || location.name}
+                          className="p-2 border-bottom cursor-pointer"
+                          style={{ 
+                            cursor: 'pointer',
+                            '&:hover': { backgroundColor: '#f8f9fa' }
+                          }}
+                          onMouseEnter={(e) => e.target.style.backgroundColor = '#f8f9fa'}
+                          onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
+                          onClick={() => handleLocationSelect(location)}
+                        >
+                          <div className="fw-semibold">{location.name}</div>
+                          <small className="text-muted">Fee: ₵{parseFloat(location.fee || 0).toFixed(2)}</small>
+                        </div>
+                      ))
+                    )}
+                    {/* Show "Other" option at the bottom */}
+                    <div
+                      className="p-2 border-top cursor-pointer text-primary fw-semibold"
+                      style={{ 
+                        cursor: 'pointer',
+                        backgroundColor: '#f8f9fa'
+                      }}
+                      onClick={() => {
+                        setDeliveryLocation('Other');
+                        setLocationSearchTerm('');
+                        setShowLocationDropdown(false);
+                      }}
+                    >
+                      🏠 Other (Custom Location)
+                    </div>
+                    {/* Show no results message if needed */}
+                    {filteredDeliveryLocations.length === 0 && locationSearchTerm && (
+                      <div className="p-2 text-muted text-center">
+                        No locations found
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              <Form.Control.Feedback type="invalid">{errors.deliveryLocation}</Form.Control.Feedback>
+            </Form.Group>
+
+            {/* Custom Location Fields - Show when "Other" is selected */}
+            {deliveryLocation === 'Other' && (
+              <>
+                <Form.Group className="mb-3" controlId="deliveryModalCustomLocation">
+                  <Form.Label className="fw-semibold">
+                    Custom Location Name <span className="text-danger">*</span>
+                  </Form.Label>
+                  <Form.Control
+                    type="text"
+                    value={customLocationName}
+                    onChange={(e) => setCustomLocationName(e.target.value)}
+                    isInvalid={!!errors.customLocationName}
+                    placeholder="Enter location name"
+                    className="ada-shadow-sm"
+                    style={{ minHeight: '44px', fontSize: '16px' }}
+                  />
+                  <Form.Control.Feedback type="invalid">{errors.customLocationName}</Form.Control.Feedback>
+                </Form.Group>
+                <Form.Group className="mb-3" controlId="deliveryModalCustomFee">
+                  <Form.Label className="fw-semibold">
+                    Custom Delivery Fee (₵) <span className="text-danger">*</span>
+                  </Form.Label>
+                  <Form.Control
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    step="0.01"
+                    value={customLocationFee}
+                    onChange={(e) => setCustomLocationFee(e.target.value)}
+                    isInvalid={!!errors.customLocationFee}
+                    placeholder="0.00"
+                    className="ada-shadow-sm"
+                    style={{ minHeight: '44px', fontSize: '16px' }}
+                  />
+                  <Form.Control.Feedback type="invalid">{errors.customLocationFee}</Form.Control.Feedback>
+                </Form.Group>
+              </>
+            )}
+
+            {/* Customer Phone */}
+            <Form.Group className="mb-3" controlId="deliveryModalPhone">
+              <Form.Label className="fw-semibold">
+                Customer Phone <span className="text-danger">*</span>
+              </Form.Label>
+              <Form.Control
+                type="tel"
+                inputMode="tel"
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value)}
+                isInvalid={!!errors.customerPhone}
+                placeholder="0XXXXXXXXX or +233XXXXXXXXX"
+                className="ada-shadow-sm"
+                style={{ minHeight: '44px', fontSize: '16px' }}
+              />
+              <Form.Control.Feedback type="invalid">{errors.customerPhone}</Form.Control.Feedback>
+            </Form.Group>
+
+            {/* Delivery Summary */}
+            {(deliveryLocation || customerPhone) && (
+              <div className="mt-4 p-3 bg-light rounded">
+                <h6 className="mb-2">Delivery Summary</h6>
+                {customerPhone && (
+                  <div className="d-flex justify-content-between mb-1">
+                    <span>Phone:</span>
+                    <span className="fw-semibold">{customerPhone}</span>
+                  </div>
+                )}
+                {deliveryLocation && (
+                  <>
+                    <div className="d-flex justify-content-between mb-1">
+                      <span>Location:</span>
+                      <span className="fw-semibold">
+                        {deliveryLocation === 'Other' ? (customLocationName || 'Custom Location') : deliveryLocation}
+                      </span>
+                    </div>
+                    <div className="d-flex justify-content-between mb-1">
+                      <span>Delivery Fee:</span>
+                      <span className="fw-semibold text-success">
+                        ₵{currentDeliveryFee.toFixed(2)}
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </Form>
+        </Modal.Body>
+        <Modal.Footer className="d-flex flex-column flex-sm-row gap-2">
+          <Button 
+            variant="secondary" 
+            className="w-100 w-sm-auto order-2 order-sm-1"
+            onClick={() => {
+              // Reset to pickup and clear fields
+              setDeliveryType('Pickup');
+              setDeliveryLocation('');
+              setCustomerPhone('');
+              setCustomLocationName('');
+              setCustomLocationFee('');
+              setLocationSearchTerm('');
+              setShowLocationDropdown(false);
+              setShowDeliveryModal(false);
+            }}
+          >
+            <i className="bi bi-x-circle me-2"></i>
+            Cancel Delivery
+          </Button>
+          <Button 
+            variant="primary" 
+            className="w-100 w-sm-auto order-1 order-sm-2"
+            onClick={() => {
+              // Validate delivery fields
+              let hasErrors = false;
+              let modalErrors = {};
+              
+              if (!customerPhone.trim()) {
+                modalErrors.customerPhone = 'Customer phone is required for delivery orders';
+                hasErrors = true;
+              } else if (!/^(\+233|0)\d{9}$/.test(customerPhone.trim())) {
+                modalErrors.customerPhone = 'Invalid Ghana phone format';
+                hasErrors = true;
+              }
+              
+              if (!deliveryLocation) {
+                modalErrors.deliveryLocation = 'Delivery location is required';
+                hasErrors = true;
+              } else if (deliveryLocation === 'Other') {
+                if (!customLocationName.trim()) {
+                  modalErrors.customLocationName = 'Custom location name is required';
+                  hasErrors = true;
+                }
+                if (!customLocationFee.trim()) {
+                  modalErrors.customLocationFee = 'Custom location fee is required';
+                  hasErrors = true;
+                } else if (isNaN(parseFloat(customLocationFee)) || parseFloat(customLocationFee) < 0) {
+                  modalErrors.customLocationFee = 'Please enter a valid fee amount';
+                  hasErrors = true;
+                }
+              }
+              
+              if (hasErrors) {
+                setErrors(modalErrors);
+              } else {
+                setErrors({});
+                setShowDeliveryModal(false);
+              }
+            }}
+          >
+            <i className="bi bi-check-circle me-2"></i>
+            Confirm Delivery
+          </Button>
         </Modal.Footer>
       </Modal>
 

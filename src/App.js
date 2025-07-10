@@ -12,6 +12,7 @@ import EditOrderPage from './pages/EditOrderPage';
 import ViewOrdersPage from './components/ViewOrdersPage';
 import ViewMenuPage from './components/ViewMenuPage';
 import ViewTransactionsPage from './components/ViewTransactionsPage';
+import AuditLogViewer from './components/AuditLogViewer';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Navbar from './components/Navbar';
@@ -114,6 +115,11 @@ function AppContent() {
         <Route 
           path="/view-transactions" 
           element={userData ? <ViewTransactionsPage /> : <Navigate to="/login" />} 
+        />
+        <Route path="/audit-logs" 
+          element={userData && (userData.role === 'admin' || userData.role === 'superadmin') ? 
+            <AuditLogViewer /> : 
+            <Navigate to="/dashboard" />} 
         />
         <Route path="*" element={<Navigate to={userData ? "/dashboard" : "/login"} />} /> 
       </Routes>
