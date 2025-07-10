@@ -34,7 +34,7 @@ const DashboardPage = ({ userData }) => {
   // Custom styles for mobile optimization
   const mobileCardStyle = {
     cursor: 'pointer',
-    minHeight: isMobile ? '120px' : '160px', // Smaller height on mobile
+    minHeight: isMobile ? '140px' : '160px', // Slightly bigger height on mobile
     transition: 'all 0.3s ease'
   };
 
@@ -88,11 +88,14 @@ const DashboardPage = ({ userData }) => {
               style={mobileCardStyle}
               onClick={() => handleDashboardAction(item.title, item.route)}
             >
-              <Card.Body className={isMobile ? "py-2 px-2 d-flex flex-column align-items-center text-center" : "py-4 px-3 d-flex flex-column align-items-center text-center"}>
-                <div className="ada-text-primary mb-2" style={{ fontSize: isMobile ? 'clamp(1.8rem, 4vw, 2.2rem)' : 'clamp(2.5rem, 5vw, 3rem)' }}>
+              <Card.Body className={isMobile ? "py-3 px-2 d-flex flex-column align-items-center justify-content-center text-center" : "py-4 px-3 d-flex flex-column align-items-center text-center"}>
+                <div className="ada-text-primary mb-2" style={{ fontSize: isMobile ? 'clamp(2rem, 5vw, 2.5rem)' : 'clamp(2.5rem, 5vw, 3rem)' }}>
                   <i className={item.icon}></i>
                 </div>
-                <h6 className={`ada-text-primary mb-1 text-center ${isMobile ? '' : 'h5'}`} style={{ fontSize: isMobile ? '0.8rem' : undefined }}>{item.title}</h6>
+                <h6 className={`ada-text-primary mb-1 text-center ${isMobile ? '' : 'h5'}`} style={{ fontSize: isMobile ? '0.95rem' : undefined, fontWeight: '600' }}>{item.title}</h6>
+                {isMobile && (
+                  <p className="text-muted small mb-0 px-1 text-center" style={{ fontSize: '0.75rem', lineHeight: '1.3' }}>{item.description}</p>
+                )}
                 {!isMobile && (
                   <p className="text-muted small mb-0 px-2">{item.description}</p>
                 )}
