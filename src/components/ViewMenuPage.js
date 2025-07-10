@@ -5,9 +5,11 @@ import { toast } from 'react-toastify';
 import { API_BASE_URL } from '../utils/api';
 import { tokenFetch } from '../utils/tokenFetch';
 import { menuCacheService } from '../services/menuCacheService';
+import { useAuth } from '../contexts/AuthContext';
 
 const ViewMenuPage = () => {
     const navigate = useNavigate();
+    const { userData } = useAuth();
     const [menuItems, setMenuItems] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -124,6 +126,11 @@ const ViewMenuPage = () => {
     try {
       const response = await tokenFetch(`${API_BASE_URL}/menu/items/${itemId}/toggle-availability/`, {
         method: 'PUT',
+        body: JSON.stringify({
+          modified_by: userData?.id || userData?.user_id,
+          modified_by_username: userData?.username,
+          modified_by_role: userData?.role || userData?.user_role
+        }),
       });
 
       if (!response.ok) {

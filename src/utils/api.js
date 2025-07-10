@@ -137,5 +137,8 @@ export const API_ENDPOINTS = {
   PROFILE: `${API_BASE_URL}/users/profile/`,
   PAYMENTS: `${API_BASE_URL}/payments/`,
   HEALTH: `${API_BASE_URL}/health/`,
+  AUDIT: `${API_BASE_URL}/audit/`,
+  AUDIT_LOGS: `${API_BASE_URL}/audit/logs/`,
+  AUDIT_DASHBOARD: `${API_BASE_URL}/audit/dashboard/`,
 };
 

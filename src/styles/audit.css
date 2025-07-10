@@ -1,0 +1,292 @@
+/* Audit Log Styles */
+
+.audit-log-item {
+  transition: background-color 0.2s ease;
+}
+
+.audit-log-item:hover {
+  background-color: rgba(0, 123, 255, 0.05);
+}
+
+.activity-item {
+  transition: background-color 0.2s ease;
+}
+
+.activity-item:hover {
+  background-color: rgba(0, 123, 255, 0.05);
+}
+
+/* Audit badge styles */
+.audit-action-badge {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+}
+
+/* Audit log viewer styles */
+.audit-logs {
+  max-width: 100%;
+}
+
+.audit-log-viewer h2 {
+  color: var(--ada-primary, #007bff);
+  margin-bottom: 1rem;
+}
+
+.audit-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.audit-stat-card {
+  text-align: center;
+  padding: 1.5rem;
+  border: 1px solid #dee2e6;
+  border-radius: 0.5rem;
+  background: white;
+}
+
+.audit-stat-value {
+  font-size: 2rem;
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+}
+
+.audit-stat-label {
+  font-size: 0.875rem;
+  color: #6c757d;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Filter section styles */
+.audit-filters {
+  background: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  margin-bottom: 2rem;
+}
+
+.audit-filters .form-label {
+  font-weight: 600;
+  color: #495057;
+  margin-bottom: 0.5rem;
+}
+
+/* Activity list styles */
+.audit-activity-list {
+  border: 1px solid #dee2e6;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.audit-activity-item {
+  padding: 1rem;
+  border-bottom: 1px solid #e9ecef;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.audit-activity-item:last-child {
+  border-bottom: none;
+}
+
+.audit-activity-item:hover {
+  background-color: #f8f9fa;
+}
+
+.audit-activity-meta {
+  font-size: 0.75rem;
+  color: #6c757d;
+}
+
+.audit-change-item {
+  background: #e9ecef;
+  padding: 0.25rem 0.5rem;
+  margin: 0.125rem 0;
+  border-radius: 0.25rem;
+  font-family: 'Courier New', monospace;
+  font-size: 0.75rem;
+}
+
+/* Modal styles */
+.audit-modal .modal-header {
+  background: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.audit-modal .pre-code {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 0.25rem;
+  padding: 1rem;
+  font-size: 0.8rem;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* Dashboard widget styles */
+.audit-dashboard-widget {
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 0.5rem;
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.audit-dashboard-widget .card-header {
+  background: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
+  font-weight: 600;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .audit-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+  
+  .audit-stat-card {
+    padding: 1rem;
+  }
+  
+  .audit-stat-value {
+    font-size: 1.5rem;
+  }
+  
+  .audit-filters {
+    padding: 1rem;
+  }
+  
+  .audit-activity-item {
+    padding: 0.75rem;
+  }
+}
+
+@media (max-width: 576px) {
+  .audit-stats-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .audit-activity-meta {
+    font-size: 0.7rem;
+  }
+  
+  .audit-change-item {
+    font-size: 0.7rem;
+  }
+}
+
+/* Loading states */
+.audit-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  color: #6c757d;
+}
+
+.audit-loading .spinner-border {
+  margin-right: 0.75rem;
+}
+
+/* Error states */
+.audit-error {
+  background: #f8d7da;
+  border: 1px solid #f5c6cb;
+  color: #721c24;
+  padding: 1rem;
+  border-radius: 0.25rem;
+  margin: 1rem 0;
+}
+
+/* Success states */
+.audit-success {
+  background: #d4edda;
+  border: 1px solid #c3e6cb;
+  color: #155724;
+  padding: 1rem;
+  border-radius: 0.25rem;
+  margin: 1rem 0;
+}
+
+/* Utility classes */
+.audit-text-primary {
+  color: var(--ada-primary, #007bff) !important;
+}
+
+.audit-text-success {
+  color: #28a745 !important;
+}
+
+.audit-text-warning {
+  color: #ffc107 !important;
+}
+
+.audit-text-danger {
+  color: #dc3545 !important;
+}
+
+.audit-text-info {
+  color: #17a2b8 !important;
+}
+
+.audit-bg-light {
+  background-color: #f8f9fa !important;
+}
+
+/* Animation classes */
+.audit-fade-in {
+  animation: auditFadeIn 0.3s ease-in-out;
+}
+
+@keyframes auditFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.audit-slide-in {
+  animation: auditSlideIn 0.4s ease-out;
+}
+
+@keyframes auditSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Custom scrollbar for audit content */
+.audit-scrollable {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.audit-scrollable::-webkit-scrollbar {
+  width: 6px;
+}
+
+.audit-scrollable::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.audit-scrollable::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.audit-scrollable::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}

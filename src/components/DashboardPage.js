@@ -3,6 +3,7 @@ import { Container, Row, Col, Card } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import optimizedToast, { contextToast } from '../utils/toastUtils';
 import RecentActivityCard from './RecentActivityCard';
+import AuditActivityCard from './AuditActivityCard';
 
 const DashboardPage = ({ userData }) => {
   const navigate = useNavigate();
@@ -33,7 +34,7 @@ const DashboardPage = ({ userData }) => {
   // Custom styles for mobile optimization
   const mobileCardStyle = {
     cursor: 'pointer',
-    minHeight: '160px', // Ensure consistent height
+    minHeight: isMobile ? '120px' : '160px', // Smaller height on mobile
     transition: 'all 0.3s ease'
   };
 
@@ -64,22 +65,37 @@ const DashboardPage = ({ userData }) => {
     },
   ];
 
+  // Add audit logs item for admin/superadmin users
+  const adminItems = [];
+  if (userData && (userData.role === 'admin' || userData.role === 'superadmin')) {
+    adminItems.push({
+      title: 'Audit Logs',
+      route: '/audit-logs',
+      description: 'View system activity logs and user actions',
+      icon: 'bi bi-shield-check'
+    });
+  }
+
+  const allDashboardItems = [...dashboardItems, ...adminItems];
+
   return (
-      <Container className="my-3 my-md-4 px-3 px-md-4">
-        <Row className="g-3 g-md-4">
-        {dashboardItems.map((item) => (
-          <Col xs={12} sm={6} lg={3} key={item.title}>
+      <Container className={isMobile ? "my-2 px-2" : "my-3 my-md-4 px-3 px-md-4"}>
+        <Row className={isMobile ? "g-2" : "g-3 g-md-4"}>
+        {allDashboardItems.map((item) => (
+          <Col xs={6} sm={6} lg={3} key={item.title}>
             <Card 
               className="h-100 mobile-friendly-card" 
               style={mobileCardStyle}
               onClick={() => handleDashboardAction(item.title, item.route)}
             >
-              <Card.Body className="py-4 px-3 d-flex flex-column align-items-center text-center">
-                <div className="ada-text-primary mb-3" style={{ fontSize: 'clamp(2.5rem, 5vw, 3rem)' }}>
+              <Card.Body className={isMobile ? "py-2 px-2 d-flex flex-column align-items-center text-center" : "py-4 px-3 d-flex flex-column align-items-center text-center"}>
+                <div className="ada-text-primary mb-2" style={{ fontSize: isMobile ? 'clamp(1.8rem, 4vw, 2.2rem)' : 'clamp(2.5rem, 5vw, 3rem)' }}>
                   <i className={item.icon}></i>
                 </div>
-                <h5 className="ada-text-primary mb-2">{item.title}</h5>
-                <p className="text-muted small mb-0 px-2">{item.description}</p>
+                <h6 className={`ada-text-primary mb-1 text-center ${isMobile ? '' : 'h5'}`} style={{ fontSize: isMobile ? '0.8rem' : undefined }}>{item.title}</h6>
+                {!isMobile && (
+                  <p className="text-muted small mb-0 px-2">{item.description}</p>
+                )}
               </Card.Body>
             </Card>
           </Col>
@@ -88,16 +104,26 @@ const DashboardPage = ({ userData }) => {
 
 
       {/* Recent Activity Card */}
-      <Row className="mt-4">
-        <Col xs={12}>
+      <Row className={isMobile ? "mt-3" : "mt-4"}>
+        <Col xs={12} lg={8}>
           <RecentActivityCard 
-            maxItems={5}
+            maxItems={isMobile ? 4 : 5}
             showFullHistory={true}
             refreshInterval={60000}
             className="ada-fade-in"
           />
         </Col>
-        </Row>
+        
+        {/* Audit Activity Card - Only show for admin/superadmin */}
+        {userData && (userData.role === 'admin' || userData.role === 'superadmin') && (
+          <Col xs={12} lg={4}>
+            <AuditActivityCard 
+              maxItems={5}
+              className="ada-fade-in"
+            />
+          </Col>
+        )}
+      </Row>
       </Container>
   );
 };
