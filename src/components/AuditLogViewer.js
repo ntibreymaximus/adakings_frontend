@@ -68,7 +68,7 @@ const AuditLogViewer = () => {
     if (filters.search && searchTerm !== filters.search) {
       setSearchTerm(filters.search);
     }
-  }, [filters.search]);
+  }, [filters.search, searchTerm]);
 
   const getActionBadgeVariant = (action) => {
     switch (action) {

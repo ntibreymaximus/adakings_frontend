@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Spinner, Alert, Badge } from 'react-bootstrap';
+import { Card, Spinner, Alert, Badge, Modal, Button } from 'react-bootstrap';
 import { API_BASE_URL } from '../utils/api';
 import { useNavigate } from 'react-router-dom';
 import { getRelativeTime } from '../services/activityService';
@@ -26,6 +26,8 @@ const RecentActivityCard = ({
   const [showTodayOnly, setShowTodayOnly] = useState(true);
   const [lastFetchTime, setLastFetchTime] = useState(0);
   const [isCurrentlyFetching, setIsCurrentlyFetching] = useState(false);
+  const [showAllActivityModal, setShowAllActivityModal] = useState(false);
+  const [allActivitiesForModal, setAllActivitiesForModal] = useState([]);
 
   // Fetch recent activity data with intelligent throttling
   const fetchRecentActivity = async (forceRefresh = false) => {
@@ -319,7 +321,8 @@ let allActivities = [];
 
       const mergedActivities = filteredActivities.slice(0, maxItems);
       
-
+      // Store all activities for modal (not limited by maxItems)
+      setAllActivitiesForModal(filteredActivities);
       setActivities(mergedActivities);
       setLastUpdated(new Date());
       setRetryCount(0);
@@ -358,9 +361,9 @@ let allActivities = [];
     fetchRecentActivity(true); // Force refresh on manual action
   };
 
-  // Navigate to full activity history
+  // Show all activity in modal
   const handleViewAllActivity = () => {
-    navigate('/view-orders');
+    setShowAllActivityModal(true);
   };
 
   // Handle activity item click
@@ -432,7 +435,8 @@ let allActivities = [];
   }
 
   return (
-    <Card className={`ada-quick-action-card ${className}`} style={style}>
+    <>
+      <Card className={`ada-quick-action-card ${className}`} style={style}>
       <Card.Header className="d-flex justify-content-between align-items-center">
         <span>
           <i className="bi bi-clock-history me-2"></i>
@@ -469,20 +473,20 @@ let allActivities = [];
               {activities.map((activity, index) => (
                 <div 
                   key={activity.id || `activity-${index}`}
-                  className="list-group-item list-group-item-action border-0 py-2 px-3"
+                  className="list-group-item list-group-item-action border-0 py-2 px-2"
                   style={{ cursor: 'pointer' }}
                   onClick={() => handleActivityClick(activity)}
                 >
                   <div className="d-flex align-items-center">
                     {/* Activity Icon */}
                     <div 
-                      className="flex-shrink-0 me-3 rounded-circle d-flex align-items-center justify-content-center"
+                      className="flex-shrink-0 me-2 rounded-circle d-flex align-items-center justify-content-center"
                       style={{
-                        width: '40px',
-                        height: '40px',
+                        width: '32px',
+                        height: '32px',
                         backgroundColor: activity.colorTag || '#666',
                         color: 'white',
-                        fontSize: '1.1rem'
+                        fontSize: '0.9rem'
                       }}
                     >
                       <i className={activity.iconType || 'bi bi-circle'}></i>
@@ -490,13 +494,13 @@ let allActivities = [];
                     
                     {/* Activity Content */}
                     <div className="flex-grow-1 min-w-0">
-                      <div className="fw-semibold text-dark mb-1" style={{ fontSize: '0.9rem' }}>
+                      <div className="fw-semibold text-dark" style={{ fontSize: '0.85rem', lineHeight: '1.2' }}>
                         {activity.title}
                       </div>
-                      <div className="text-muted small">
+                      <div className="text-muted" style={{ fontSize: '0.75rem', lineHeight: '1.3' }}>
                         {activity.description}
                       </div>
-                      <div className="text-muted" style={{ fontSize: '0.75rem' }}>
+                      <div className="text-muted" style={{ fontSize: '0.7rem', marginTop: '2px' }}>
                         {getSafeRelativeTime(activity.timestamp)}
                       </div>
                     </div>
@@ -504,20 +508,20 @@ let allActivities = [];
                     {/* Activity Amount/Status */}
                     <div className="flex-shrink-0 text-end ms-2">
                       {activity.amount && (
-                        <div className="fw-bold small text-success">
+                        <div className="fw-bold text-success" style={{ fontSize: '0.8rem' }}>
                           GH₵ {parseFloat(activity.amount).toFixed(2)}
                         </div>
                       )}
                       {activity.status && (
-                        <div className={`badge ${getStatusBadgeClass(activity.status)} small`}>
+                        <div className={`badge ${getStatusBadgeClass(activity.status)}`} style={{ fontSize: '0.65rem', padding: '0.2rem 0.4rem' }}>
                           {activity.status}
                         </div>
                       )}
                     </div>
                     
                     {/* Chevron */}
-                    <div className="flex-shrink-0 ms-2 text-muted">
-                      <i className="bi bi-chevron-right"></i>
+                    <div className="flex-shrink-0 ms-1 text-muted">
+                      <i className="bi bi-chevron-right" style={{ fontSize: '0.8rem' }}></i>
                     </div>
                   </div>
                 </div>
@@ -566,7 +570,112 @@ let allActivities = [];
           </small>
         </div>
       )}
-    </Card>
+      </Card>
+
+      {/* All Activity Modal */}
+      <Modal 
+        show={showAllActivityModal} 
+        onHide={() => setShowAllActivityModal(false)} 
+        size="lg" 
+        scrollable
+        centered
+        fullscreen="sm-down"
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>
+            <i className="bi bi-clock-history me-2"></i>
+            All Activity {showTodayOnly ? '(Today)' : '(Last 7 Days)'}
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {allActivitiesForModal.length > 0 ? (
+            <div className="list-group list-group-flush">
+              {allActivitiesForModal.map((activity, index) => (
+                <div 
+                  key={activity.id || `activity-modal-${index}`}
+                  className="list-group-item list-group-item-action border-0 py-3"
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => {
+                    setShowAllActivityModal(false);
+                    handleActivityClick(activity);
+                  }}
+                >
+                  <div className="d-flex align-items-start">
+                    {/* Activity Icon */}
+                    <div 
+                      className="flex-shrink-0 me-3 rounded-circle d-flex align-items-center justify-content-center"
+                      style={{
+                        width: '40px',
+                        height: '40px',
+                        backgroundColor: activity.colorTag || '#666',
+                        color: 'white',
+                        fontSize: '1rem'
+                      }}
+                    >
+                      <i className={activity.iconType || 'bi bi-circle'}></i>
+                    </div>
+                    
+                    {/* Activity Content */}
+                    <div className="flex-grow-1">
+                      <div className="d-flex justify-content-between align-items-start mb-1">
+                        <h6 className="mb-0 fw-semibold">{activity.title}</h6>
+                        {activity.amount && (
+                          <span className="fw-bold text-success">
+                            GH₵ {parseFloat(activity.amount).toFixed(2)}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-muted mb-1" style={{ fontSize: '0.9rem' }}>
+                        {activity.description}
+                      </p>
+                      <div className="d-flex justify-content-between align-items-center">
+                        <small className="text-muted">
+                          <i className="bi bi-clock me-1"></i>
+                          {getSafeRelativeTime(activity.timestamp)}
+                        </small>
+                        {activity.status && (
+                          <span className={`badge ${getStatusBadgeClass(activity.status)}`}>
+                            {activity.status}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-5">
+              <i className="bi bi-clock-history text-muted" style={{ fontSize: '3rem' }}></i>
+              <h5 className="text-muted mt-3">No Activity Found</h5>
+              <p className="text-muted">
+                {showTodayOnly ? 'No activity for today.' : 'No activity in the last 7 days.'}
+              </p>
+              <Button 
+                variant="outline-primary" 
+                size="sm"
+                onClick={() => {
+                  setShowTodayOnly(!showTodayOnly);
+                  fetchRecentActivity(true);
+                }}
+              >
+                {showTodayOnly ? 'Show All Activities' : 'Show Today Only'}
+              </Button>
+            </div>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <div className="d-flex justify-content-between align-items-center w-100">
+            <small className="text-muted">
+              Showing {allActivitiesForModal.length} activities
+            </small>
+            <Button variant="secondary" onClick={() => setShowAllActivityModal(false)}>
+              Close
+            </Button>
+          </div>
+        </Modal.Footer>
+      </Modal>
+    </>
   );
 };
 

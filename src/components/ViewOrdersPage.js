@@ -1027,11 +1027,11 @@ const ViewOrdersPage = memo(() => {
           </Button>
           {isMobile && (
             <Button
-              variant="outline-secondary"
-              size="sm"
-              onClick={() => setShowStatsModal(true)}
-              className="d-flex align-items-center ada-shadow-sm"
-              style={{ minHeight: '44px' }}
+            variant="primary"
+            size="sm"
+            onClick={() => setShowStatsModal(true)}
+            className="d-flex align-items-center ada-shadow-sm ms-auto"
+            style={{ minHeight: '44px', color: 'white', fontWeight: '500' }}
             >
               <i className="bi bi-bar-chart-line me-2"></i>
               <span>View Stats</span>

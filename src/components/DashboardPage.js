@@ -35,7 +35,8 @@ const DashboardPage = ({ userData }) => {
   const mobileCardStyle = {
     cursor: 'pointer',
     minHeight: isMobile ? '140px' : '160px', // Slightly bigger height on mobile
-    transition: 'all 0.3s ease'
+    transition: 'all 0.3s ease',
+    borderRadius: '12px' // Add rounded corners
   };
 
   const dashboardItems = [

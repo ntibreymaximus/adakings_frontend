@@ -1152,10 +1152,15 @@ body {
 }
 
 /* Mobile-friendly dashboard card enhancements */
+.mobile-friendly-card {
+  border-radius: 12px !important;
+}
+
 @media (max-width: 576px) {
   .mobile-friendly-card {
     margin-bottom: 0.75rem;
     box-shadow: var(--ada-shadow-sm) !important;
+    border-radius: 12px !important;
   }
   
   .mobile-friendly-card:active {
