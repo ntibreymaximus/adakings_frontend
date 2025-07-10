@@ -34,18 +34,6 @@ const AuditLogViewer = () => {
   const { summary, actionBreakdown, topUsers, loading: dashboardLoading } = useAuditDashboard();
   const { total, analytics } = useAuditStats(logs);
 
-  // Permission check
-  if (!userData || (userData.role !== 'admin' && userData.role !== 'superadmin')) {
-    return (
-      <Container className="my-4">
-        <Alert variant="danger">
-          <Alert.Heading>Access Denied</Alert.Heading>
-          <p>You need administrator privileges to view audit logs.</p>
-        </Alert>
-      </Container>
-    );
-  }
-
   const handleFilterChange = (newFilters) => {
     updateFilters(newFilters);
   };
@@ -69,6 +57,18 @@ const AuditLogViewer = () => {
       setSearchTerm(filters.search);
     }
   }, [filters.search, searchTerm]);
+
+  // Permission check
+  if (!userData || (userData.role !== 'admin' && userData.role !== 'superadmin')) {
+    return (
+      <Container className="my-4">
+        <Alert variant="danger">
+          <Alert.Heading>Access Denied</Alert.Heading>
+          <p>You need administrator privileges to view audit logs.</p>
+        </Alert>
+      </Container>
+    );
+  }
 
   const getActionBadgeVariant = (action) => {
     switch (action) {

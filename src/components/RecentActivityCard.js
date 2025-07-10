@@ -28,6 +28,7 @@ const RecentActivityCard = ({
   const [isCurrentlyFetching, setIsCurrentlyFetching] = useState(false);
   const [showAllActivityModal, setShowAllActivityModal] = useState(false);
   const [allActivitiesForModal, setAllActivitiesForModal] = useState([]);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   // Fetch recent activity data with intelligent throttling
   const fetchRecentActivity = async (forceRefresh = false) => {
@@ -347,6 +348,16 @@ let allActivities = [];
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Handle window resize for mobile detection
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Auto-refresh interval
   useEffect(() => {
     if (refreshInterval > 0) {
@@ -603,13 +614,13 @@ let allActivities = [];
                   <div className="d-flex align-items-start">
                     {/* Activity Icon */}
                     <div 
-                      className="flex-shrink-0 me-3 rounded-circle d-flex align-items-center justify-content-center"
+                      className="flex-shrink-0 me-2 rounded-circle d-flex align-items-center justify-content-center"
                       style={{
-                        width: '40px',
-                        height: '40px',
+                        width: isMobile ? '32px' : '40px',
+                        height: isMobile ? '32px' : '40px',
                         backgroundColor: activity.colorTag || '#666',
                         color: 'white',
-                        fontSize: '1rem'
+                        fontSize: isMobile ? '0.8rem' : '1rem'
                       }}
                     >
                       <i className={activity.iconType || 'bi bi-circle'}></i>
@@ -618,14 +629,14 @@ let allActivities = [];
                     {/* Activity Content */}
                     <div className="flex-grow-1">
                       <div className="d-flex justify-content-between align-items-start mb-1">
-                        <h6 className="mb-0 fw-semibold">{activity.title}</h6>
+                        <h6 className="mb-0 fw-semibold" style={{ fontSize: isMobile ? '0.9rem' : '1rem' }}>{activity.title}</h6>
                         {activity.amount && (
-                          <span className="fw-bold text-success">
+                          <span className="fw-bold text-success" style={{ fontSize: isMobile ? '0.85rem' : '1rem' }}>
                             GH₵ {parseFloat(activity.amount).toFixed(2)}
                           </span>
                         )}
                       </div>
-                      <p className="text-muted mb-1" style={{ fontSize: '0.9rem' }}>
+                      <p className="text-muted mb-1" style={{ fontSize: isMobile ? '0.8rem' : '0.9rem' }}>
                         {activity.description}
                       </p>
                       <div className="d-flex justify-content-between align-items-center">
@@ -665,11 +676,19 @@ let allActivities = [];
           )}
         </Modal.Body>
         <Modal.Footer>
-          <div className="d-flex justify-content-between align-items-center w-100">
-            <small className="text-muted">
-              Showing {allActivitiesForModal.length} activities
-            </small>
-            <Button variant="secondary" onClick={() => setShowAllActivityModal(false)}>
+          <div className={isMobile ? "d-grid w-100" : "d-flex justify-content-between align-items-center w-100"}>
+            {!isMobile && (
+              <small className="text-muted">
+                Showing {allActivitiesForModal.length} activities
+              </small>
+            )}
+            <Button 
+              variant="secondary" 
+              onClick={() => setShowAllActivityModal(false)}
+              size={isMobile ? "sm" : undefined}
+              className={isMobile ? "py-2" : ""}
+            >
+              <i className="bi bi-x-circle me-2"></i>
               Close
             </Button>
           </div>

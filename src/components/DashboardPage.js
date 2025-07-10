@@ -34,7 +34,7 @@ const DashboardPage = ({ userData }) => {
   // Custom styles for mobile optimization
   const mobileCardStyle = {
     cursor: 'pointer',
-    minHeight: isMobile ? '140px' : '160px', // Slightly bigger height on mobile
+    minHeight: isMobile ? '140px' : '160px', // Original height
     transition: 'all 0.3s ease',
     borderRadius: '12px' // Add rounded corners
   };
