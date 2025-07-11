@@ -2,6 +2,44 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0] - 2025-07-11
+
+### 🚀 Development Release
+
+**📋 Release Information:**
+- **Environment**: dev
+- **Branch**: `dev/1.4.0`
+- **Version**: `1.4.0`
+- **Deployment Time**: 2025-07-11 12:13:37
+- **Description**: Development environment deployment with latest React components
+
+**📝 Changes Made:**
+React v1.4.0: Deploy to dev environment
+
+**📁 Files Modified:**
+  - Modified: `gitignore`
+  - Modified: `VERSION`
+  - Modified: `package.json`
+  - Changed: `public/icons/`
+  - Changed: `public/logo192.svg`
+  - Changed: `public/logo512.svg`
+  - Changed: `public/manifest.json`
+  - Changed: `public/sw.js`
+
+**🔄 Deployment Details:**
+- **Source Branch**: `dev/1.4.0`
+- **Target Branch**: `dev/1.4.0`
+- **Build Process**: Development build with source maps
+- **React Version**: Latest
+
+**🎯 Environment Specific Notes:**
+- Development environment deployment
+- Contains latest React components and changes
+- Used for integration testing before production
+- Devtest branch updated for continuous testing
+
+---
+
 ## [1.3.0] - 2025-07-11
 
 ### 🎯 Production Release

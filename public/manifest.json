@@ -1,0 +1,28 @@
+{
+  "short_name": "ADARESMANSYS",
+  "name": "Adakings Restaurant Management System",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "logo192.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192"
+    },
+    {
+      "src": "logo512.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#000000",
+  "background_color": "#ffffff",
+  "description": "A comprehensive restaurant management system for Adakings",
+  "categories": ["business", "productivity"],
+  "orientation": "any"
+}
