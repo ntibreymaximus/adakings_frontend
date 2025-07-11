@@ -12,7 +12,7 @@ const isLocalhost = Boolean(
 );
 
 export function register(config) {
-  // Enable service worker in both production and development
+  // Allow service worker in development for testing PWA features
   if ('serviceWorker' in navigator) {
     // The URL constructor is available in all browsers that support SW.
     const publicUrl = new URL(process.env.PUBLIC_URL, window.location.href);
@@ -88,12 +88,18 @@ function registerValidSW(swUrl, config) {
     .then((registration) => {
       console.log('Service Worker registered successfully:', registration);
       
-      // Set up periodic sync for background updates
-      if ('sync' in window.ServiceWorkerRegistration.prototype) {
+      // Set up periodic sync for background updates after activation
+      if ('sync' in registration) {
         console.log('Background sync is supported');
-        // Register sync events
-        registration.sync.register('sync-orders');
-        registration.sync.register('sync-profile');
+        // Wait for service worker to be active before registering sync
+        if (registration.active) {
+          try {
+            registration.sync.register('sync-orders');
+            registration.sync.register('sync-profile');
+          } catch (err) {
+            console.log('Sync registration will be attempted when SW is active');
+          }
+        }
       }
       
       // Handle service worker updates
@@ -190,11 +196,17 @@ export function setupOfflineHandlers() {
   window.addEventListener('online', () => {
     console.log('App is back online');
     // Trigger sync when back online
-    if ('serviceWorker' in navigator && 'sync' in window.ServiceWorkerRegistration.prototype) {
+    if ('serviceWorker' in navigator) {
       navigator.serviceWorker.ready.then((registration) => {
-        registration.sync.register('sync-orders');
-        registration.sync.register('sync-profile');
-        registration.sync.register('sync-all');
+        if ('sync' in registration && registration.active) {
+          try {
+            registration.sync.register('sync-orders');
+            registration.sync.register('sync-profile');
+            registration.sync.register('sync-all');
+          } catch (err) {
+            console.log('Sync registration deferred:', err.message);
+          }
+        }
       });
     }
     

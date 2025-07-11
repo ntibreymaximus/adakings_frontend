@@ -29,8 +29,10 @@ const LoginPage = () => {
           <Col xs={12} sm={10} md={8} lg={5}>
             {/* Brand Header */}
             <div className="text-center mb-3 mb-md-4">
+              <div className="mb-2">
+                <i className="bi bi-shop ada-text-primary" style={{ fontSize: 'clamp(3rem, 6vw, 4rem)' }}></i>
+              </div>
               <h1 className="ada-text-primary mb-1 mb-md-2" style={{ fontSize: 'clamp(2rem, 5vw, 2.5rem)' }}>
-                <i className="bi bi-shop me-2"></i>
                 ADARESMANSYS
               </h1>
               <p className="text-muted">Adakings Restaurant Management System</p>
@@ -125,6 +127,7 @@ const LoginPage = () => {
                 </div>
               </Card.Body>
             </Card>
+            
           </Col>
         </Row>
       </Container>

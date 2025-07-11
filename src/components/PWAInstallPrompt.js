@@ -18,22 +18,9 @@ const PWAInstallPrompt = () => {
   const [showPrompt, setShowPrompt] = useState(false);
   const [installing, setInstalling] = useState(false);
   const [installResult, setInstallResult] = useState(null);
-  const [dismissed, setDismissed] = useState(false);
   const [slideUp, setSlideUp] = useState(false);
 
-  // Check if install prompt was previously dismissed
-  useEffect(() => {
-    const dismissedTimestamp = localStorage.getItem('pwa-install-dismissed');
-    const oneDayAgo = Date.now() - (24 * 60 * 60 * 1000);
-    
-    // Reset dismissal after 24 hours
-    if (dismissedTimestamp && parseInt(dismissedTimestamp) < oneDayAgo) {
-      localStorage.removeItem('pwa-install-dismissed');
-      setDismissed(false);
-    } else if (dismissedTimestamp) {
-      setDismissed(true);
-    }
-  }, []);
+  // No longer persisting dismissal state - prompt will show on every reload if not installed
 
   // Show prompt when conditions are met
   useEffect(() => {
@@ -45,16 +32,27 @@ const PWAInstallPrompt = () => {
       return isMobileDevice || isMobileViewport;
     };
 
-    if (isInstallable && deferredPrompt && !isPWA && !dismissed && checkIsMobile()) {
+    const isMobileDevice = checkIsMobile();
+    
+    console.log('PWAInstallPrompt - Conditions check:', {
+      isInstallable,
+      hasDeferredPrompt: !!deferredPrompt,
+      isPWA,
+      isMobileDevice,
+      willShow: isInstallable && deferredPrompt && !isPWA && isMobileDevice
+    });
+    
+    if (isInstallable && deferredPrompt && !isPWA && isMobileDevice) {
       // Delay showing prompt by 3 seconds for better UX
       const timer = setTimeout(() => {
+        console.log('PWAInstallPrompt - Showing prompt after 3s delay');
         setShowPrompt(true);
         setTimeout(() => setSlideUp(true), 100);
       }, 3000);
       
       return () => clearTimeout(timer);
     }
-  }, [isInstallable, deferredPrompt, isPWA, dismissed]);
+  }, [isInstallable, deferredPrompt, isPWA]);
 
   const handleInstall = async () => {
     if (!deferredPrompt) return;
@@ -98,8 +96,6 @@ const PWAInstallPrompt = () => {
     setSlideUp(false);
     setTimeout(() => {
       setShowPrompt(false);
-      setDismissed(true);
-      localStorage.setItem('pwa-install-dismissed', Date.now().toString());
       
       // Track dismissal
       if (typeof gtag !== 'undefined') {
@@ -117,8 +113,15 @@ const PWAInstallPrompt = () => {
 
   // Don't render if conditions aren't met
   if (!showPrompt || isPWA || !isInstallable) {
+    console.log('PWAInstallPrompt - Not rendering:', {
+      showPrompt,
+      isPWA,
+      isInstallable
+    });
     return null;
   }
+  
+  console.log('PWAInstallPrompt - Rendering toast');
 
   return (
     <div className={`pwa-toast ${slideUp ? 'show' : ''}`}>
