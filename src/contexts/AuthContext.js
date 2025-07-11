@@ -74,6 +74,8 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('userData');
       localStorage.removeItem('token');
       localStorage.removeItem('refreshToken');
+      localStorage.removeItem('tokenExpiresAt');
+      localStorage.removeItem('refreshExpiresAt');
       
       // Clear any cached data
       localStorage.removeItem('instant_update_orders');
@@ -144,6 +146,19 @@ export const AuthProvider = ({ children }) => {
       const data = await response.json();
       localStorage.setItem('token', data.access);
       
+      // Store new refresh token if provided
+      if (data.refresh) {
+        localStorage.setItem('refreshToken', data.refresh);
+      }
+      
+      // Store token expiration info for proactive refresh
+      if (data.access_expires_at) {
+        localStorage.setItem('tokenExpiresAt', data.access_expires_at);
+      }
+      if (data.refresh_expires_at) {
+        localStorage.setItem('refreshExpiresAt', data.refresh_expires_at);
+      }
+      
       return data.access;
     } catch (error) {
       await logout('token_expired');
@@ -194,7 +209,7 @@ export const AuthProvider = ({ children }) => {
     setIsLoading(true);
     
     try {
-      const response = await fetch(`${API_BASE_URL}/users/login/`, {
+      const response = await fetch(`${API_BASE_URL}/token/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -233,6 +248,14 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('userData', JSON.stringify(data.user));
       localStorage.setItem('token', data.access);
       localStorage.setItem('refreshToken', data.refresh);
+      
+      // Store token expiration info for proactive refresh
+      if (data.access_expires_at) {
+        localStorage.setItem('tokenExpiresAt', data.access_expires_at);
+      }
+      if (data.refresh_expires_at) {
+        localStorage.setItem('refreshExpiresAt', data.refresh_expires_at);
+      }
       
       optimizedToast.success(`Welcome ${data.user.username || data.user.email}`);
       navigate('/dashboard');

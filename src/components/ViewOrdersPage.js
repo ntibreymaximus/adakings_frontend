@@ -529,8 +529,11 @@ const ViewOrdersPage = memo(() => {
             : order
         );
         setFilteredOrders(updatedFilteredOrders);
+      
         
-        
+        // Refresh the order data to reflect the latest changes
+        await refreshOrderData();
+
         contextToast.orderUpdated(newStatus);
         
         setShowStatusModal(false);

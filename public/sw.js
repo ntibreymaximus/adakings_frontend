@@ -14,7 +14,15 @@ self.addEventListener('fetch', event => {
       if (cachedResponse) {
         return cachedResponse;
       }
-      return fetch(event.request);
+      return fetch(event.request).catch(error => {
+        console.error('Fetch failed:', error);
+        // Return a fallback response or a custom error page
+        // You can customize this based on your needs
+        return new Response('Network error happened', {
+          status: 408,
+          headers: { 'Content-Type': 'text/plain' },
+        });
+      });
     })
   );
 });

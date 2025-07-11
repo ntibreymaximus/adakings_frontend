@@ -22,6 +22,46 @@ export const tokenFetch = async (url, options = {}) => {
 
   const response = await fetch(url, { ...options, headers });
   
+  // Check for token refresh warning headers from backend
+  const refreshWarning = response.headers.get('X-Token-Refresh-Warning');
+  const expiresIn = response.headers.get('X-Token-Expires-In');
+  
+  if (refreshWarning === 'true' && expiresIn) {
+    const expiresInSeconds = parseInt(expiresIn);
+    console.log(`⚠️ Token refresh warning: expires in ${expiresInSeconds} seconds`);
+    
+    // If token expires in less than 5 minutes, proactively refresh
+    if (expiresInSeconds < 300) {
+      console.log('🔄 Proactively refreshing token...');
+      try {
+        const refreshToken = localStorage.getItem('refreshToken');
+        if (refreshToken) {
+          const refreshResponse = await fetch(`${response.url.split('/api/')[0]}/api/token/refresh/`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ refresh: refreshToken })
+          });
+          
+          if (refreshResponse.ok) {
+            const refreshData = await refreshResponse.json();
+            localStorage.setItem('token', refreshData.access);
+            if (refreshData.refresh) {
+              localStorage.setItem('refreshToken', refreshData.refresh);
+            }
+            if (refreshData.access_expires_at) {
+              localStorage.setItem('tokenExpiresAt', refreshData.access_expires_at);
+            }
+            console.log('✅ Token refreshed successfully');
+          }
+        }
+      } catch (error) {
+        console.error('⚠️ Proactive token refresh failed:', error);
+      }
+    }
+  }
+  
   if (!response.ok) {
     if (response.status === 401) {
       // Token expired or invalid - clear storage and reload

@@ -569,6 +569,7 @@ const CreateOrderForm = ({ isEditMode: isEditModeProp = false }) => {
       if (isEditMode && existingOrder) {
         orderPayload.status = existingOrder.status;
         orderPayload.payment_status = existingOrder.payment_status;
+        // Don't send total_price - it's calculated by the backend
         // Don't modify payment amounts directly from order form
       }
 
@@ -577,21 +578,28 @@ const CreateOrderForm = ({ isEditMode: isEditModeProp = false }) => {
           // For custom locations, use the custom fields
           orderPayload.custom_delivery_location = customLocationName.trim();
           orderPayload.custom_delivery_fee = parseFloat(customLocationFee);
-          // Don't send delivery_location for custom locations
+          // Explicitly set delivery_location to null for custom locations
+          orderPayload.delivery_location = null;
         } else {
           // For predefined locations, use the delivery_location field
           orderPayload.delivery_location = deliveryLocation;
-          // Don't send custom fields for predefined locations
+          // Explicitly clear custom fields for predefined locations
+          orderPayload.custom_delivery_location = null;
+          orderPayload.custom_delivery_fee = null;
         }
+      } else {
+        // For pickup orders, explicitly clear all delivery fields
+        orderPayload.delivery_location = null;
+        orderPayload.custom_delivery_location = null;
+        orderPayload.custom_delivery_fee = null;
       }
-      // For pickup orders, don't send any delivery fields
 
       // Determine API endpoint and method based on edit mode
       const orderNumberForApi = existingOrder?.order_number || orderNumber;
       const apiUrl = isEditMode 
         ? `${API_ENDPOINTS.ORDERS}${orderNumberForApi}/`
         : API_ENDPOINTS.ORDERS;
-      const method = isEditMode ? 'PUT' : 'POST';
+      const method = isEditMode ? 'PATCH' : 'POST';
 
       const payloadTime = performance.now();
       console.log(`⏱️ Payload prepared in ${(payloadTime - startTime).toFixed(2)}ms`);
@@ -623,7 +631,14 @@ const CreateOrderForm = ({ isEditMode: isEditModeProp = false }) => {
       const actionText = isEditMode ? 'updated' : 'created';
       const locationText = deliveryType === 'Delivery' && deliveryLocation ? ` to ${deliveryLocation === 'Other' ? (customLocationName || 'Custom Location') : deliveryLocation}` : '';
       
-      optimizedToast.success(`Order ${result.order_number} ${actionText} - ₵${grandTotal.toFixed(2)}`);
+      // Use the backend calculated total price instead of frontend calculated
+      const finalTotal = result.total_price || grandTotal;
+      console.log('📊 Order total comparison:', {
+        frontend: grandTotal,
+        backend: result.total_price,
+        using: finalTotal
+      });
+      optimizedToast.success(`Order ${result.order_number} ${actionText} - ₵${parseFloat(finalTotal).toFixed(2)}`);
       
       // Clear form only if creating new order
       if (!isEditMode) {
