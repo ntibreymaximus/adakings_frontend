@@ -123,49 +123,7 @@ const PWAStatusIndicator = () => {
   const showStatusIndicator = displayMode !== 'browser' || isInstallable;
   const showPrompt = isInstallable && deferredPrompt && !isPWA && showInstallPrompt && (isMobile || isMobileView);
 
-  return (
-    <>
-      {/* Status indicator */}
-      {showStatusIndicator && (
-        <div className={`pwa-status-indicator bg-${getStatusColor()}`}>
-          {getStatusText()}
-        </div>
-      )}
-
-      {/* Install prompt - Toast style */}
-      {showPrompt && (
-        <div className="pwa-install-prompt" key="pwa-prompt">
-          <div className="pwa-prompt-info">
-            <i className="bi bi-download"></i>
-            <div>
-              <strong>Install ADARESMANSYS</strong>
-              <small>Add to home screen</small>
-            </div>
-          </div>
-          <div className="pwa-prompt-buttons">
-            <button 
-              className="install-button"
-              onClick={handleInstallClick}
-              disabled={installing}
-            >
-              {installing ? (
-                <span className="spinner-mini"></span>
-              ) : (
-                'Install'
-              )}
-            </button>
-            <button 
-              className="close-button"
-              onClick={handleClose}
-              aria-label="Close"
-            >
-              <i className="bi bi-x"></i>
-            </button>
-          </div>
-        </div>
-      )}
-    </>
-  );
+  return null; // Component disabled - both status indicator and install prompt removed
 };
 
 export default PWAStatusIndicator;
