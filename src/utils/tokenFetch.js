@@ -31,7 +31,64 @@ export const tokenFetch = async (url, options = {}) => {
       window.location.href = '/login';
       throw new Error('Authentication expired');
     }
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    
+    // Try to get error details from response body
+    let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+    let errorDetails = null;
+    try {
+      const errorData = await response.json();
+      errorDetails = errorData;
+      console.error('🔴 API Error Response:', errorData);
+      if (errorData.items && Array.isArray(errorData.items)) {
+        console.error('🔴 Items errors:', errorData.items);
+        errorData.items.forEach((itemError, index) => {
+          console.error(`🔴 Item error ${index}:`, itemError);
+        });
+      }
+      
+      if (errorData.detail) {
+        errorMessage = errorData.detail;
+      } else if (errorData.message) {
+        errorMessage = errorData.message;
+      } else if (errorData.error) {
+        errorMessage = errorData.error;
+      } else if (errorData.errors) {
+        // Handle validation errors
+        const errors = Object.entries(errorData.errors)
+          .map(([field, msgs]) => `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`)
+          .join('; ');
+        errorMessage = errors;
+      } else if (errorData.items && Array.isArray(errorData.items) && errorData.items.length > 0) {
+        // Handle items field errors
+        const itemErrors = errorData.items.map(item => {
+          if (typeof item === 'object') {
+            // Extract error messages from objects
+            return Object.entries(item)
+              .map(([field, error]) => `${field}: ${Array.isArray(error) ? error.join(', ') : error}`)
+              .join('; ');
+          }
+          return String(item);
+        });
+        errorMessage = 'Items error: ' + itemErrors.join('. ');
+      } else if (typeof errorData === 'string') {
+        errorMessage = errorData;
+      } else {
+        // Try to show any field that has an array of errors
+        const fieldsWithErrors = Object.entries(errorData)
+          .filter(([_, value]) => Array.isArray(value) && value.length > 0)
+          .map(([field, errors]) => `${field}: ${errors.join(', ')}`);
+        if (fieldsWithErrors.length > 0) {
+          errorMessage = fieldsWithErrors.join('; ');
+        }
+      }
+    } catch (e) {
+      // If response body is not JSON, use default message
+      console.error('Failed to parse error response:', e);
+    }
+    
+    const error = new Error(errorMessage);
+    error.status = response.status;
+    throw error;
   }
   
   return response;

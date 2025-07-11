@@ -191,10 +191,7 @@ class ApiFirstService {
       timeoutPromise
     ]);
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
+    // tokenFetch already handles error cases and throws, so if we get here, response is ok
     return await response.json();
   }
 

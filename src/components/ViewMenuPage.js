@@ -134,7 +134,22 @@ const ViewMenuPage = () => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to toggle availability');
+        // Try to get the error details from the response
+        let errorMessage = 'Failed to toggle availability';
+        try {
+          const errorData = await response.json();
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          } else if (errorData.message) {
+            errorMessage = errorData.message;
+          } else if (errorData.detail) {
+            errorMessage = errorData.detail;
+          }
+        } catch (parseError) {
+          // If response is not JSON, use status text
+          errorMessage = response.statusText || 'Failed to toggle availability';
+        }
+        throw new Error(errorMessage);
       }
 
       const updatedItem = await response.json();
@@ -149,7 +164,8 @@ const ViewMenuPage = () => {
 
       toast.success(`${updatedItem.name} is now ${updatedItem.is_available ? 'available' : 'unavailable'}`);
     } catch (err) {
-      toast.error('Failed to update item availability. Please try again.');
+      console.error('Error toggling availability:', err);
+      toast.error(err.message || 'Failed to update item availability. Please try again.');
     }
   };
 

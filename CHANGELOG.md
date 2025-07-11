@@ -2,6 +2,71 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2025-07-11
+
+### 🚀 Development Release
+
+**📋 Release Information:**
+- **Environment**: dev
+- **Branch**: `dev/1.2.0`
+- **Version**: `1.2.0`
+- **Deployment Time**: 2025-07-11 01:52:56
+- **Description**: Development environment deployment with latest React components
+
+**📝 Changes Made:**
+React v1.2.0: Deploy to dev environment
+
+**📁 Files Modified:**
+  - Modified: `EADME.md`
+  - Modified: `VERSION`
+  - Modified: `package-lock.json`
+  - Modified: `package.json`
+  - Modified: `public/index.html`
+  - Modified: `src/App.css`
+  - Modified: `src/App.js`
+  - Modified: `src/components/LoginPage.js`
+  - Modified: `src/components/Navbar.js`
+  - Modified: `src/components/PWA/PWADashboardPage.js`
+  - Modified: `src/components/PWAInstallPrompt.css`
+  - Modified: `src/components/PWAInstallPrompt.js`
+  - Modified: `src/components/PWAStatusIndicator.js`
+  - Modified: `src/components/PWAUpdateNotification.js`
+  - Modified: `src/components/ViewMenuPage.js`
+  - Modified: `src/components/ViewOrdersPage.js`
+  - Modified: `src/contexts/EnvironmentContext.js`
+  - Modified: `src/index.css`
+  - Modified: `src/pages/CreateOrderForm.js`
+  - Deleted: `src/pages/EditOrderPage.js`
+  - Modified: `src/services/apiCacheService.js`
+  - Modified: `src/services/apiFirstService.js`
+  - Modified: `src/styles/pwa.css`
+  - Modified: `src/styles/theme.css`
+  - Modified: `src/utils/activityTypes.js`
+  - Modified: `src/utils/api.js`
+  - Modified: `src/utils/cleanupPWA.js`
+  - Modified: `src/utils/envConfig.js`
+  - Modified: `src/utils/serviceWorkerRegistration.js`
+  - Modified: `src/utils/tokenFetch.js`
+  - Changed: `generate-icons.html`
+  - Changed: `src/components/MobilePWABanner.js`
+  - Changed: `src/components/PWAInstallToast.js`
+  - Changed: `src/components/PWAStatusIndicator.old.js`
+  - Changed: `src/styles/pwa-mobile.css`
+
+**🔄 Deployment Details:**
+- **Source Branch**: `dev/1.2.0`
+- **Target Branch**: `dev/1.2.0`
+- **Build Process**: Development build with source maps
+- **React Version**: Latest
+
+**🎯 Environment Specific Notes:**
+- Development environment deployment
+- Contains latest React components and changes
+- Used for integration testing before production
+- Devtest branch updated for continuous testing
+
+---
+
 ## [1.1.3] - 2025-07-10
 
 ### 🚀 Development Release

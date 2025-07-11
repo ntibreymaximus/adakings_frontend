@@ -91,7 +91,7 @@ const getApiBaseUrl = () => {
   if (window.location.hostname.includes('railway.app')) {
     // For Railway environments, construct backend URL based on naming convention
     const frontendUrl = window.location.hostname;
-    const backendUrl = frontendUrl.replace('adakingsfrontend-', 'adakingsbackend-');
+    const backendUrl = frontendUrl.replace('adaresmansys-', 'adaresmansys-backend-');
     return `https://${backendUrl}/api`;
   }
   
@@ -113,7 +113,7 @@ const getBackendBaseUrl = () => {
   if (window.location.hostname.includes('railway.app')) {
     // For Railway environments, construct backend URL based on naming convention
     const frontendUrl = window.location.hostname;
-    const backendUrl = frontendUrl.replace('adakingsfrontend-', 'adakingsbackend-');
+    const backendUrl = frontendUrl.replace('adaresmansys-', 'adaresmansys-backend-');
     return `https://${backendUrl}`;
   }
   

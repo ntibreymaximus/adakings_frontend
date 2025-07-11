@@ -37,7 +37,15 @@ const PWAInstallPrompt = () => {
 
   // Show prompt when conditions are met
   useEffect(() => {
-    if (isInstallable && deferredPrompt && !isPWA && !dismissed) {
+    // Enhanced mobile detection
+    const checkIsMobile = () => {
+      const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+      const isMobileDevice = /iPhone|iPad|iPod|Android|webOS|BlackBerry|Windows Phone/i.test(userAgent);
+      const isMobileViewport = window.innerWidth <= 768;
+      return isMobileDevice || isMobileViewport;
+    };
+
+    if (isInstallable && deferredPrompt && !isPWA && !dismissed && checkIsMobile()) {
       // Delay showing prompt by 3 seconds for better UX
       const timer = setTimeout(() => {
         setShowPrompt(true);
@@ -113,139 +121,40 @@ const PWAInstallPrompt = () => {
   }
 
   return (
-    <>
-      {/* Backdrop */}
-      <div 
-        className={`pwa-install-backdrop ${slideUp ? 'show' : ''}`}
-        onClick={handleDismiss}
-      />
-      
-      {/* Install Prompt Modal */}
-      <div className={`pwa-install-prompt ${slideUp ? 'slide-up' : ''}`}>
-        <div className="pwa-install-content">
-          {/* Header */}
-          <div className="pwa-install-header">
-            <div className="app-icon">
-              <img 
-                src="/logo192.png" 
-                alt="AdaKings" 
-                onError={(e) => { e.target.style.display = 'none'; }}
-              />
-              <div className="app-icon-fallback">🍽️</div>
-            </div>
-            
-            <div className="app-info">
-              <h3>Install AdaKings</h3>
-              <p>Restaurant Management System</p>
-            </div>
-            
-            <button 
-              className="close-btn"
-              onClick={handleDismiss}
-              aria-label="Close install prompt"
-            >
-              ×
-            </button>
-          </div>
-
-          {/* Features */}
-          <div className="pwa-install-features">
-            <div className="feature-item">
-              <span className="feature-icon">⚡</span>
-              <span>Fast & Reliable</span>
-            </div>
-            <div className="feature-item">
-              <span className="feature-icon">📱</span>
-              <span>Works Offline</span>
-            </div>
-            <div className="feature-item">
-              <span className="feature-icon">🔄</span>
-              <span>Auto Sync</span>
-            </div>
-            <div className="feature-item">
-              <span className="feature-icon">🏠</span>
-              <span>Home Screen Access</span>
-            </div>
-          </div>
-
-          {/* Benefits */}
-          <div className="pwa-install-benefits">
-            <h4>Why install?</h4>
-            <ul>
-              <li>
-                <span className="benefit-icon">🚀</span>
-                Instant access from your home screen
-              </li>
-              <li>
-                <span className="benefit-icon">💨</span>
-                Faster loading times
-              </li>
-              <li>
-                <span className="benefit-icon">📶</span>
-                Works even when you're offline
-              </li>
-              <li>
-                <span className="benefit-icon">🔔</span>
-                Get important notifications
-              </li>
-            </ul>
-          </div>
-
-          {/* Device-specific instructions */}
-          {isMobile && (
-            <div className="pwa-install-instructions">
-              <small>
-                Installing gives you a native app experience with faster performance and offline access.
-              </small>
-            </div>
-          )}
-
-          {/* Actions */}
-          <div className="pwa-install-actions">
-            <button
-              className="btn-install"
-              onClick={handleInstall}
-              disabled={installing}
-            >
-              {installing ? (
-                <>
-                  <span className="spinner"></span>
-                  Installing...
-                </>
-              ) : (
-                <>
-                  <span className="install-icon">⬇️</span>
-                  Install App
-                </>
-              )}
-            </button>
-            
-            <button
-              className="btn-later"
-              onClick={handleLater}
-              disabled={installing}
-            >
-              Maybe Later
-            </button>
-          </div>
-
-          {/* Result Messages */}
-          {installResult === 'error' && (
-            <div className="pwa-install-result error">
-              <span className="result-icon">⚠️</span>
-              Installation failed. Please try again.
-            </div>
-          )}
-          
-          {installResult === 'dismissed' && (
-            <div className="pwa-install-result info">
-              <span className="result-icon">ℹ️</span>
-              Installation was cancelled.
-            </div>
-          )}
+    <div className={`pwa-toast ${slideUp ? 'show' : ''}`}>
+      <div className="pwa-toast-body">
+        <div className="pwa-toast-icon-wrapper">
+          <i className="bi bi-app-indicator"></i>
+        </div>
+        
+        <div className="pwa-toast-text">
+          <div className="pwa-toast-title">Add ADARESMANSYS to Home Screen</div>
+          <div className="pwa-toast-subtitle">Install for quick access</div>
         </div>
       </div>
-    </>
+      
+      <div className="pwa-toast-buttons">
+        <button
+          className="pwa-btn-install"
+          onClick={handleInstall}
+          disabled={installing}
+        >
+          {installing ? (
+            <div className="pwa-loading"></div>
+          ) : (
+            'Install'
+          )}
+        </button>
+        
+        <button
+          className="pwa-btn-dismiss"
+          onClick={handleDismiss}
+          aria-label="Dismiss"
+        >
+          ×
+        </button>
+      </div>
+    </div>
   );
 };
 

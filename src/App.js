@@ -9,7 +9,6 @@ import LoginPage from './components/LoginPage';
 import UserProfilePage from './components/UserProfilePage';
 import DashboardPage from './components/DashboardPage';
 import CreateOrderPage from './pages/CreateOrderForm';
-import EditOrderPage from './pages/EditOrderPage';
 import ViewOrdersPage from './components/ViewOrdersPage';
 import ViewMenuPage from './components/ViewMenuPage';
 import ViewTransactionsPage from './components/ViewTransactionsPage';
@@ -19,6 +18,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import Navbar from './components/Navbar';
 import PWAStatusIndicator from './components/PWAStatusIndicator';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
+import MobilePWABanner from './components/MobilePWABanner';
 import PWAUpdateNotification from './components/PWAUpdateNotification';
 import PWAManager from './components/PWAManager';
 import EnvironmentTag from './components/EnvironmentTag';
@@ -27,8 +27,9 @@ import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './styles/theme.css';
 import './styles/pwa.css';
+import './styles/pwa-mobile.css';
 import './App.css';
-import './utils/cleanupPWA'; // Clean up any remaining PWA data
+// import './utils/cleanupPWA'; // Disabled - was interfering with PWA functionality
 
 // Inner App component that uses authentication context
 function AppContent() {
@@ -104,7 +105,7 @@ function AppContent() {
         />
         <Route 
           path="/edit-order/:orderNumber" 
-          element={userData ? <EditOrderPage /> : <Navigate to="/login" />} 
+          element={userData ? <CreateOrderPage isEditMode={true} /> : <Navigate to="/login" />} 
         />
         <Route 
           path="/view-orders" 
@@ -130,8 +131,11 @@ function AppContent() {
       {/* PWA status indicator */}
       <PWAStatusIndicator />
       
-      {/* PWA Install Prompt */}
+      {/* PWA Install Prompt - Mobile only */}
       <PWAInstallPrompt />
+      
+      {/* Mobile PWA Banner - Disabled to avoid conflicts */}
+      {/* <MobilePWABanner /> */}
       
       {/* PWA Update Notification */}
       <PWAUpdateNotification />

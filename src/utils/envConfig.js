@@ -1,4 +1,4 @@
-// Environment configuration utility for Adakings Frontend
+// Environment configuration utility for ADARESMANSYS
 
 // Get current environment
 export const getCurrentEnvironment = () => {

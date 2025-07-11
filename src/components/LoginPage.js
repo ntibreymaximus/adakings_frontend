@@ -31,9 +31,9 @@ const LoginPage = () => {
             <div className="text-center mb-3 mb-md-4">
               <h1 className="ada-text-primary mb-1 mb-md-2" style={{ fontSize: 'clamp(2rem, 5vw, 2.5rem)' }}>
                 <i className="bi bi-shop me-2"></i>
-                Adakings
+                ADARESMANSYS
               </h1>
-              <p className="text-muted">Restaurant Management System</p>
+              <p className="text-muted">ADARESMANSYS</p>
             </div>
             
             <Card className="mobile-friendly-card">
@@ -129,7 +129,7 @@ const LoginPage = () => {
             {/* Footer */}
             <div className="text-center mt-3 mt-md-4 mb-2">
               <small className="text-muted d-block">
-                © 2024 Adakings Restaurant. All rights reserved.
+                © 2024 ADARESMANSYS. All rights reserved.
               </small>
             </div>
           </Col>

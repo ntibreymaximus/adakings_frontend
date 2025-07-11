@@ -86,10 +86,10 @@ const PWADashboardPage = ({ userData }) => {
               <Col>
                 <div className="pwa-header text-center">
                   <h1 className="ada-text-primary mb-2" style={{ fontSize: 'clamp(1.5rem, 4vw, 2rem)' }}>
-                    Welcome to AdaKings
+                    Welcome to ADARESMANSYS
                   </h1>
                   <p className="text-muted mb-0">
-                    Your restaurant management dashboard
+                    ADARESMANSYS
                   </p>
                 </div>
               </Col>
@@ -144,7 +144,7 @@ const PWADashboardPage = ({ userData }) => {
             <Row className="mt-4 mb-2">
               <Col className="text-center">
                 <small className="text-muted">
-                  AdaKings PWA • Always at your fingertips
+                  ADARESMANSYS
                 </small>
               </Col>
             </Row>

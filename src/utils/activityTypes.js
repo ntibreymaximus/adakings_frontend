@@ -2,7 +2,7 @@
  * Activity Type Utilities for Order Status Changes and Payment Transactions
  * 
  * This module provides comprehensive styling, icons, and CSS class mapping
- * for different activity types in the Adakings PWA application.
+ * for different activity types in the ADARESMANSYS PWA application.
  */
 
 // ===========================================

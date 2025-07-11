@@ -25,7 +25,7 @@ export const EnvironmentProvider = ({ children }) => {
       const apiBaseUrl = process.env.REACT_APP_API_BASE_URL || process.env.REACT_APP_BACKEND_BASE_URL;
       if (apiBaseUrl) {
         try {
-          const response = await fetch(`${apiBaseUrl}/api/environment/`);
+          const response = await fetch(`${apiBaseUrl}/environment/`);
           if (response.ok) {
             const data = await response.json();
             setEnvInfo({

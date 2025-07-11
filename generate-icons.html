@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generate PWA Icons</title>
+</head>
+<body>
+    <h1>PWA Icon Generator</h1>
+    <p>Right-click on each canvas and save as PNG:</p>
+    
+    <h2>logo192.png (192x192)</h2>
+    <canvas id="canvas192" width="192" height="192" style="border: 1px solid #ccc;"></canvas>
+    
+    <h2>logo512.png (512x512)</h2>
+    <canvas id="canvas512" width="512" height="512" style="border: 1px solid #ccc;"></canvas>
+    
+    <script>
+        function drawIcon(canvasId, size) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            
+            // Background
+            ctx.fillStyle = '#2563eb'; // Blue background
+            ctx.fillRect(0, 0, size, size);
+            
+            // Text
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${size * 0.15}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('ADARES', size / 2, size / 2 - size * 0.1);
+            ctx.fillText('MANSYS', size / 2, size / 2 + size * 0.1);
+            
+            // Border
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = size * 0.02;
+            ctx.strokeRect(size * 0.1, size * 0.1, size * 0.8, size * 0.8);
+        }
+        
+        // Draw both icons
+        drawIcon('canvas192', 192);
+        drawIcon('canvas512', 512);
+        
+        // Auto-download function
+        function downloadCanvas(canvasId, filename) {
+            const canvas = document.getElementById(canvasId);
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+        
+        // Add download buttons
+        setTimeout(() => {
+            const button192 = document.createElement('button');
+            button192.textContent = 'Download logo192.png';
+            button192.onclick = () => downloadCanvas('canvas192', 'logo192.png');
+            document.getElementById('canvas192').after(button192);
+            
+            const button512 = document.createElement('button');
+            button512.textContent = 'Download logo512.png';
+            button512.onclick = () => downloadCanvas('canvas512', 'logo512.png');
+            document.getElementById('canvas512').after(button512);
+        }, 100);
+    </script>
+    
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        canvas {
+            display: block;
+            margin: 10px 0;
+        }
+        button {
+            margin: 10px 0 20px 0;
+            padding: 10px 20px;
+            background-color: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #1d4ed8;
+        }
+    </style>
+</body>
+</html>

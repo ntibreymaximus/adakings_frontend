@@ -152,44 +152,212 @@
   }
 }
 
-/* PWA install prompt styles */
+/* PWA install prompt styles - Toast version */
 .pwa-install-prompt {
   position: fixed;
-  bottom: 20px;
+  bottom: 80px;
   left: 20px;
   right: 20px;
-  background: var(--bs-primary);
+  background: #323232;
   color: white;
-  padding: 16px;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 12px 16px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   z-index: 1001;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 12px;
+  animation: slideUpFromBottom 0.3s ease-out;
+  max-width: 380px;
+  margin: 0 auto;
+}
+
+.pwa-prompt-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.pwa-prompt-info i {
+  font-size: 20px;
+}
+
+.pwa-prompt-info div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pwa-install-prompt strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: white;
+  display: block;
+}
+
+.pwa-install-prompt small {
+  font-size: 12px;
+  color: #d1d1d1;
+  display: block;
+}
+
+.pwa-prompt-buttons {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .pwa-install-prompt .install-button {
-  background: rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: #4caf50;
+  border: none;
   color: white;
-  padding: 8px 16px;
-  border-radius: 6px;
+  padding: 6px 14px;
+  border-radius: 4px;
   cursor: pointer;
-  transition: background-color 0.2s;
+  font-weight: 500;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 65px;
+  height: 32px;
 }
 
 .pwa-install-prompt .install-button:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: #45a049;
+}
+
+.pwa-install-prompt .install-button:active {
+  transform: translateY(0);
 }
 
 .pwa-install-prompt .close-button {
   background: none;
   border: none;
-  color: white;
-  font-size: 18px;
+  color: #ff5252;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  line-height: 1;
   cursor: pointer;
-  margin-left: 16px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.pwa-install-prompt .close-button:hover {
+  color: #ff7979;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .pwa-install-prompt {
+    bottom: 60px;
+    left: 16px;
+    right: 16px;
+    padding: 10px 14px;
+    max-width: none;
+  }
+  
+  .pwa-install-prompt strong {
+    font-size: 1rem;
+  }
+  
+  .pwa-install-prompt small {
+    font-size: 0.813rem;
+  }
+  
+  .pwa-install-prompt .install-button {
+    padding: 8px 16px;
+    font-size: 0.813rem;
+  }
+  
+  .pwa-install-prompt .close-button {
+    width: 28px;
+    height: 28px;
+    font-size: 18px;
+  }
+}
+
+@media (max-width: 480px) {
+  .pwa-install-prompt {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+    gap: 12px;
+  }
+  
+  .pwa-install-prompt > div:last-child {
+    justify-content: center;
+  }
+}
+
+/* Spinner styles */
+.spinner-mini {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
+}
+
+/* Animation for slide up */
+@keyframes slideUpFromBottom {
+  from {
+    transform: translateY(100px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Dark mode support for PWA install prompt */
+@media (prefers-color-scheme: dark) {
+  .pwa-install-prompt {
+    background: #1e1e1e;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  }
+  
+  .pwa-install-prompt strong {
+    color: #ffffff;
+  }
+  
+  .pwa-install-prompt small {
+    color: #cccccc;
+  }
+  
+  .pwa-install-prompt .close-button {
+    color: #ff6b6b;
+  }
+  
+  .pwa-install-prompt .close-button:hover {
+    color: #ff8787;
+  }
+}
+
+/* Ensure visibility on mobile screen sizes only */
+.pwa-install-prompt {
+  visibility: visible !important;
+  opacity: 1 !important;
+  display: flex !important;
+  transform: none !important;
+}
+
+/* Hide on desktop screens */
+@media (min-width: 769px) {
+  .pwa-install-prompt {
+    display: none !important;
+  }
 }
 
 /* PWA status indicator */

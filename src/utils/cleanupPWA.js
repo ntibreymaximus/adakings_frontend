@@ -27,7 +27,7 @@ export const cleanupPWAData = () => {
     if ('caches' in window) {
       caches.keys().then(cacheNames => {
         cacheNames.forEach(cacheName => {
-          if (cacheName.includes('adakings') || cacheName.includes('pwa')) {
+          if (cacheName.includes('adaresmansys') || cacheName.includes('pwa')) {
             caches.delete(cacheName);
           }
         });

@@ -1,4 +1,4 @@
-/* AdaKings Theme - Essential Styles */
+/* ADARESMANSYS Theme - Essential Styles */
 
 /* ==================== CSS VARIABLES ==================== */
 :root {
@@ -492,7 +492,7 @@ body {
 }
 
 /* ==================== BOOTSTRAP OVERRIDES ==================== */
-/* Override Bootstrap CSS variables with AdaKings theme */
+/* Override Bootstrap CSS variables with ADARESMANSYS theme */
 :root {
   --bs-primary: var(--ada-primary);
   --bs-primary-rgb: 30, 64, 175;

@@ -16,7 +16,7 @@ class ApiCacheService {
       essential: {
         maxAge: 24 * 60 * 60 * 1000, // 24 hours
         strategy: 'cache-first',
-        endpoints: [API_ENDPOINTS.MENU_ITEMS, API_ENDPOINTS.USERS, API_ENDPOINTS.ORDERS]
+        endpoints: [API_ENDPOINTS.MENU_ITEMS, API_ENDPOINTS.ORDERS]
       },
       
       // Frequently accessed data
@@ -296,9 +296,6 @@ class ApiCacheService {
   // Preload essential API data for offline use
   async preloadEssentialData() {
     console.log('🚀 API Cache: Preloading essential data for offline use');
-    console.log('🔍 DEBUG: API_ENDPOINTS.MENU_ITEMS =', API_ENDPOINTS.MENU_ITEMS);
-    console.log('🔍 DEBUG: API_ENDPOINTS.USERS =', API_ENDPOINTS.USERS);
-    console.log('🔍 DEBUG: API_ENDPOINTS.ORDERS =', API_ENDPOINTS.ORDERS);
     
     // Check if user is authenticated before preloading
     const token = localStorage.getItem('token');
@@ -307,8 +304,18 @@ class ApiCacheService {
       return;
     }
     
-    const essentialEndpoints = this.cacheConfig.essential.endpoints;
-    console.log('🔍 DEBUG: Essential endpoints configured:', essentialEndpoints);
+    // Get user data to check permissions
+    const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+    const isAdmin = userData.role === 'admin' || userData.role === 'superadmin';
+    
+    let essentialEndpoints = [...this.cacheConfig.essential.endpoints];
+    
+    // Only add users endpoint if user is admin
+    if (isAdmin) {
+      essentialEndpoints.push(API_ENDPOINTS.USERS);
+    }
+    
+    console.log('🔍 DEBUG: Essential endpoints to preload:', essentialEndpoints);
     const promises = essentialEndpoints.map(async (endpoint) => {
       try {
         await this.fetch(endpoint);

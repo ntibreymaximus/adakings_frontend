@@ -1,8 +1,8 @@
-# Adakings Frontend React App - Smart Deployment System
+# ADARESMANSYS - Smart Deployment System
 
 ## Overview
 
-This is the Adakings Frontend React Application with a comprehensive **npm-based smart deployment system** that maintains independent version sequences for feature, development, and production branches.
+This is the ADARESMANSYS React Application with a comprehensive **npm-based smart deployment system** that maintains independent version sequences for feature, development, and production branches.
 
 ## 🚀 Current Version Status
 
@@ -53,7 +53,7 @@ npm run deploy:help
 ## 📁 Project Structure
 
 ```
-adakings_frontend/
+ADARESMANSYS/
 ├── src/
 │   ├── components/         # React components
 │   ├── pages/             # Application pages

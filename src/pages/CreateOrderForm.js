@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Form, Button, Container, Row, Col, Card, ListGroup, Modal } from 'react-bootstrap';
-import { useNavigate } from 'react-router-dom';
+import { Form, Button, Container, Row, Col, Card, ListGroup, Modal, Spinner, Alert } from 'react-bootstrap';
+import { useNavigate, useParams } from 'react-router-dom';
 import optimizedToast, { contextToast } from '../utils/toastUtils';
 import { API_ENDPOINTS } from '../utils/api';
 import { apiFirstService } from '../services/apiFirstService';
@@ -9,9 +9,14 @@ import { useAuth } from '../contexts/AuthContext';
 
 // Delivery locations will be fetched from backend
 
-const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber = null }) => {
+const CreateOrderForm = ({ isEditMode: isEditModeProp = false }) => {
   const navigate = useNavigate();
+  const { orderNumber } = useParams();
   const { userData } = useAuth();
+  
+  // Determine if we're in edit mode from prop or URL
+  const isEditMode = isEditModeProp || !!orderNumber;
+  
   const [allMenuItems, setAllMenuItems] = useState([]);
   const [customerPhone, setCustomerPhone] = useState('');
   const [deliveryType, setDeliveryType] = useState('Pickup');
@@ -20,6 +25,9 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
   const [selectedItems, setSelectedItems] = useState({});
   const [selectedExtras, setSelectedExtras] = useState({});
   const [errors, setErrors] = useState({});
+  const [existingOrder, setExistingOrder] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -39,11 +47,12 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
   const searchTimeoutRef = useRef(null);
   
   // Filter menu items into main items and extras
-  const mainMenuItems = (allMenuItems || []).filter(item => !item.is_extra && item.is_available);
-  const extraMenuItems = (allMenuItems || []).filter(item => item.is_extra && item.is_available);
+  // Handle cases where is_available might not be set (default to true)
+  const mainMenuItems = (allMenuItems || []).filter(item => !item.is_extra && (item.is_available !== false));
+  const extraMenuItems = (allMenuItems || []).filter(item => item.is_extra && (item.is_available !== false));
   
-  // Fallback: if no main menu items found, show all available items (in case is_extra field is missing or different)
-  const displayMenuItems = mainMenuItems.length > 0 ? mainMenuItems : (allMenuItems || []).filter(item => item.is_available);
+  // Fallback: if no main menu items found, show all items that aren't explicitly unavailable
+  const displayMenuItems = mainMenuItems.length > 0 ? mainMenuItems : (allMenuItems || []).filter(item => !item.is_extra && (item.is_available !== false));
 
   // Filter delivery locations based on search term
   const filteredDeliveryLocations = deliveryLocations.filter(location =>
@@ -122,21 +131,49 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
       
       if (order.items && Array.isArray(order.items)) {
         console.log('📋 Processing order items:', order.items);
+        console.log('📋 Sample item structure:', order.items[0]);
         order.items.forEach(item => {
+          // Handle different possible field names for menu item ID
+          let menuItemId = item.menu_item_id || item.menu_item || item.id;
+          
+          // Check if menu_item is an object with nested id
+          if (item.menu_item && typeof item.menu_item === 'object') {
+            menuItemId = item.menu_item.id;
+            console.log(`📋 Nested menu item found:`, item.menu_item);
+          }
+          
+          console.log(`🔍 Looking for menu item with ID: ${menuItemId}`);
+          
           // Find the menu item in allMenuItems to get is_extra status
-          const menuItem = allMenuItems.find(mi => mi.id === item.menu_item_id);
+          const menuItem = allMenuItems.find(mi => {
+            return mi.id === menuItemId || 
+                   mi.id === parseInt(menuItemId) || 
+                   mi.id.toString() === menuItemId.toString();
+          });
+          
           if (menuItem) {
             if (menuItem.is_extra) {
-              newSelectedExtras[item.menu_item_id] = item.quantity;
-              console.log(`✨ Added extra: ${menuItem.name} (quantity: ${item.quantity})`);
+              newSelectedExtras[menuItem.id.toString()] = item.quantity;
+              console.log(`✨ Added extra: ${menuItem.name} (ID: ${menuItem.id}, quantity: ${item.quantity})`);
             } else {
-              newSelectedItems[item.menu_item_id] = item.quantity;
-              console.log(`🍽️ Added item: ${menuItem.name} (quantity: ${item.quantity})`);
+              newSelectedItems[menuItem.id.toString()] = item.quantity;
+              console.log(`🍽️ Added item: ${menuItem.name} (ID: ${menuItem.id}, quantity: ${item.quantity})`);
             }
           } else {
-            console.warn(`⚠️ Menu item with ID ${item.menu_item_id} not found in current menu items`);
-            // Default to regular item if menu item not found
-            newSelectedItems[item.menu_item_id] = item.quantity;
+            console.warn(`⚠️ Menu item with ID ${menuItemId} not found in current menu items`);
+            console.log('Available menu item IDs:', allMenuItems.map(mi => mi.id));
+            // Check if the item has embedded menu item info we can use
+            if (item.menu_item && typeof item.menu_item === 'object') {
+              const isExtra = item.menu_item.is_extra || false;
+              if (isExtra) {
+                newSelectedExtras[menuItemId.toString()] = item.quantity;
+              } else {
+                newSelectedItems[menuItemId.toString()] = item.quantity;
+              }
+            } else {
+              // Default to regular item if menu item not found
+              newSelectedItems[menuItemId.toString()] = item.quantity;
+            }
           }
         });
       }
@@ -158,6 +195,47 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Fetch order data when in edit mode
+  useEffect(() => {
+    const fetchOrderData = async () => {
+      if (!isEditMode || !orderNumber) return;
+      
+      try {
+        setLoading(true);
+        console.log(`🔍 Fetching order data for order #${orderNumber}`);
+        
+        const data = await apiFirstService.request(`${API_ENDPOINTS.ORDERS}${orderNumber}/`, {
+          method: 'GET'
+        });
+        
+        console.log('✅ Order data fetched:', data);
+        console.log('📦 Existing order items:', data.items);
+        
+        // Check if order can be edited
+        if (data.status === 'Fulfilled' || data.status === 'Cancelled') {
+          setLoadError(`Cannot edit ${data.status.toLowerCase()} orders`);
+          optimizedToast.error(`This order is ${data.status.toLowerCase()} and cannot be edited`);
+          return;
+        }
+        
+        setExistingOrder(data);
+        setLoadError(null);
+      } catch (error) {
+        console.error('❌ Error fetching order data:', error);
+        if (error.status === 404) {
+          setLoadError('Order not found');
+        } else {
+          setLoadError(error.message || 'Failed to fetch order data');
+        }
+        optimizedToast.error(`Failed to load order: ${error.message || 'Unknown error'}`);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchOrderData();
+  }, [isEditMode, orderNumber]);
+
   useEffect(() => {
     const fetchInitialData = async () => {
       // Only fetch delivery locations once on mount
@@ -171,6 +249,18 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
         const items = await menuCacheService.getMenuItems();
         setAllMenuItems(items);
         console.log(`✅ Loaded ${items.length} menu items for order ${isEditMode ? 'editing' : 'creation'}`);
+        
+        // Debug menu items
+        console.log('📊 Menu items breakdown:');
+        console.log(`- Total items: ${items.length}`);
+        console.log(`- Items with is_extra=true: ${items.filter(item => item.is_extra).length}`);
+        console.log(`- Items with is_extra=false: ${items.filter(item => !item.is_extra).length}`);
+        console.log(`- Items with is_available=true: ${items.filter(item => item.is_available === true).length}`);
+        console.log(`- Items with is_available=false: ${items.filter(item => item.is_available === false).length}`);
+        console.log(`- Items with is_available undefined: ${items.filter(item => item.is_available === undefined).length}`);
+        if (items.length > 0) {
+          console.log('Sample item:', items[0]);
+        }
         
         // If in edit mode and we have existing order data, populate the form
         if (isEditMode && existingOrder && !isInitialized) {
@@ -190,10 +280,11 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
   
   // Separate effect to repopulate items when menu items are loaded (after initial load)
   useEffect(() => {
-    if (isEditMode && existingOrder && allMenuItems.length > 0 && isInitialized) {
-      // Re-populate items now that menu items are available
-      console.log('🔄 Re-populating items with loaded menu data');
+    if (isEditMode && existingOrder && allMenuItems.length > 0 && !isInitialized) {
+      // Populate items now that menu items are available
+      console.log('🔄 Populating items with loaded menu data');
       populateFormWithOrderData(existingOrder);
+      setIsInitialized(true);
     }
   }, [allMenuItems, isEditMode, existingOrder, populateFormWithOrderData, isInitialized]);
 
@@ -426,54 +517,81 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
     setIsSubmitting(true);
 
     try {
-      const payloadItems = preValidationItems.map(([itemId, quantity]) => ({ menu_item_id: itemId, quantity }));
+      const payloadItems = preValidationItems
+        .map(([itemId, quantity]) => ({ 
+          menu_item_id: parseInt(itemId), 
+          quantity: parseInt(quantity) 
+        }))
+        .filter(item => !isNaN(item.menu_item_id) && item.menu_item_id > 0);
       
       const payloadExtras = Object.entries(selectedExtras)
         .filter(([, quantity]) => quantity > 0)
-        .map(([extraId, quantity]) => ({ menu_item_id: extraId, quantity }));
+        .map(([extraId, quantity]) => ({ 
+          menu_item_id: parseInt(extraId), 
+          quantity: parseInt(quantity) 
+        }))
+        .filter(item => !isNaN(item.menu_item_id) && item.menu_item_id > 0);
       
       // Combine main items and extras into one items array
       const allItems = [...payloadItems, ...payloadExtras];
+      
+      // Validate that we have at least one item
+      if (allItems.length === 0) {
+        optimizedToast.error('No valid items in order. Please add at least one item.');
+        setIsSubmitting(false);
+        return;
+      }
+      
+      console.log('🛒 Items being sent:', allItems);
 
+      // Clean up phone number - remove any spaces or special characters
+      const cleanPhone = customerPhone.trim().replace(/\s+/g, '').replace(/-/g, '');
+      
       const orderPayload = {
-        customer_phone: customerPhone.trim(),
+        customer_phone: cleanPhone,
         delivery_type: deliveryType,
         notes: notes.trim(),
         items: allItems,
         // User tracking information
-        created_by: userData?.id || userData?.user_id,
-        created_by_username: userData?.username,
-        created_by_role: userData?.role || userData?.user_role,
         modified_by: userData?.id || userData?.user_id,
         modified_by_username: userData?.username,
         modified_by_role: userData?.role || userData?.user_role,
       };
+      
+      // Only add created_by fields for new orders
+      if (!isEditMode) {
+        orderPayload.created_by = userData?.id || userData?.user_id;
+        orderPayload.created_by_username = userData?.username;
+        orderPayload.created_by_role = userData?.role || userData?.user_role;
+      }
+      
+      // Preserve existing order status and payment info when editing
+      if (isEditMode && existingOrder) {
+        orderPayload.status = existingOrder.status;
+        orderPayload.payment_status = existingOrder.payment_status;
+        // Don't modify payment amounts directly from order form
+      }
 
       if (deliveryType === 'Delivery') {
         if (deliveryLocation === 'Other') {
-          // For custom locations, use the custom fields and clear predefined location
+          // For custom locations, use the custom fields
           orderPayload.custom_delivery_location = customLocationName.trim();
           orderPayload.custom_delivery_fee = parseFloat(customLocationFee);
-          orderPayload.delivery_location = null; // Explicitly clear predefined location
+          // Don't send delivery_location for custom locations
         } else {
-          // For predefined locations, use the delivery_location field and clear custom fields
+          // For predefined locations, use the delivery_location field
           orderPayload.delivery_location = deliveryLocation;
-          orderPayload.custom_delivery_location = null; // Explicitly clear custom location
-          orderPayload.custom_delivery_fee = null; // Explicitly clear custom fee
+          // Don't send custom fields for predefined locations
         }
-      } else {
-        // For pickup orders, clear all delivery-related fields
-        orderPayload.delivery_location = null;
-        orderPayload.custom_delivery_location = null;
-        orderPayload.custom_delivery_fee = null;
       }
+      // For pickup orders, don't send any delivery fields
 
       // Determine API endpoint and method based on edit mode
       const orderNumberForApi = existingOrder?.order_number || orderNumber;
       const apiUrl = isEditMode 
         ? `${API_ENDPOINTS.ORDERS}${orderNumberForApi}/`
         : API_ENDPOINTS.ORDERS;
-      const method = isEditMode ? 'PATCH' : 'POST';
+      const method = isEditMode ? 'PUT' : 'POST';
 
       const payloadTime = performance.now();
       console.log(`⏱️ Payload prepared in ${(payloadTime - startTime).toFixed(2)}ms`);
@@ -530,13 +648,104 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
       navigate('/view-orders');
     } catch (error) {
       console.error('🚨 Network/Request Error:', error);
-      optimizedToast.error(`Error ${isEditMode ? 'updating' : 'creating'} order`);
+      console.error('Error details:', {
+        message: error.message,
+        status: error.status,
+        response: error.response,
+        data: error.data
+      });
+      
+      // Show more specific error message
+      let errorMessage = `Error ${isEditMode ? 'updating' : 'creating'} order`;
+      if (error.message) {
+        errorMessage += `: ${error.message}`;
+      } else if (error.status === 400) {
+        errorMessage += ': Invalid order data';
+      } else if (error.status === 403) {
+        errorMessage += ': Permission denied';
+      } else if (error.status === 404) {
+        errorMessage += ': Order not found';
+      }
+      
+      optimizedToast.error(errorMessage);
     } finally {
       // Always re-enable the button after the request completes
       setIsSubmitting(false);
     }
   };
 
+
+  // Show loading state when fetching order data in edit mode
+  if (isEditMode && loading) {
+    return (
+      <Container className="my-3 my-md-4 px-3 px-md-4" style={{ minHeight: 'calc(100vh - 100px)' }}>
+        <div className="mb-3">
+          <Button 
+            variant="outline-primary" 
+            size="sm"
+            onClick={() => navigate('/dashboard')}
+            className="d-flex align-items-center ada-shadow-sm"
+            style={{ minHeight: '44px' }}
+          >
+            <i className="bi bi-arrow-left me-2"></i>
+            <span>Back to Dashboard</span>
+          </Button>
+        </div>
+        
+        <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '300px' }}>
+          <div className="text-center">
+            <Spinner animation="border" variant="primary" className="mb-3" />
+            <h5 className="text-muted">Loading order data...</h5>
+            <p className="text-muted">Please wait while we fetch order #{orderNumber}</p>
+          </div>
+        </div>
+      </Container>
+    );
+  }
+
+  // Show error state if order fetch failed
+  if (isEditMode && loadError) {
+    return (
+      <Container className="my-3 my-md-4 px-3 px-md-4" style={{ minHeight: 'calc(100vh - 100px)' }}>
+        <div className="mb-3">
+          <Button 
+            variant="outline-primary" 
+            size="sm"
+            onClick={() => navigate('/dashboard')}
+            className="d-flex align-items-center ada-shadow-sm"
+            style={{ minHeight: '44px' }}
+          >
+            <i className="bi bi-arrow-left me-2"></i>
+            <span>Back to Dashboard</span>
+          </Button>
+        </div>
+        
+        <Alert variant="danger" className="text-center">
+          <Alert.Heading>
+            <i className="bi bi-exclamation-triangle me-2"></i>
+            Error Loading Order
+          </Alert.Heading>
+          <p className="mb-3">{loadError}</p>
+          <div className="d-flex gap-2 justify-content-center">
+            <Button 
+              variant="outline-danger" 
+              onClick={() => navigate('/view-orders')}
+            >
+              <i className="bi bi-list me-2"></i>
+              View All Orders
+            </Button>
+            <Button 
+              variant="primary" 
+              onClick={() => window.location.reload()}
+            >
+              <i className="bi bi-arrow-clockwise me-2"></i>
+              Try Again
+            </Button>
+          </div>
+        </Alert>
+      </Container>
+    );
+  }
 
   return (
     <Container className="my-3 my-md-4 px-3 px-md-4" style={{ minHeight: 'calc(100vh - 100px)' }}>
@@ -557,11 +766,16 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
         {/* Order Form - Left Side (Full width on mobile, 8 columns on large screens) */}
         <Col lg={8} className="order-1 order-lg-1">
           <Card className="ada-shadow-md">
-            <Card.Header className="ada-bg-primary text-white py-3">
+            <Card.Header className={`${isEditMode ? 'bg-warning' : 'ada-bg-primary'} text-white py-3`}>
               <h5 className="mb-0">
                 <i className={`bi ${isEditMode ? 'bi-pencil-square' : 'bi-plus-circle'} me-2`}></i>
-                {isEditMode ? `Edit Order ${existingOrder?.order_number || ''}` : 'Create New Order'}
+                {isEditMode ? `Edit Order ${existingOrder?.order_number || orderNumber || ''}` : 'Create New Order'}
               </h5>
+              {isEditMode && existingOrder && (
+                <small className="d-block mt-1">
+                  Status: <span className="badge bg-light text-dark">{existingOrder.status}</span>
+                </small>
+              )}
             </Card.Header>
             <Card.Body className="p-4">
               <Form onSubmit={handleSubmit}>
@@ -579,7 +793,11 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
                 <div className="ada-shadow-sm mb-3" style={{ border: '1px solid #e9ecef', borderRadius: 'var(--ada-border-radius-lg)', backgroundColor: 'var(--ada-off-white)' }}>
                   <ListGroup variant="flush">
                     {Object.entries(selectedItems).map(([itemId, quantity]) => {
-                      const item = displayMenuItems.find(mi => mi.id.toString() === itemId);
+                      let item = displayMenuItems.find(mi => mi.id.toString() === itemId.toString());
+                      // If not found in displayMenuItems, search in allMenuItems
+                      if (!item) {
+                        item = allMenuItems.find(mi => mi.id.toString() === itemId.toString() && !mi.is_extra);
+                      }
                       if (!item || quantity <= 0) return null;
                       return (
                         <ListGroup.Item key={itemId} className="py-3">
@@ -641,7 +859,9 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
                         </div>
                         <p className="text-muted mb-0">No menu items available</p>
                         <small className="text-muted">
-                          {allMenuItems.length === 0 ? 'No items loaded from API' : `${allMenuItems.length} total items, but none are available items`}
+                          {allMenuItems.length === 0 ? 'No items loaded from API' : 
+                           mainMenuItems.length === 0 ? `${allMenuItems.length} items loaded, but all are marked as extras` :
+                           `${allMenuItems.length} total items loaded`}
                         </small>
                       </div>
                     ) : (
@@ -662,7 +882,7 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
                         ))
                     )}
                   </div>
-                  {displayMenuItems.filter(item => !selectedItems[item.id]).length === 0 && (
+                  {displayMenuItems.length > 0 && displayMenuItems.filter(item => !selectedItems[item.id]).length === 0 && (
                     <small className="text-muted fst-italic">All menu items have been added</small>
                   )}
                 </div>
@@ -970,6 +1190,7 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
                       }}
                       onClick={() => {
                         setDeliveryLocation('Other');
+                        setCustomLocationName(locationSearchTerm); // Auto-fill with search term
                         setLocationSearchTerm('');
                         setShowLocationDropdown(false);
                       }}
@@ -1100,7 +1321,11 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
                   <div className="mb-2" style={{ maxHeight: '120px', overflowY: 'auto' }}>
                     {Object.entries(selectedItems).map(([itemId, quantity]) => {
                       if (quantity <= 0) return null;
-                      const item = displayMenuItems.find(mi => mi.id.toString() === itemId);
+                      let item = displayMenuItems.find(mi => mi.id.toString() === itemId.toString());
+                      // If not found in displayMenuItems, search in allMenuItems
+                      if (!item) {
+                        item = allMenuItems.find(mi => mi.id.toString() === itemId.toString() && !mi.is_extra);
+                      }
                       if (!item) return null;
                       const itemTotal = parseFloat(item.price || 0) * quantity;
                       return (
@@ -1137,7 +1362,11 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
                   <div className="mb-2" style={{ maxHeight: '100px', overflowY: 'auto' }}>
                     {Object.entries(selectedExtras).map(([extraId, quantity]) => {
                       if (quantity <= 0) return null;
-                      const extra = extraMenuItems.find(e => e.id.toString() === extraId);
+                      let extra = extraMenuItems.find(e => e.id.toString() === extraId.toString());
+                      // If not found in extraMenuItems, search in allMenuItems
+                      if (!extra) {
+                        extra = allMenuItems.find(mi => mi.id.toString() === extraId.toString() && mi.is_extra);
+                      }
                       if (!extra) return null;
                       const extraTotal = parseFloat(extra.price || 0) * quantity;
                       return (
@@ -1233,6 +1462,12 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
                 <i className={`bi ${deliveryType === 'Delivery' ? 'bi-truck' : 'bi-shop'} me-1`}></i>
                 {deliveryType}
               </span>
+              {isEditMode && existingOrder && (
+                <span className="badge bg-info" style={{ fontSize: '0.75rem' }}>
+                  <i className="bi bi-pencil me-1"></i>
+                  Editing #{existingOrder.order_number}
+                </span>
+              )}
             </div>
           </Modal.Title>
         </Modal.Header>
@@ -1607,6 +1842,7 @@ const CreateOrderForm = ({ isEditMode = false, existingOrder = null, orderNumber
                       }}
                       onClick={() => {
                         setDeliveryLocation('Other');
+                        setCustomLocationName(locationSearchTerm); // Auto-fill with search term
                         setLocationSearchTerm('');
                         setShowLocationDropdown(false);
                       }}

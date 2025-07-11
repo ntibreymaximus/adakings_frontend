@@ -12,69 +12,40 @@ const PWAStatusIndicator = () => {
     isInstallable, 
     displayMode, 
     installPWA, 
-    deferredPrompt,
-    isMobile 
+    deferredPrompt 
   } = usePWA();
   
   const [installing, setInstalling] = useState(false);
   const [showInstallPrompt, setShowInstallPrompt] = useState(false);
-  const [isMobileView, setIsMobileView] = useState(window.innerWidth <= 768);
-  
-  // Handle window resize
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobileView(window.innerWidth <= 768);
-    };
-    
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
   
   // Check if prompt was previously dismissed and show prompt accordingly
   useEffect(() => {
-    // Only show on mobile devices or mobile view
-    if (!isInstallable || !deferredPrompt || isPWA || (!isMobile && !isMobileView)) {
+    if (!isInstallable || !deferredPrompt || isPWA) {
       return;
     }
     
     const dismissedTime = localStorage.getItem('pwa-prompt-dismissed');
-    let timer;
-    
     if (dismissedTime) {
       const hoursSinceDismissed = (Date.now() - parseInt(dismissedTime)) / (1000 * 60 * 60);
       // Show again after 24 hours
       if (hoursSinceDismissed >= 24) {
         localStorage.removeItem('pwa-prompt-dismissed');
         // Add delay before showing to ensure proper rendering
-        timer = setTimeout(() => {
+        const timer = setTimeout(() => {
           setShowInstallPrompt(true);
           console.log('Showing PWA install prompt after 24h dismissal');
         }, 3000);
+        return () => clearTimeout(timer);
       }
     } else {
       // Add delay before showing to ensure proper rendering
-      timer = setTimeout(() => {
+      const timer = setTimeout(() => {
         setShowInstallPrompt(true);
         console.log('Showing PWA install prompt for first time');
       }, 3000);
+      return () => clearTimeout(timer);
     }
-    
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
-  }, [isInstallable, deferredPrompt, isPWA, isMobile, isMobileView]);
-
-  // Debug logging
-  useEffect(() => {
-    console.log('PWA Status Debug:', {
-      isInstallable,
-      deferredPrompt: !!deferredPrompt,
-      isPWA,
-      showInstallPrompt,
-      displayMode,
-      shouldShowPrompt: isInstallable && deferredPrompt && !isPWA && showInstallPrompt
-    });
-  }, [isInstallable, deferredPrompt, isPWA, showInstallPrompt, displayMode]);
+  }, [isInstallable, deferredPrompt, isPWA]);
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) {
@@ -96,13 +67,6 @@ const PWAStatusIndicator = () => {
     }
   };
 
-  const handleClose = () => {
-    console.log('Closing PWA install prompt');
-    setShowInstallPrompt(false);
-    // Remember dismissal for 24 hours
-    localStorage.setItem('pwa-prompt-dismissed', Date.now().toString());
-  };
-
   const getStatusText = () => {
     if (isPWA) {
       return `PWA (${displayMode})`;
@@ -119,47 +83,51 @@ const PWAStatusIndicator = () => {
     return 'secondary';
   };
 
-  // Determine what to show
-  const showStatusIndicator = displayMode !== 'browser' || isInstallable;
-  const showPrompt = isInstallable && deferredPrompt && !isPWA && showInstallPrompt && (isMobile || isMobileView);
+  // Debug logging
+  useEffect(() => {
+    console.log('PWA Status Debug:', {
+      isInstallable,
+      deferredPrompt: !!deferredPrompt,
+      isPWA,
+      showInstallPrompt,
+      displayMode,
+      shouldShowPrompt: isInstallable && deferredPrompt && !isPWA && showInstallPrompt
+    });
+  }, [isInstallable, deferredPrompt, isPWA, showInstallPrompt, displayMode]);
 
   return (
     <>
       {/* Status indicator */}
-      {showStatusIndicator && (
-        <div className={`pwa-status-indicator bg-${getStatusColor()}`}>
-          {getStatusText()}
-        </div>
-      )}
+      <div className={`pwa-status-indicator bg-${getStatusColor()}`}>
+        {getStatusText()}
+      </div>
 
-      {/* Install prompt - Toast style */}
-      {showPrompt && (
+      {/* Install prompt */}
+      {isInstallable && deferredPrompt && !isPWA && showInstallPrompt && (
         <div className="pwa-install-prompt" key="pwa-prompt">
-          <div className="pwa-prompt-info">
-            <i className="bi bi-download"></i>
-            <div>
-              <strong>Install ADARESMANSYS</strong>
-              <small>Add to home screen</small>
-            </div>
+          <div>
+            <strong>Install ADARESMANSYS</strong>
+            <small>Get the full app experience!</small>
           </div>
-          <div className="pwa-prompt-buttons">
+          <div>
             <button 
               className="install-button"
               onClick={handleInstallClick}
               disabled={installing}
             >
-              {installing ? (
-                <span className="spinner-mini"></span>
-              ) : (
-                'Install'
-              )}
+              {installing ? 'Installing...' : 'Install'}
             </button>
             <button 
               className="close-button"
-              onClick={handleClose}
+              onClick={() => {
+                console.log('Closing PWA install prompt');
+                setShowInstallPrompt(false);
+                // Remember dismissal for 24 hours
+                localStorage.setItem('pwa-prompt-dismissed', Date.now().toString());
+              }}
               aria-label="Close"
             >
-              <i className="bi bi-x"></i>
+              ×
             </button>
           </div>
         </div>

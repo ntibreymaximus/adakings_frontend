@@ -2345,10 +2345,20 @@ const ViewOrdersPage = memo(() => {
               <>
             <Button 
               variant="info" 
-              onClick={() => navigate(`/edit-order/${selectedOrder.order_number || selectedOrder.id}`)}
+              onClick={() => {
+                // Check if order can be edited
+                if (selectedOrder.status === 'Fulfilled' || selectedOrder.status === 'Cancelled') {
+                  optimizedToast.warning(`Cannot edit ${selectedOrder.status.toLowerCase()} orders`);
+                  return;
+                }
+                // Close modal before navigating
+                setShowOrderDetailsModal(false);
+                navigate(`/edit-order/${selectedOrder.order_number || selectedOrder.id}`);
+              }}
               className="flex-fill order-1 order-sm-2"
               size={isMobile ? "sm" : undefined}
               style={{ minHeight: isMobile ? '36px' : '44px' }}
+              disabled={selectedOrder.status === 'Fulfilled' || selectedOrder.status === 'Cancelled'}
             >
               <i className="bi bi-pencil me-1"></i>
               {isMobile ? 'Edit' : 'Edit Order'}

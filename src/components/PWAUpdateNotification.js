@@ -229,7 +229,7 @@ const PWAUpdateNotification = () => {
                   ? 'The app will reload automatically'
                   : updateResult === 'error'
                     ? 'Please try again or reload manually'
-                    : 'A new version of AdaKings is ready to install'
+                    : 'A new version of ADARESMANSYS is ready'
               }
             </p>
           </div>
