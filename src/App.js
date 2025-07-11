@@ -22,12 +22,14 @@ import MobilePWABanner from './components/MobilePWABanner';
 import PWAUpdateNotification from './components/PWAUpdateNotification';
 import PWAManager from './components/PWAManager';
 import EnvironmentTag from './components/EnvironmentTag';
+import Footer from './components/Footer';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap/dist/js/bootstrap.bundle.min.js';
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import './styles/theme.css';
 import './styles/pwa.css';
 import './styles/pwa-mobile.css';
+import './styles/footer.css';
 import './App.css';
 // import './utils/cleanupPWA'; // Disabled - was interfering with PWA functionality
 
@@ -148,6 +150,9 @@ function AppContent() {
       
       {/* Environment Tag */}
       <EnvironmentTag />
+      
+      {/* Footer with version */}
+      <Footer />
       
       <ToastContainer
         position="top-right"

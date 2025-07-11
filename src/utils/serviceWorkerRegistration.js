@@ -1,5 +1,5 @@
 // Enhanced Service Worker registration utility with lifecycle management
-// This file helps register the service worker in production environments
+// This file helps register the service worker in both production and development environments
 
 const isLocalhost = Boolean(
   window.location.hostname === 'localhost' ||
@@ -12,7 +12,8 @@ const isLocalhost = Boolean(
 );
 
 export function register(config) {
-  if (process.env.NODE_ENV === 'production' && 'serviceWorker' in navigator) {
+  // Enable service worker in both production and development
+  if ('serviceWorker' in navigator) {
     // The URL constructor is available in all browsers that support SW.
     const publicUrl = new URL(process.env.PUBLIC_URL, window.location.href);
     if (publicUrl.origin !== window.location.origin) {

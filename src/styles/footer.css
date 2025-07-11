@@ -1,0 +1,109 @@
+/* Footer Styles */
+.app-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background-color: white;
+  border-top: 1px solid #dee2e6;
+  padding: 10px 0;
+  z-index: 1000;
+}
+
+.footer-content {
+  color: black;
+}
+
+.footer-content .copyright {
+  font-size: 0.7rem;
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.footer-content .version {
+  font-size: 0.75rem;
+  color: #333;
+}
+
+/* Add padding to main content to account for fixed footer */
+.App {
+  padding-bottom: 50px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .app-footer {
+    padding: 8px 0;
+  }
+  
+  .footer-content .copyright {
+    font-size: 0.65rem;
+  }
+  
+  .footer-content .version {
+    font-size: 0.7rem;
+  }
+  
+  .App {
+    padding-bottom: 45px;
+  }
+}
+
+@media (max-width: 480px) {
+  .footer-content .copyright {
+    font-size: 0.6rem;
+  }
+  
+  .footer-content .version {
+    font-size: 0.65rem;
+  }
+  
+  .App {
+    padding-bottom: 40px;
+  }
+}
+
+/* Dark mode support (if implemented) - keeping white background */
+@media (prefers-color-scheme: dark) {
+  .app-footer {
+    background-color: white;
+    border-top-color: #dee2e6;
+  }
+  
+  .footer-content {
+    color: black;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .app-footer {
+    background-color: white;
+    border-top: 2px solid black;
+  }
+  
+  .footer-content {
+    color: black;
+  }
+  
+  .footer-content .copyright {
+    font-weight: 700;
+  }
+}
+
+/* Ensure footer doesn't overlap with environment tag */
+.environment-tag {
+  bottom: 60px !important;
+}
+
+@media (max-width: 768px) {
+  .environment-tag {
+    bottom: 55px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .environment-tag {
+    bottom: 50px !important;
+  }
+}

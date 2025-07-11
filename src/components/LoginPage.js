@@ -33,7 +33,7 @@ const LoginPage = () => {
                 <i className="bi bi-shop me-2"></i>
                 ADARESMANSYS
               </h1>
-              <p className="text-muted">ADARESMANSYS</p>
+              <p className="text-muted">Adakings Restaurant Management System</p>
             </div>
             
             <Card className="mobile-friendly-card">
@@ -125,13 +125,6 @@ const LoginPage = () => {
                 </div>
               </Card.Body>
             </Card>
-            
-            {/* Footer */}
-            <div className="text-center mt-3 mt-md-4 mb-2">
-              <small className="text-muted d-block">
-                © 2024 ADARESMANSYS. All rights reserved.
-              </small>
-            </div>
           </Col>
         </Row>
       </Container>
