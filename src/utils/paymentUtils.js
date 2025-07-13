@@ -13,7 +13,9 @@ export const PAYMENT_STATUSES = {
   UNPAID: 'Unpaid',
   PARTIALLY_PAID: 'Partially Paid',
   OVERPAID: 'Overpaid',
-  PENDING_PAYMENT: 'Pending Payment'
+  PENDING_PAYMENT: 'Pending Payment',
+  BOLT: 'BOLT',
+  WIX: 'WIX'
 };
 
 /**
@@ -159,6 +161,10 @@ export const getPaymentStatusBadgeVariant = (paymentStatus) => {
       return 'bg-info';
     case 'pending payment':
       return 'bg-secondary';
+    case 'bolt':
+      return 'bg-success';
+    case 'wix':
+      return 'bg-success';
     default:
       return 'bg-secondary';
   }

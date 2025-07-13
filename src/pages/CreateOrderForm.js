@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Form, Button, Container, Row, Col, Card, ListGroup, Modal, Spinner, Alert } from 'react-bootstrap';
+import { Form, Button, Container, Row, Col, Card, ListGroup, Modal, Spinner, Alert, Nav, Tab } from 'react-bootstrap';
 import { useNavigate, useParams } from 'react-router-dom';
 import optimizedToast, { contextToast } from '../utils/toastUtils';
 import { API_ENDPOINTS } from '../utils/api';
@@ -51,8 +51,16 @@ const CreateOrderForm = ({ isEditMode: isEditModeProp = false }) => {
   const mainMenuItems = (allMenuItems || []).filter(item => !item.is_extra && (item.is_available !== false));
   const extraMenuItems = (allMenuItems || []).filter(item => item.is_extra && (item.is_available !== false));
   
+  // Further categorize main menu items by type
+  const regularMenuItems = mainMenuItems.filter(item => item.item_type === 'regular');
+  const boltMenuItems = mainMenuItems.filter(item => item.item_type === 'bolt');
+  const wixMenuItems = mainMenuItems.filter(item => item.item_type === 'wix');
+  
   // Fallback: if no main menu items found, show all items that aren't explicitly unavailable
   const displayMenuItems = mainMenuItems.length > 0 ? mainMenuItems : (allMenuItems || []).filter(item => !item.is_extra && (item.is_available !== false));
+  
+  // State for active menu tab
+  const [activeMenuTab, setActiveMenuTab] = useState('regular');
 
   // Filter delivery locations based on search term
   const filteredDeliveryLocations = deliveryLocations.filter(location =>
@@ -185,6 +193,20 @@ const CreateOrderForm = ({ isEditMode: isEditModeProp = false }) => {
       console.log('⏳ Menu items not loaded yet, will populate items later');
     }
   }, [allMenuItems]);
+
+useEffect(() => {
+    if (activeMenuTab === "bolt") {
+      setDeliveryType("Delivery");
+      setDeliveryLocation("Bolt Delivery");
+      setCustomLocationFee(0);
+      // Don't clear customer phone - it's optional for Bolt orders
+    } else if (activeMenuTab === "wix") {
+      setDeliveryType("Delivery");
+      setDeliveryLocation("WIX Delivery");
+      setCustomLocationFee(0);
+      // Don't clear customer phone - it's optional for Wix orders
+    }
+  }, [activeMenuTab]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -439,9 +461,16 @@ const CreateOrderForm = ({ isEditMode: isEditModeProp = false }) => {
     
     // Only validate customer fields if delivery is selected
     if (deliveryType === 'Delivery') {
-      if (!customerPhone.trim()) formErrors.customerPhone = 'Customer phone is required for delivery orders';
-      if (customerPhone.trim() && !/^(\+233|0)\d{9}$/.test(customerPhone.trim())) {
-          formErrors.customerPhone = 'Invalid Ghana phone format (e.g., 0XXXXXXXXX or +233XXXXXXXXX)';
+      // Special handling for Bolt and WIX orders - they don't require customer phone
+      const isBoltOrWixOrder = activeMenuTab === 'bolt' || activeMenuTab === 'wix';
+      const isBoltOrWixDelivery = deliveryLocation === 'Bolt Delivery' || deliveryLocation === 'WIX Delivery';
+      
+      // Skip phone validation for Bolt/WIX orders when using their delivery types
+      if (!isBoltOrWixOrder || !isBoltOrWixDelivery) {
+        if (!customerPhone.trim()) formErrors.customerPhone = 'Customer phone is required for delivery orders';
+        if (customerPhone.trim() && !/^(\+233|0)\d{9}$/.test(customerPhone.trim())) {
+            formErrors.customerPhone = 'Invalid Ghana phone format (e.g., 0XXXXXXXXX or +233XXXXXXXXX)';
+        }
       }
       if (!deliveryLocation) {
           formErrors.deliveryLocation = 'Delivery location is required for delivery orders.';
@@ -497,6 +526,50 @@ const CreateOrderForm = ({ isEditMode: isEditModeProp = false }) => {
                              : 0;
   const grandTotal = currentOrderSubTotal + extrasSubTotal + currentDeliveryFee;
 
+  // Separate validation function for order submission
+  const validateOrderSubmission = () => {
+    // Validate items
+    const validItems = Object.entries(selectedItems).filter(([, quantity]) => quantity > 0);
+    if (validItems.length === 0) {
+      return { isValid: false, error: 'At least one item must be added to the order' };
+    }
+    
+    // Validate delivery orders
+    if (deliveryType === 'Delivery') {
+      // Special handling for Bolt and WIX orders - they don't require customer phone
+      const isBoltOrWixOrder = activeMenuTab === 'bolt' || activeMenuTab === 'wix';
+      const isBoltOrWixDelivery = deliveryLocation === 'Bolt Delivery' || deliveryLocation === 'WIX Delivery';
+      
+      // Validate phone for non-Bolt/WIX delivery orders
+      if (!isBoltOrWixOrder || !isBoltOrWixDelivery) {
+        const cleanPhone = customerPhone.trim().replace(/\s+/g, '').replace(/-/g, '');
+        if (!cleanPhone) {
+          return { isValid: false, error: 'Customer phone number is required for delivery orders' };
+        }
+        if (!/^(\+233|0)\d{9}$/.test(cleanPhone)) {
+          return { isValid: false, error: 'Invalid Ghana phone format (e.g., 0241234567 or +233241234567)' };
+        }
+      }
+      
+      // Validate delivery location
+      if (!deliveryLocation) {
+        return { isValid: false, error: 'Delivery location is required for delivery orders' };
+      }
+      
+      // Validate custom location details if "Other" is selected
+      if (deliveryLocation === 'Other') {
+        if (!customLocationName.trim()) {
+          return { isValid: false, error: 'Custom location name is required' };
+        }
+        if (!customLocationFee.trim() || isNaN(parseFloat(customLocationFee)) || parseFloat(customLocationFee) < 0) {
+          return { isValid: false, error: 'Please enter a valid delivery fee amount' };
+        }
+      }
+    }
+    
+    return { isValid: true, validItems };
+  };
+
   const handleFinalSubmit = async () => {
     // Prevent multiple submissions
     if (isSubmitting) {
@@ -507,17 +580,21 @@ const CreateOrderForm = ({ isEditMode: isEditModeProp = false }) => {
     const startTime = performance.now();
     console.log('⏱️ Order submission started');
     
-    // Fast pre-validation before setting loading state
-    const preValidationItems = Object.entries(selectedItems).filter(([, quantity]) => quantity > 0);
-    if (preValidationItems.length === 0) {
-      contextToast.formValidation('Items');
-      return;
+    // Validate order before submission
+    const validation = validateOrderSubmission();
+    if (!validation.isValid) {
+      optimizedToast.error(validation.error);
+      console.log('❌ Validation failed:', validation.error);
+      return; // Exit early - no API call will be made
     }
     
+    // Only proceed with submission if validation passed
+    console.log('✅ Validation passed, proceeding with submission');
     setIsSubmitting(true);
 
     try {
-      const payloadItems = preValidationItems
+      // Use validated items from validation result
+      const payloadItems = validation.validItems
         .map(([itemId, quantity]) => ({ 
           menu_item_id: parseInt(itemId), 
           quantity: parseInt(quantity) 
@@ -867,39 +944,112 @@ const CreateOrderForm = ({ isEditMode: isEditModeProp = false }) => {
               
               {showMenuDropdown && (
                 <div className="mb-3 p-3 ada-shadow-sm" style={{ border: '1px solid #e9ecef', borderRadius: 'var(--ada-border-radius-lg)', backgroundColor: 'var(--ada-light-gray)' }}>
-                  <div className="d-flex gap-2 flex-wrap">
-                    {displayMenuItems.length === 0 ? (
-                      <div className="text-center py-3">
-                        <div className="text-muted mb-2">
-                          <i className="bi bi-exclamation-triangle" style={{ fontSize: '1.5rem' }}></i>
-                        </div>
-                        <p className="text-muted mb-0">No menu items available</p>
-                        <small className="text-muted">
-                          {allMenuItems.length === 0 ? 'No items loaded from API' : 
-                           mainMenuItems.length === 0 ? `${allMenuItems.length} items loaded, but all are marked as extras` :
-                           `${allMenuItems.length} total items loaded`}
-                        </small>
+                  {displayMenuItems.length === 0 ? (
+                    <div className="text-center py-3">
+                      <div className="text-muted mb-2">
+                        <i className="bi bi-exclamation-triangle" style={{ fontSize: '1.5rem' }}></i>
                       </div>
-                    ) : (
-                      displayMenuItems
-                        .filter(item => !selectedItems[item.id])
-                        .map(item => (
-                          <Button
-                            key={item.id}
-                            variant="outline-success"
-                            size="sm"
-                            onClick={() => handleAddItem(item.id)}
-                            className="ada-shadow-sm mb-2"
-                            style={{ minHeight: '44px' }}
-                          >
-                            {item.name} (₵{parseFloat(item.price || 0).toFixed(2)})
-                            <i className="bi bi-plus-circle ms-1"></i>
-                          </Button>
-                        ))
-                    )}
-                  </div>
-                  {displayMenuItems.length > 0 && displayMenuItems.filter(item => !selectedItems[item.id]).length === 0 && (
-                    <small className="text-muted fst-italic">All menu items have been added</small>
+                      <p className="text-muted mb-0">No menu items available</p>
+                      <small className="text-muted">
+                        {allMenuItems.length === 0 ? 'No items loaded from API' : 
+                         mainMenuItems.length === 0 ? `${allMenuItems.length} items loaded, but all are marked as extras` :
+                         `${allMenuItems.length} total items loaded`}
+                      </small>
+                    </div>
+                  ) : (
+                    <Tab.Container activeKey={activeMenuTab} onSelect={(k) => setActiveMenuTab(k)}>
+                      <Nav variant="tabs" className="mb-3">
+                        <Nav.Item>
+                          <Nav.Link eventKey="regular">
+                            <i className="bi bi-bag-fill me-1"></i>
+                            Regular
+                          </Nav.Link>
+                        </Nav.Item>
+                        <Nav.Item>
+                          <Nav.Link eventKey="bolt">
+                            <i className="bi bi-lightning-fill me-1"></i>
+                            Bolt
+                          </Nav.Link>
+                        </Nav.Item>
+                        <Nav.Item>
+                          <Nav.Link eventKey="wix">
+                            <i className="bi bi-box-fill me-1"></i>
+                            WIX
+                          </Nav.Link>
+                        </Nav.Item>
+                      </Nav>
+                      <Tab.Content>
+                        <Tab.Pane eventKey="regular" style={{ minHeight: '100px' }}>
+                          <div className="d-flex gap-2 flex-wrap">
+                            {regularMenuItems.filter(item => !selectedItems[item.id]).length === 0 ? (
+                              <small className="text-muted fst-italic">All regular items have been added</small>
+                            ) : (
+                              regularMenuItems
+                                .filter(item => !selectedItems[item.id])
+                                .map(item => (
+                                  <Button
+                                    key={item.id}
+                                    variant="outline-success"
+                                    size="sm"
+                                    onClick={() => handleAddItem(item.id)}
+                                    className="ada-shadow-sm mb-2"
+                                    style={{ minHeight: '44px' }}
+                                  >
+                                    {item.name} (₵{parseFloat(item.price || 0).toFixed(2)})
+                                    <i className="bi bi-plus-circle ms-1"></i>
+                                  </Button>
+                                ))
+                            )}
+                          </div>
+                        </Tab.Pane>
+                        <Tab.Pane eventKey="bolt" style={{ minHeight: '100px' }}>
+                          <div className="d-flex gap-2 flex-wrap">
+                            {boltMenuItems.filter(item => !selectedItems[item.id]).length === 0 ? (
+                              <small className="text-muted fst-italic">All Bolt items have been added</small>
+                            ) : (
+                              boltMenuItems
+                                .filter(item => !selectedItems[item.id])
+                                .map(item => (
+                                  <Button
+                                    key={item.id}
+                                    variant="outline-primary"
+                                    size="sm"
+                                    onClick={() => handleAddItem(item.id)}
+                                    className="ada-shadow-sm mb-2"
+                                    style={{ minHeight: '44px' }}
+                                  >
+                                    {item.name} (₵{parseFloat(item.price || 0).toFixed(2)})
+                                    <i className="bi bi-plus-circle ms-1"></i>
+                                  </Button>
+                                ))
+                            )}
+                          </div>
+                        </Tab.Pane>
+                        <Tab.Pane eventKey="wix" style={{ minHeight: '100px' }}>
+                          <div className="d-flex gap-2 flex-wrap">
+                            {wixMenuItems.filter(item => !selectedItems[item.id]).length === 0 ? (
+                              <small className="text-muted fst-italic">All WIX items have been added</small>
+                            ) : (
+                              wixMenuItems
+                                .filter(item => !selectedItems[item.id])
+                                .map(item => (
+                                  <Button
+                                    key={item.id}
+                                    variant="outline-info"
+                                    size="sm"
+                                    onClick={() => handleAddItem(item.id)}
+                                    className="ada-shadow-sm mb-2"
+                                    style={{ minHeight: '44px' }}
+                                  >
+                                    {item.name} (₵{parseFloat(item.price || 0).toFixed(2)})
+                                    <i className="bi bi-plus-circle ms-1"></i>
+                                  </Button>
+                                ))
+                            )}
+                          </div>
+                        </Tab.Pane>
+                      </Tab.Content>
+                    </Tab.Container>
                   )}
                 </div>
               )}

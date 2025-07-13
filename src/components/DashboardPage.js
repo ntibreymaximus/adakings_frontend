@@ -53,12 +53,6 @@ const DashboardPage = ({ userData }) => {
       icon: 'bi bi-list-ul'
     },
     { 
-      title: 'View Menu', 
-      route: '/view-menu', 
-      description: 'Browse the list of available menu items',
-      icon: 'bi bi-book-fill'
-    },
-    { 
       title: 'View Transactions', 
       route: '/view-transactions', 
       description: 'See a history of all financial transactions',
@@ -66,9 +60,9 @@ const DashboardPage = ({ userData }) => {
     },
   ];
 
-  // Add audit logs item for admin/superadmin users
+  // Add audit logs item for superadmin users only
   const adminItems = [];
-  if (userData && (userData.role === 'admin' || userData.role === 'superadmin')) {
+  if (userData && userData.role === 'superadmin') {
     adminItems.push({
       title: 'Audit Logs',
       route: '/audit-logs',
@@ -118,8 +112,8 @@ const DashboardPage = ({ userData }) => {
           />
         </Col>
         
-        {/* Audit Activity Card - Only show for admin/superadmin */}
-        {userData && (userData.role === 'admin' || userData.role === 'superadmin') && (
+        {/* Audit Activity Card - Only show for superadmin */}
+        {userData && userData.role === 'superadmin' && (
           <Col xs={12} lg={4}>
             <AuditActivityCard 
               maxItems={5}

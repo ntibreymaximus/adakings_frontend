@@ -14,6 +14,7 @@ import {
 } from '../services/paymentService';
 import { API_BASE_URL } from '../utils/api';
 import SimpleUserTracking from './SimpleUserTracking';
+import DeliveryRiderSelector from './DeliveryRiderSelector';
 
 // Optimized ViewOrdersPage with instant loading
 const ViewOrdersPage = memo(() => {
@@ -45,6 +46,7 @@ const ViewOrdersPage = memo(() => {
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
     const [showStats, setShowStats] = useState(!isMobile); // Stats visible by default on desktop
     const [showStatsModal, setShowStatsModal] = useState(false);
+    const [statusFilter, setStatusFilter] = useState(null); // null means no filter (show all)
   const [orderStats, setOrderStats] = useState({
     total: 0,
     pending: 0,
@@ -55,6 +57,13 @@ const ViewOrdersPage = memo(() => {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isCancellingOrder, setIsCancellingOrder] = useState(false);
+  
+  // Delivery rider state
+const [availableRiders, setAvailableRiders] = useState([]);
+const [orderForAssignment, setOrderForAssignment] = useState(null);
+  const [isSelectingRiderForStatus, setIsSelectingRiderForStatus] = useState(false);
+  const [selectedRider, setSelectedRider] = useState(null);
+  const [showRiderSelector, setShowRiderSelector] = useState(false);
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -75,6 +84,35 @@ const ViewOrdersPage = memo(() => {
             
             const token = localStorage.getItem('token');
             if (!token) {
+                console.error('❌ No authentication token found');
+                logout();
+                return;
+            }
+
+            // Validate token format and expiry
+            try {
+                const tokenParts = token.split('.');
+                if (tokenParts.length !== 3) {
+                    throw new Error('Invalid token format');
+                }
+                
+                const payload = JSON.parse(atob(tokenParts[1]));
+                const tokenExpiry = new Date(payload.exp * 1000);
+                const now = new Date();
+                
+                console.log('🔐 Token validation:', {
+                    expiresAt: tokenExpiry.toISOString(),
+                    currentTime: now.toISOString(),
+                    isExpired: now >= tokenExpiry
+                });
+                
+                if (now >= tokenExpiry) {
+                    console.error('❌ Token has expired');
+                    logout();
+                    return;
+                }
+            } catch (tokenError) {
+                console.error('❌ Token validation failed:', tokenError);
                 logout();
                 return;
             }
@@ -91,7 +129,8 @@ const ViewOrdersPage = memo(() => {
                 endpoint,
                 selectedDate,
                 isToday,
-                showLoader
+                showLoader,
+                tokenPreview: token.substring(0, 20) + '...'
             });
 
             const response = await fetch(endpoint, {
@@ -103,22 +142,45 @@ const ViewOrdersPage = memo(() => {
                 },
             });
 
-            console.log('📡 Response status:', response.status, response.statusText);
+            console.log('📡 Response received:', {
+                status: response.status,
+                statusText: response.statusText,
+                headers: Object.fromEntries(response.headers.entries())
+            });
 
             if (!response.ok) {
+                // Handle specific error codes
                 if (response.status === 401) {
+                    console.error('❌ Authentication failed (401) - Token may be invalid or expired');
+                    
+                    // Try to get more details
+                    try {
+                        const errorData = await response.json();
+                        console.error('Authentication error details:', errorData);
+                    } catch (e) {
+                        // Ignore parsing error
+                    }
+                    
                     logout();
                     return;
                 }
                 
+                if (response.status === 400) {
+                    console.error('❌ Bad Request (400) - Check request format');
+                }
+                
                 // Try to get error details from response
                 let errorDetails = `HTTP ${response.status}`;
+                let errorData = null;
                 try {
-                    const errorData = await response.json();
+                    errorData = await response.json();
+                    console.error('❌ API Error Response:', errorData);
+                    
                     if (errorData.detail || errorData.message) {
                         errorDetails += `: ${errorData.detail || errorData.message}`;
                     }
                 } catch (parseError) {
+                    console.error('Failed to parse error response:', parseError);
                     // If we can't parse the error response, use the status text
                     if (response.statusText) {
                         errorDetails += `: ${response.statusText}`;
@@ -141,12 +203,20 @@ const ViewOrdersPage = memo(() => {
             setAllOrders(orders);
             
         } catch (error) {
-            console.error('Error fetching orders:', error);
+            console.error('❌ Error fetching orders:', {
+                error: error,
+                message: error.message,
+                stack: error.stack
+            });
             
             // Provide more specific error messages
             let errorMessage = 'Failed to load orders';
             
-            if (error.message.includes('HTTP 404')) {
+            if (error.message.includes('HTTP 400')) {
+                errorMessage = 'Bad request. Please check your input and try again.';
+            } else if (error.message.includes('HTTP 401')) {
+                errorMessage = 'Authentication failed. Please login again.';
+            } else if (error.message.includes('HTTP 404')) {
                 errorMessage = `No orders found for ${new Date(selectedDate).toLocaleDateString()}`;
             } else if (error.message.includes('HTTP 403')) {
                 errorMessage = 'Access denied. Please check your permissions.';
@@ -154,6 +224,7 @@ const ViewOrdersPage = memo(() => {
                 errorMessage = 'Server error. Please try again later.';
             } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
                 errorMessage = 'Network error. Please check your connection and try again.';
+                console.error('🌐 Network issue - is the backend running on http://localhost:8000?');
             } else if (error.message.includes('HTTP')) {
                 errorMessage = `Server error (${error.message}). Please try again.`;
             }
@@ -342,18 +413,49 @@ const ViewOrdersPage = memo(() => {
     
     // Update state when orders or stats change
     useEffect(() => {
-        setFilteredOrders(allOrders); // Backend already filtered
+        // Apply status filtering if a filter is selected
+        let filtered = allOrders;
+        
+        if (statusFilter) {
+            filtered = allOrders.filter(order => {
+                // Map status filter to actual order statuses
+                switch (statusFilter) {
+                    case 'total':
+                        return true; // Show all orders
+                    case 'pending':
+                        return order.status === 'Pending' || order.status === 'Accepted';
+                    case 'outForDelivery':
+                        return order.status === 'Out for Delivery';
+                    case 'fulfilled':
+                        return order.status === 'Fulfilled';
+                    default:
+                        return true;
+                }
+            });
+        }
+        
+        setFilteredOrders(filtered);
         setOrderStats(orderStatsMemo);
         setCurrentPage(1); // Reset to first page when orders change
-    }, [allOrders, orderStatsMemo]);
+    }, [allOrders, orderStatsMemo, statusFilter]);
     
-    // Update paginated orders when allOrders or currentPage changes
+    // Update paginated orders when filteredOrders or currentPage changes
     useEffect(() => {
         const startIndex = (currentPage - 1) * ordersPerPage;
         const endIndex = startIndex + ordersPerPage;
-        const paginatedData = allOrders.slice(startIndex, endIndex);
+        const paginatedData = filteredOrders.slice(startIndex, endIndex);
         setPaginatedOrders(paginatedData);
-    }, [allOrders, currentPage, ordersPerPage]);
+    }, [filteredOrders, currentPage, ordersPerPage]);
+    
+    // Function to handle stats card click for filtering
+    const handleStatsClick = useCallback((statType) => {
+        // Toggle filter: if already selected, clear it; otherwise set it
+        if (statusFilter === statType) {
+            setStatusFilter(null); // Clear filter
+        } else {
+            setStatusFilter(statType); // Set filter
+        }
+    }, [statusFilter]);
 
     // Handle URL parameter for auto-opening order details
     useEffect(() => {
@@ -426,11 +528,111 @@ const ViewOrdersPage = memo(() => {
     };
 
     const isToday = selectedDate === getTodayDate();
+    
+    // Function to handle rider assignment
+const handleAssignRiderInline = async (order) => {
+    setOrderForAssignment(order);
+    const token = localStorage.getItem('token');
+    try {
+        const response = await fetch(`${API_BASE_URL}/deliveries/riders/available/`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (response.ok) {
+            const data = await response.json();
+            setAvailableRiders(data);
+            setIsSelectingRiderForStatus(true);
+        } else {
+            throw new Error('Failed to fetch riders');
+        }
+    } catch (error) {
+        optimizedToast.error('Failed to load riders');
+        setIsSelectingRiderForStatus(false);
+    }
+};
+    
+    // Function to handle rider assignment from inline modal
+    const handleAssignToRider = async () => {
+        if (!selectedRider || !orderForAssignment) {
+            optimizedToast.error('Please select a rider');
+            return;
+        }
+        
+        setIsUpdatingStatus(true);
+        
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`${API_BASE_URL}/deliveries/orders/${orderForAssignment.id}/assign-rider/`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    rider_id: selectedRider.id,
+                    delivery_instructions: '' // No instructions field in inline version
+                })
+            });
+            
+            if (response.ok) {
+                optimizedToast.success(`Order assigned to ${selectedRider.name}`);
+                
+                // Reset inline rider selection state
+                setIsSelectingRiderForStatus(false);
+                setSelectedRider(null);
+                setAvailableRiders([]);
+                setOrderForAssignment(null);
+                
+                // Refresh order data
+                await refreshOrderData();
+                
+                // Now proceed with status update to "Out for Delivery"
+                await performStatusUpdate();
+            } else {
+                throw new Error('Assignment failed');
+            }
+        } catch (error) {
+            optimizedToast.error('Failed to assign rider');
+        } finally {
+            setIsUpdatingStatus(false);
+        }
+    };
+    
+    // Callback when rider assignment is complete
+    const onAssignmentComplete = async () => {
+        // Close the rider selector modal
+        setShowRiderSelector(false);
+        
+        // If we have an order with rider assigned, update status to "Out for Delivery"
+        if (orderForAssignment && newStatus === 'Out for Delivery') {
+            // Update the selectedOrder with the orderForAssignment to ensure we have the right order
+            setSelectedOrder(orderForAssignment);
+            
+            // Perform the status update now that rider is assigned
+            await performStatusUpdate();
+        }
+        
+        // Refresh orders to get updated data
+        await refreshOrderData();
+        
+        setOrderForAssignment(null);
+    };
 
     const handleUpdateStatus = async () => {
         if (!selectedOrder || !newStatus) {
             contextToast.formValidation('Status');
             return;
+        }
+        
+        // Special handling for "Out for Delivery" status for delivery orders
+        if (newStatus === 'Out for Delivery' && selectedOrder.delivery_type === 'Delivery') {
+            // Check if rider is already assigned
+            if (!selectedOrder.assigned_rider_id) {
+                // Show rider selector modal
+                setOrderForAssignment(selectedOrder);
+                setShowStatusModal(false);
+                setShowRiderSelector(true);
+                return;
+            }
         }
         
         // Check if the new status is "Cancelled" and show confirmation modal
@@ -455,7 +657,8 @@ const ViewOrdersPage = memo(() => {
     try {
       // Enhanced payment status validation
       const paymentStatus = selectedOrder.payment_status?.toUpperCase();
-      const isPaymentConfirmed = paymentStatus === 'PAID' || paymentStatus === 'OVERPAID';
+      const isBoltOrWix = isBoltOrWixOrder(selectedOrder);
+      const isPaymentConfirmed = paymentStatus === 'PAID' || paymentStatus === 'OVERPAID' || isBoltOrWix;
       const isPartiallyPaid = paymentStatus === 'PARTIALLY PAID';
       const hasNoPayment = !paymentStatus || paymentStatus === 'UNPAID';
       const hasPendingPayment = paymentStatus === 'PENDING PAYMENT';
@@ -681,9 +884,20 @@ const ViewOrdersPage = memo(() => {
                         optimizedToast.info(`ID: ${paymentResponse.formatted_transaction_id || paymentResponse.custom_transaction_id}`);
                     }
                     
-                    // Check if this is a delivery order - it should auto-change to "Fulfilled" when payment confirmed
-                    if (selectedOrder.delivery_type === 'Delivery') {
-                        optimizedToast.info('🚚 Order fulfilled');
+                    // Update the selected order with the new status from the payment response
+                    if (paymentResponse.order_status) {
+                        setSelectedOrder(prevOrder => ({
+                            ...prevOrder,
+                            status: paymentResponse.order_status,
+                            payment_status: paymentResponse.order_payment_status || prevOrder.payment_status,
+                            amount_paid: paymentResponse.order_amount_paid || prevOrder.amount_paid,
+                            balance_due: paymentResponse.order_balance_due || prevOrder.balance_due
+                        }));
+                        
+                        // Check if this is a delivery order that was auto-changed to "Fulfilled"
+                        if (selectedOrder.delivery_type === 'Delivery' && paymentResponse.order_status === 'Fulfilled') {
+                            optimizedToast.info('🚚 Order automatically fulfilled upon payment confirmation');
+                        }
                     }
                 }
                 
@@ -710,10 +924,37 @@ const ViewOrdersPage = memo(() => {
     };
 
 
+    // Helper function to check if order is from Bolt or Wix
+    const isBoltOrWixOrder = (order) => {
+        if (!order) return false;
+        
+        // Check all possible location fields
+        const locationName = order.effective_delivery_location_name || 
+                           (order.delivery_location && order.delivery_location.name) || 
+                           order.delivery_location || 
+                           order.custom_delivery_location || 
+                           '';
+        
+        // Convert to lowercase for case-insensitive comparison
+        const lowerLocationName = locationName.toLowerCase();
+        
+        // Check if it's a Bolt or Wix delivery
+        const isBoltOrWix = lowerLocationName.includes('bolt') || lowerLocationName.includes('wix');
+        
+        // Debug log
+        console.log('Checking Bolt/Wix order:', {
+            locationName,
+            lowerLocationName,
+            isBoltOrWix,
+            order: order
+        });
+        
+        return isBoltOrWix;
+    };
+
     const openPaymentModal = (order) => {
         setSelectedOrder(order);
         setNewPaymentMode('');
-        setPaymentAmount('');
         setMobileNumber('');
         setShowPaymentConfirmation(false);
         
@@ -733,6 +974,21 @@ const ViewOrdersPage = memo(() => {
             setPaymentAmount(order.amount_paid || '0.00'); // Set refund amount to amount paid
         } else {
             setIsRefundMode(false);
+            // Auto-populate payment amount based on balance due or total price
+            const balanceDue = parseFloat(order.balance_due || 0);
+            const totalPrice = parseFloat(order.total_price || 0);
+            const amountPaid = parseFloat(order.amount_paid || 0);
+            
+            // If there's a balance due, use that; otherwise use the total price
+            if (balanceDue > 0) {
+                setPaymentAmount(balanceDue.toFixed(2));
+            } else if (amountPaid === 0) {
+                // If nothing has been paid yet, set to total price
+                setPaymentAmount(totalPrice.toFixed(2));
+            } else {
+                // If already paid in full or overpaid, default to empty
+                setPaymentAmount('');
+            }
         }
         
         setShowPaymentModal(true);
@@ -761,6 +1017,11 @@ const ViewOrdersPage = memo(() => {
 
     const closeStatusModal = () => {
         setShowStatusModal(false);
+        // Reset inline rider selection state
+        setIsSelectingRiderForStatus(false);
+        setSelectedRider(null);
+        setAvailableRiders([]);
+        setOrderForAssignment(null);
         // Don't set selectedOrder to null, keep it for order details modal
         setNewStatus('');
         // Return to order details modal if order is selected
@@ -801,6 +1062,13 @@ const ViewOrdersPage = memo(() => {
                         if (updatedOrder) {
                             console.log('🔄 Updating selectedOrder with fresh data:', updatedOrder);
                             setSelectedOrder(updatedOrder);
+                            
+                            // Also update the filtered orders to reflect the change immediately
+                            setFilteredOrders(prevFiltered => {
+                                return prevFiltered.map(order => 
+                                    order.id === selectedOrderId ? updatedOrder : order
+                                );
+                            });
                         } else {
                             console.log('⚠️ Could not find updated order in refreshed data');
                         }
@@ -819,8 +1087,14 @@ const ViewOrdersPage = memo(() => {
     const getStatusOptions = (order) => {
         if (!order) return ['Pending', 'Accepted', 'Fulfilled', 'Cancelled'];
         
+        // Use the existing helper function for consistent Bolt/Wix detection
+        if (isBoltOrWixOrder(order)) {
+            // Bolt/Wix orders: Accepted, Fulfilled, Cancelled
+            return ['Accepted', 'Fulfilled', 'Cancelled'];
+        }
+
         if (order.delivery_type === 'Delivery') {
-            // Delivery orders: Accepted → Out for Delivery → Fulfilled/Cancelled
+            // Regular delivery orders: Accepted → Out for Delivery → Fulfilled/Cancelled
             return ['Accepted', 'Out for Delivery', 'Fulfilled', 'Cancelled'];
         } else {
             // Pickup orders: Pending → Accepted → Fulfilled/Cancelled
@@ -850,6 +1124,8 @@ const ViewOrdersPage = memo(() => {
             case 'overpaid': return 'bg-info';
             case 'pending payment': return 'bg-secondary';
             case 'refunded': return 'bg-dark text-white';
+            case 'bolt-delivery': return 'bg-primary';
+            case 'wix-delivery': return 'bg-primary';
             default: return 'bg-secondary';
         }
     };
@@ -947,6 +1223,11 @@ const ViewOrdersPage = memo(() => {
             return '#6c757d'; // Bootstrap secondary
           case 'refunded':
             return '#343a40'; // Bootstrap dark
+          case 'bolt':
+          case 'bolt-delivery':
+          case 'wix':
+          case 'wix-delivery':
+            return '#198754'; // Bootstrap success (green)
           default:
             return '#6c757d'; // Bootstrap secondary
         }
@@ -969,6 +1250,11 @@ const ViewOrdersPage = memo(() => {
             return '#fff'; // White text for secondary background
           case 'refunded':
             return '#fff'; // White text for dark background
+          case 'bolt':
+          case 'bolt-delivery':
+          case 'wix':
+          case 'wix-delivery':
+            return '#fff'; // White text for success (green) background
           default:
             return '#fff'; // White text for secondary background
         }
@@ -983,6 +1269,10 @@ const ViewOrdersPage = memo(() => {
             return 'Part-Paid';
           case 'Not Paid':
             return 'Unpaid';
+          case 'Bolt-Delivery':
+            return 'BOLT';
+          case 'Wix-Delivery':
+            return 'WIX';
           default:
             return paymentStatus;
         }
@@ -1046,38 +1336,134 @@ const ViewOrdersPage = memo(() => {
       {!isMobile && showStats && (
         <Row className="mb-4 g-3">
           <Col xs={6} md={3}>
-            <Card className="text-center h-100">
+            <Card 
+              className="text-center h-100 ada-shadow-sm" 
+              onClick={() => handleStatsClick('total')}
+              style={{ 
+                cursor: 'pointer', 
+                transition: 'all 0.2s ease-in-out',
+                border: statusFilter === 'total' ? '2px solid var(--ada-primary)' : '1px solid #dee2e6',
+                backgroundColor: statusFilter === 'total' ? '#f8f9fa' : 'white'
+              }}
+              onMouseEnter={(e) => {
+                if (statusFilter !== 'total') {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (statusFilter !== 'total') {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                }
+              }}
+            >
               <Card.Body>
                 <i className="bi bi-list-ul text-primary" style={{ fontSize: '2rem' }}></i>
                 <h4 className="mt-2">{orderStats.total}</h4>
                 <p className="mb-0 text-muted">Total Orders</p>
+                {statusFilter === 'total' && (
+                  <small className="text-primary fw-bold">✓ Active Filter</small>
+                )}
               </Card.Body>
             </Card>
           </Col>
           <Col xs={6} md={3}>
-            <Card className="text-center h-100">
+            <Card 
+              className="text-center h-100 ada-shadow-sm" 
+              onClick={() => handleStatsClick('pending')}
+              style={{ 
+                cursor: 'pointer', 
+                transition: 'all 0.2s ease-in-out',
+                border: statusFilter === 'pending' ? '2px solid var(--ada-primary)' : '1px solid #dee2e6',
+                backgroundColor: statusFilter === 'pending' ? '#f8f9fa' : 'white'
+              }}
+              onMouseEnter={(e) => {
+                if (statusFilter !== 'pending') {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (statusFilter !== 'pending') {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                }
+              }}
+            >
               <Card.Body>
                 <i className="bi bi-clock text-warning" style={{ fontSize: '2rem' }}></i>
                 <h4 className="mt-2">{orderStats.pending}</h4>
                 <p className="mb-0 text-muted">Pending & Accepted</p>
+                {statusFilter === 'pending' && (
+                  <small className="text-primary fw-bold">✓ Active Filter</small>
+                )}
               </Card.Body>
             </Card>
           </Col>
           <Col xs={6} md={3}>
-            <Card className="text-center h-100">
+            <Card 
+              className="text-center h-100 ada-shadow-sm" 
+              onClick={() => handleStatsClick('outForDelivery')}
+              style={{ 
+                cursor: 'pointer', 
+                transition: 'all 0.2s ease-in-out',
+                border: statusFilter === 'outForDelivery' ? '2px solid var(--ada-primary)' : '1px solid #dee2e6',
+                backgroundColor: statusFilter === 'outForDelivery' ? '#f8f9fa' : 'white'
+              }}
+              onMouseEnter={(e) => {
+                if (statusFilter !== 'outForDelivery') {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (statusFilter !== 'outForDelivery') {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                }
+              }}
+            >
               <Card.Body>
                 <i className="bi bi-truck text-info" style={{ fontSize: '2rem' }}></i>
                 <h4 className="mt-2">{orderStats.outForDelivery}</h4>
                 <p className="mb-0 text-muted">Out for Delivery</p>
+                {statusFilter === 'outForDelivery' && (
+                  <small className="text-primary fw-bold">✓ Active Filter</small>
+                )}
               </Card.Body>
             </Card>
           </Col>
           <Col xs={6} md={3}>
-            <Card className="text-center h-100">
+            <Card 
+              className="text-center h-100 ada-shadow-sm" 
+              onClick={() => handleStatsClick('fulfilled')}
+              style={{ 
+                cursor: 'pointer', 
+                transition: 'all 0.2s ease-in-out',
+                border: statusFilter === 'fulfilled' ? '2px solid var(--ada-primary)' : '1px solid #dee2e6',
+                backgroundColor: statusFilter === 'fulfilled' ? '#f8f9fa' : 'white'
+              }}
+              onMouseEnter={(e) => {
+                if (statusFilter !== 'fulfilled') {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (statusFilter !== 'fulfilled') {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                }
+              }}
+            >
               <Card.Body>
                 <i className="bi bi-check-circle text-success" style={{ fontSize: '2rem' }}></i>
                 <h4 className="mt-2">{orderStats.fulfilled}</h4>
                 <p className="mb-0 text-muted">Fulfilled</p>
+                {statusFilter === 'fulfilled' && (
+                  <small className="text-primary fw-bold">✓ Active Filter</small>
+                )}
               </Card.Body>
             </Card>
           </Col>
@@ -1231,8 +1617,8 @@ const ViewOrdersPage = memo(() => {
                             background: getPaymentStatusBadgeColor(order.payment_status),
                             color: getPaymentStatusTextColor(order.payment_status)
                           }}
-                        >
-                          {order.payment_status || 'Not Paid'}
+                          >
+                          {order.payment_status ? getShortPaymentStatus(order.payment_status) : 'NOT PAID'}
                         </span>
                       </td>
                       <td>
@@ -1440,6 +1826,13 @@ const ViewOrdersPage = memo(() => {
                           >
                             <i className="bi bi-chevron-right"></i>
                           </button>
+                          {/* Delivery Rider - Only show for delivery orders with assigned rider */}
+                          {order.delivery_type === 'Delivery' && order.assigned_rider_name && (
+                            <span className="text-muted" style={{ fontSize: '0.7rem', marginTop: '2px' }}>
+                              <i className="bi bi-person-badge me-1" style={{ fontSize: '0.65rem' }}></i>
+                              {order.assigned_rider_name}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </Card.Body>
@@ -1539,15 +1932,32 @@ const ViewOrdersPage = memo(() => {
                 
                 <Form.Select
                   value={newStatus}
-                  onChange={(e) => setNewStatus(e.target.value)}
+                  onChange={(e) => {
+                    const selectedValue = e.target.value;
+                    setNewStatus(selectedValue);
+                    
+                    // If "Out for Delivery" is selected and no rider assigned, open rider modal immediately
+                    if (
+                      selectedValue === "Out for Delivery" &&
+                      selectedOrder.delivery_type === "Delivery" &&
+                      !selectedOrder.assigned_rider_id
+                    ) {
+                      // Store the order for assignment
+                      setOrderForAssignment(selectedOrder);
+                      // Close the status modal
+                      setShowStatusModal(false);
+                      // Open the rider selector modal
+                      setShowRiderSelector(true);
+                    }
+                  }}
                   className="ada-shadow-sm"
                   required
                 >
                   <option value="">Select new status...</option>
                   {getStatusOptions(selectedOrder).map((status) => {
-                    // Enhanced payment status checking with case-insensitive comparison
                     const paymentStatus = selectedOrder.payment_status?.toUpperCase();
-                    const isPaymentConfirmed = paymentStatus === 'PAID' || paymentStatus === 'OVERPAID';
+                    const isBoltOrWix = isBoltOrWixOrder(selectedOrder);
+                    const isPaymentConfirmed = paymentStatus === 'PAID' || paymentStatus === 'OVERPAID' || isBoltOrWix;
                     const isPartiallyPaid = paymentStatus === 'PARTIALLY PAID';
                     const isDeliveryOrder = selectedOrder.delivery_type === 'Delivery';
                     
@@ -1684,7 +2094,7 @@ const ViewOrdersPage = memo(() => {
                     className={`badge ${getPaymentStatusBadgeVariant(selectedOrder.payment_status)} ms-2`}
                     style={{ fontSize: '0.85rem', padding: '0.5rem 0.75rem' }}
                   >
-                    {selectedOrder.payment_status || 'Not Paid'}
+                    {selectedOrder.payment_status ? getShortPaymentStatus(selectedOrder.payment_status) : 'NOT PAID'}
                   </span>
                 </p>
                 <p className="mb-3">
@@ -2161,7 +2571,7 @@ const ViewOrdersPage = memo(() => {
                     backgroundColor: getPaymentStatusBadgeColor(selectedOrder.payment_status),
                     color: getPaymentStatusTextColor(selectedOrder.payment_status)
                   }}>
-                  {selectedOrder.payment_status || 'Not Paid'}
+                  {getShortPaymentStatus(selectedOrder.payment_status) || 'Not Paid'}
                 </span>
               </div>
             )}
@@ -2376,16 +2786,18 @@ const ViewOrdersPage = memo(() => {
               <i className="bi bi-pencil-square me-1"></i>
               {isMobile ? 'Status' : 'Update Status'}
             </Button>
-            <Button 
-              variant="success" 
-              onClick={() => openPaymentModal(selectedOrder)}
-              className="flex-fill order-3 order-sm-4"
-              size={isMobile ? "sm" : undefined}
-              style={{ minHeight: isMobile ? '36px' : '44px' }}
-            >
-              <i className="bi bi-credit-card me-1"></i>
-              {isMobile ? 'Payment' : 'Update Payment'}
-            </Button>
+            {!isBoltOrWixOrder(selectedOrder) && (
+              <Button 
+                variant="success" 
+                onClick={() => openPaymentModal(selectedOrder)}
+                className="flex-fill order-3 order-sm-4"
+                size={isMobile ? "sm" : undefined}
+                style={{ minHeight: isMobile ? '36px' : '44px' }}
+              >
+                <i className="bi bi-credit-card me-1"></i>
+                {isMobile ? 'Payment' : 'Update Payment'}
+              </Button>
+            )}
               </>
             )}
           </div>
@@ -2408,38 +2820,66 @@ const ViewOrdersPage = memo(() => {
         <Modal.Body>
           <Row className="g-3">
             <Col xs={6}>
-              <Card className="text-center h-100">
+              <Card 
+                className={`text-center h-100 ${statusFilter === 'total' ? 'border-primary bg-primary bg-opacity-10' : 'border-light'}`}
+                style={{ cursor: 'pointer' }}
+                onClick={() => {
+                  handleStatsClick('total');
+                  setShowStatsModal(false);
+                }}
+              >
                 <Card.Body>
-                  <i className="bi bi-list-ul text-primary" style={{ fontSize: '2rem' }}></i>
-                  <h4 className="mt-2">{orderStats.total}</h4>
-                  <p className="mb-0 text-muted">Total Orders</p>
+                  <i className={`bi bi-list-ul ${statusFilter === 'total' ? 'text-primary' : 'text-primary'}`} style={{ fontSize: '2rem' }}></i>
+                  <h4 className={`mt-2 ${statusFilter === 'total' ? 'text-primary fw-bold' : ''}`}>{orderStats.total}</h4>
+                  <p className={`mb-0 ${statusFilter === 'total' ? 'text-primary' : 'text-muted'}`}>Total Orders</p>
                 </Card.Body>
               </Card>
             </Col>
             <Col xs={6}>
-              <Card className="text-center h-100">
+              <Card 
+                className={`text-center h-100 ${statusFilter === 'pending' ? 'border-warning bg-warning bg-opacity-10' : 'border-light'}`}
+                style={{ cursor: 'pointer' }}
+                onClick={() => {
+                  handleStatsClick('pending');
+                  setShowStatsModal(false);
+                }}
+              >
                 <Card.Body>
-                  <i className="bi bi-clock text-warning" style={{ fontSize: '2rem' }}></i>
-                  <h4 className="mt-2">{orderStats.pending}</h4>
-                  <p className="mb-0 text-muted">Pending & Accepted</p>
+                  <i className={`bi bi-clock ${statusFilter === 'pending' ? 'text-warning' : 'text-warning'}`} style={{ fontSize: '2rem' }}></i>
+                  <h4 className={`mt-2 ${statusFilter === 'pending' ? 'text-warning fw-bold' : ''}`}>{orderStats.pending}</h4>
+                  <p className={`mb-0 ${statusFilter === 'pending' ? 'text-warning' : 'text-muted'}`}>Pending & Accepted</p>
                 </Card.Body>
               </Card>
             </Col>
             <Col xs={6}>
-              <Card className="text-center h-100">
+              <Card 
+                className={`text-center h-100 ${statusFilter === 'outForDelivery' ? 'border-info bg-info bg-opacity-10' : 'border-light'}`}
+                style={{ cursor: 'pointer' }}
+                onClick={() => {
+                  handleStatsClick('outForDelivery');
+                  setShowStatsModal(false);
+                }}
+              >
                 <Card.Body>
-                  <i className="bi bi-truck text-info" style={{ fontSize: '2rem' }}></i>
-                  <h4 className="mt-2">{orderStats.outForDelivery}</h4>
-                  <p className="mb-0 text-muted">Out for Delivery</p>
+                  <i className={`bi bi-truck ${statusFilter === 'outForDelivery' ? 'text-info' : 'text-info'}`} style={{ fontSize: '2rem' }}></i>
+                  <h4 className={`mt-2 ${statusFilter === 'outForDelivery' ? 'text-info fw-bold' : ''}`}>{orderStats.outForDelivery}</h4>
+                  <p className={`mb-0 ${statusFilter === 'outForDelivery' ? 'text-info' : 'text-muted'}`}>Out for Delivery</p>
                 </Card.Body>
               </Card>
             </Col>
             <Col xs={6}>
-              <Card className="text-center h-100">
+              <Card 
+                className={`text-center h-100 ${statusFilter === 'fulfilled' ? 'border-success bg-success bg-opacity-10' : 'border-light'}`}
+                style={{ cursor: 'pointer' }}
+                onClick={() => {
+                  handleStatsClick('fulfilled');
+                  setShowStatsModal(false);
+                }}
+              >
                 <Card.Body>
-                  <i className="bi bi-check-circle text-success" style={{ fontSize: '2rem' }}></i>
-                  <h4 className="mt-2">{orderStats.fulfilled}</h4>
-                  <p className="mb-0 text-muted">Fulfilled</p>
+                  <i className={`bi bi-check-circle ${statusFilter === 'fulfilled' ? 'text-success' : 'text-success'}`} style={{ fontSize: '2rem' }}></i>
+                  <h4 className={`mt-2 ${statusFilter === 'fulfilled' ? 'text-success fw-bold' : ''}`}>{orderStats.fulfilled}</h4>
+                  <p className={`mb-0 ${statusFilter === 'fulfilled' ? 'text-success' : 'text-muted'}`}>Fulfilled</p>
                 </Card.Body>
               </Card>
             </Col>
@@ -2496,7 +2936,7 @@ const ViewOrdersPage = memo(() => {
                     className={`badge ${getPaymentStatusBadgeVariant(selectedOrder.payment_status)} ms-2`}
                     style={{ fontSize: '0.85rem', padding: '0.5rem 0.75rem' }}
                   >
-                    {selectedOrder.payment_status || 'Not Paid'}
+                    {selectedOrder.payment_status ? selectedOrder.payment_status.toUpperCase().replace('-DELIVERY', '') : 'NOT PAID'}
                   </span>
                 </p>
               </div>
@@ -2591,6 +3031,23 @@ const ViewOrdersPage = memo(() => {
           </div>
         </Modal.Footer>
       </Modal>
+      
+      {/* Delivery Rider Selector Modal */}
+      <DeliveryRiderSelector
+        show={showRiderSelector}
+        onHide={() => {
+          setShowRiderSelector(false);
+          setOrderForAssignment(null);
+          // Reset states and return to order details modal
+          setNewStatus('');
+          if (selectedOrder) {
+            setShowOrderDetailsModal(true);
+          }
+        }}
+        order={orderForAssignment}
+        onAssignmentComplete={onAssignmentComplete}
+      />
+      
       </Container>
   );
 });

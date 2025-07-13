@@ -2,6 +2,44 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.6.0] - 2025-07-13
+
+### 🚀 Development Release
+
+**📋 Release Information:**
+- **Environment**: dev
+- **Branch**: `dev/1.6.0`
+- **Version**: `1.6.0`
+- **Deployment Time**: 2025-07-13 16:08:27
+- **Description**: Development environment deployment with latest React components
+
+**📝 Changes Made:**
+React v1.6.0: Deploy to dev environment
+
+**📁 Files Modified:**
+  - Modified: `ERSION`
+  - Modified: `package.json`
+  - Modified: `src/components/DashboardPage.js`
+  - Modified: `src/components/ViewOrdersPage.js`
+  - Modified: `src/pages/CreateOrderForm.js`
+  - Modified: `src/utils/paymentUtils.js`
+  - Changed: `delivery_rider_implementation_guide.md`
+  - Changed: `src/components/DeliveryRiderSelector.js`
+
+**🔄 Deployment Details:**
+- **Source Branch**: `dev/1.6.0`
+- **Target Branch**: `dev/1.6.0`
+- **Build Process**: Development build with source maps
+- **React Version**: Latest
+
+**🎯 Environment Specific Notes:**
+- Development environment deployment
+- Contains latest React components and changes
+- Used for integration testing before production
+- Devtest branch updated for continuous testing
+
+---
+
 ## [1.5.0] - 2025-07-12
 
 ### 🚀 Development Release
