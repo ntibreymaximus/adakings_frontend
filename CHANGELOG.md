@@ -2,6 +2,40 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.6.1] - 2025-07-13
+
+### 🚀 Development Release
+
+**📋 Release Information:**
+- **Environment**: dev
+- **Branch**: `dev/1.6.1`
+- **Version**: `1.6.1`
+- **Deployment Time**: 2025-07-13 16:26:55
+- **Description**: Development environment deployment with latest React components
+
+**📝 Changes Made:**
+React v1.6.1: Deploy to dev environment
+
+**📁 Files Modified:**
+  - Deleted: `NVIRONMENTS.md`
+  - Modified: `VERSION`
+  - Deleted: `delivery_rider_implementation_guide.md`
+  - Modified: `package.json`
+
+**🔄 Deployment Details:**
+- **Source Branch**: `dev/1.6.1`
+- **Target Branch**: `dev/1.6.1`
+- **Build Process**: Development build with source maps
+- **React Version**: Latest
+
+**🎯 Environment Specific Notes:**
+- Development environment deployment
+- Contains latest React components and changes
+- Used for integration testing before production
+- Devtest branch updated for continuous testing
+
+---
+
 ## [1.6.0] - 2025-07-13
 
 ### 🚀 Development Release
