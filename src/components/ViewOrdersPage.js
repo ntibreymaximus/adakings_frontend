@@ -939,11 +939,7 @@ const handleAssignRiderInline = async (order) => {
         if (!order) return false;
         
         // Check all possible location fields
-        const locationName = order.effective_delivery_location_name || 
-                           (order.delivery_location && order.delivery_location.name) || 
-                           order.delivery_location || 
-                           order.custom_delivery_location || 
-                           '';
+        const locationName = order.effective_delivery_location_name || '';
         
         // Convert to lowercase for case-insensitive comparison
         const lowerLocationName = locationName.toLowerCase();
@@ -1603,8 +1599,8 @@ const handleAssignRiderInline = async (order) => {
                           }}
                         >
                           <i className={`bi ${order.delivery_type === 'Delivery' ? 'bi-truck' : 'bi-shop'} me-2`}></i>
-                          {order.delivery_type === 'Delivery' && (order.delivery_location || order.custom_delivery_location)
-                            ? `Delivery to ${order.effective_delivery_location_name || order.delivery_location || order.custom_delivery_location}`
+                          {order.delivery_type === 'Delivery' && order.effective_delivery_location_name
+                            ? `Delivery to ${order.effective_delivery_location_name}`
                             : order.delivery_type || 'Pickup'
                           }
                         </span>
@@ -1772,9 +1768,9 @@ const handleAssignRiderInline = async (order) => {
                               }}
                             >
                               <i className={`bi ${order.delivery_type === 'Delivery' ? 'bi-truck' : 'bi-shop'} me-1`}></i>
-                              {order.delivery_type === 'Delivery' && (order.delivery_location || order.custom_delivery_location)
+                              {order.delivery_type === 'Delivery' && order.effective_delivery_location_name
                                 ? (() => {
-                                    const locationName = order.effective_delivery_location_name || order.delivery_location || order.custom_delivery_location || '';
+                                    const locationName = order.effective_delivery_location_name;
                                     const isBolt = locationName.toLowerCase().includes('bolt');
                                     return isBolt ? `By ${locationName}` : `To ${locationName}`;
                                   })()
@@ -1933,11 +1929,11 @@ const handleAssignRiderInline = async (order) => {
                         ? 'Order is only partially paid. Some status updates may be restricted.' 
                         : selectedOrder.payment_status === 'PENDING PAYMENT'
                         ? 'Payment is pending. Please wait for payment confirmation before updating status.'
-                        : 'Payment required for most status updates. Only \'Pending\' and \'Cancelled\' are available.'}
+                        : 'Payment required for most status updates. Only "Pending" and "Cancelled" are available.'}
                     </small>
                   </div>
                 )}
-                
+
                 <Form.Select
                   value={newStatus}
                   onChange={(e) => {
@@ -2671,10 +2667,10 @@ const handleAssignRiderInline = async (order) => {
                           {selectedOrder.delivery_type || 'Pickup'}
                         </span>
                       </div>
-                      {selectedOrder.delivery_type === 'Delivery' && (selectedOrder.delivery_location || selectedOrder.custom_delivery_location) && (
+                      {selectedOrder.delivery_type === 'Delivery' && selectedOrder.effective_delivery_location_name && (
                         <div className="d-flex justify-content-between align-items-center mb-2">
                           <span>Location:</span>
-                          <span className="text-muted small">{selectedOrder.effective_delivery_location_name || selectedOrder.delivery_location || selectedOrder.custom_delivery_location}</span>
+                          <span className="text-muted small">{selectedOrder.effective_delivery_location_name}</span>
                         </div>
                       )}
                       {selectedOrder.delivery_type === 'Delivery' && selectedOrder.delivery_fee && (
