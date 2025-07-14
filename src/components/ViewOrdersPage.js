@@ -29,6 +29,7 @@ const ViewOrdersPage = memo(() => {
     const [newPaymentMode, setNewPaymentMode] = useState('');
     const [paymentAmount, setPaymentAmount] = useState('');
     const [mobileNumber, setMobileNumber] = useState('');
+    const [wixOrderNumber, setWixOrderNumber] = useState('');
     const [showPaymentConfirmation, setShowPaymentConfirmation] = useState(false);
     const [showPaymentHistoryModal, setShowPaymentHistoryModal] = useState(false);
     const [showOrderDetailsModal, setShowOrderDetailsModal] = useState(false);
@@ -657,8 +658,8 @@ const handleAssignRiderInline = async (order) => {
     try {
       // Enhanced payment status validation
       const paymentStatus = selectedOrder.payment_status?.toUpperCase();
-      const isBoltOrWix = isBoltOrWixOrder(selectedOrder);
-      const isPaymentConfirmed = paymentStatus === 'PAID' || paymentStatus === 'OVERPAID' || isBoltOrWix;
+      const isBolt = isBoltDeliveryOrder(selectedOrder);
+      const isPaymentConfirmed = paymentStatus === 'PAID' || paymentStatus === 'OVERPAID' || isBolt;
       const isPartiallyPaid = paymentStatus === 'PARTIALLY PAID';
       const hasNoPayment = !paymentStatus || paymentStatus === 'UNPAID';
       const hasPendingPayment = paymentStatus === 'PENDING PAYMENT';
@@ -840,6 +841,15 @@ const handleAssignRiderInline = async (order) => {
                 paymentData.mobile_number = mobileNumber.trim().replace(/\s+/g, '');
             }
             
+            // Add Wix order number for PAID_ON_WIX payments
+            if (newPaymentMode === 'PAID_ON_WIX') {
+                if (!wixOrderNumber || wixOrderNumber.trim() === '') {
+                    contextToast.formValidation('Wix order number');
+                    return;
+                }
+                paymentData.wix_order_number = wixOrderNumber.trim();
+            }
+            
             // Use the payment service to initiate payment
             const paymentResponse = await initiatePayment(paymentData);
                 
@@ -924,8 +934,8 @@ const handleAssignRiderInline = async (order) => {
     };
 
 
-    // Helper function to check if order is from Bolt or Wix
-    const isBoltOrWixOrder = (order) => {
+    // Helper function to check if order is from Bolt
+    const isBoltDeliveryOrder = (order) => {
         if (!order) return false;
         
         // Check all possible location fields
@@ -938,18 +948,18 @@ const handleAssignRiderInline = async (order) => {
         // Convert to lowercase for case-insensitive comparison
         const lowerLocationName = locationName.toLowerCase();
         
-        // Check if it's a Bolt or Wix delivery
-        const isBoltOrWix = lowerLocationName.includes('bolt') || lowerLocationName.includes('wix');
+        // Check if it's a Bolt delivery
+        const isBolt = lowerLocationName.includes('bolt');
         
         // Debug log
-        console.log('Checking Bolt/Wix order:', {
+        console.log('Checking Bolt order:', {
             locationName,
             lowerLocationName,
-            isBoltOrWix,
+            isBolt,
             order: order
         });
         
-        return isBoltOrWix;
+        return isBolt;
     };
 
     const openPaymentModal = (order) => {
@@ -1087,9 +1097,9 @@ const handleAssignRiderInline = async (order) => {
     const getStatusOptions = (order) => {
         if (!order) return ['Pending', 'Accepted', 'Fulfilled', 'Cancelled'];
         
-        // Use the existing helper function for consistent Bolt/Wix detection
-        if (isBoltOrWixOrder(order)) {
-            // Bolt/Wix orders: Accepted, Fulfilled, Cancelled
+        // Use the existing helper function for consistent Bolt detection
+        if (isBoltDeliveryOrder(order)) {
+            // Bolt orders: Accepted, Fulfilled, Cancelled
             return ['Accepted', 'Fulfilled', 'Cancelled'];
         }
 
@@ -1125,7 +1135,6 @@ const handleAssignRiderInline = async (order) => {
             case 'pending payment': return 'bg-secondary';
             case 'refunded': return 'bg-dark text-white';
             case 'bolt-delivery': return 'bg-primary';
-            case 'wix-delivery': return 'bg-primary';
             default: return 'bg-secondary';
         }
     };
@@ -1148,6 +1157,7 @@ const handleAssignRiderInline = async (order) => {
             case 'MTN MOMO': return 'MTN MoMo';
             case 'PAYSTACK(USSD)': return 'Paystack (USSD)';
             case 'PAYSTACK(API)': return 'Paystack (API)';
+            case 'PAID_ON_WIX': return 'Paid On Wix';
             default: return paymentMode || '-';
         }
     };
@@ -1225,8 +1235,6 @@ const handleAssignRiderInline = async (order) => {
             return '#343a40'; // Bootstrap dark
           case 'bolt':
           case 'bolt-delivery':
-          case 'wix':
-          case 'wix-delivery':
             return '#198754'; // Bootstrap success (green)
           default:
             return '#6c757d'; // Bootstrap secondary
@@ -1252,8 +1260,6 @@ const handleAssignRiderInline = async (order) => {
             return '#fff'; // White text for dark background
           case 'bolt':
           case 'bolt-delivery':
-          case 'wix':
-          case 'wix-delivery':
             return '#fff'; // White text for success (green) background
           default:
             return '#fff'; // White text for secondary background
@@ -1271,8 +1277,6 @@ const handleAssignRiderInline = async (order) => {
             return 'Unpaid';
           case 'Bolt-Delivery':
             return 'BOLT';
-          case 'Wix-Delivery':
-            return 'WIX';
           default:
             return paymentStatus;
         }
@@ -1769,7 +1773,11 @@ const handleAssignRiderInline = async (order) => {
                             >
                               <i className={`bi ${order.delivery_type === 'Delivery' ? 'bi-truck' : 'bi-shop'} me-1`}></i>
                               {order.delivery_type === 'Delivery' && (order.delivery_location || order.custom_delivery_location)
-                                ? `To ${order.effective_delivery_location_name || order.delivery_location || order.custom_delivery_location}`
+                                ? (() => {
+                                    const locationName = order.effective_delivery_location_name || order.delivery_location || order.custom_delivery_location || '';
+                                    const isBolt = locationName.toLowerCase().includes('bolt');
+                                    return isBolt ? `By ${locationName}` : `To ${locationName}`;
+                                  })()
                                 : order.delivery_type === 'Delivery' ? 'Delivery' : 'Pickup'
                               }
                             </span>
@@ -1956,8 +1964,8 @@ const handleAssignRiderInline = async (order) => {
                   <option value="">Select new status...</option>
                   {getStatusOptions(selectedOrder).map((status) => {
                     const paymentStatus = selectedOrder.payment_status?.toUpperCase();
-                    const isBoltOrWix = isBoltOrWixOrder(selectedOrder);
-                    const isPaymentConfirmed = paymentStatus === 'PAID' || paymentStatus === 'OVERPAID' || isBoltOrWix;
+                    const isBolt = isBoltDeliveryOrder(selectedOrder);
+                    const isPaymentConfirmed = paymentStatus === 'PAID' || paymentStatus === 'OVERPAID' || isBolt;
                     const isPartiallyPaid = paymentStatus === 'PARTIALLY PAID';
                     const isDeliveryOrder = selectedOrder.delivery_type === 'Delivery';
                     
@@ -2230,6 +2238,34 @@ const handleAssignRiderInline = async (order) => {
                           {!isMobile && (
                             <Form.Text className="text-muted">
                               Enter Ghanaian mobile number (MTN, Vodafone, AirtelTigo)
+                            </Form.Text>
+                          )}
+                        </Form.Group>
+                      </Col>
+                    </Row>
+                  )}
+                  
+                  {/* Wix Order Number Input for PAID_ON_WIX */}
+                  {newPaymentMode === 'PAID_ON_WIX' && (
+                    <Row className={isMobile ? "mb-2" : "mb-3"}>
+                      <Col>
+                        <Form.Group controlId="wixOrderNumber">
+                          <Form.Label className={`fw-semibold ${isMobile ? 'small' : ''}`}>
+                            Wix Order Number <span className="text-danger">*</span>
+                            {!isMobile && <small className="text-muted ms-2">(Required for Wix payments)</small>}
+                          </Form.Label>
+                          <Form.Control
+                            type="text"
+                            value={wixOrderNumber}
+                            onChange={(e) => setWixOrderNumber(e.target.value)}
+                            placeholder="Enter Wix order number"
+                            className="ada-shadow-sm"
+                            size={isMobile ? "sm" : undefined}
+                            required
+                          />
+                          {!isMobile && (
+                            <Form.Text className="text-muted">
+                              Enter the order number from Wix platform
                             </Form.Text>
                           )}
                         </Form.Group>
@@ -2786,7 +2822,7 @@ const handleAssignRiderInline = async (order) => {
               <i className="bi bi-pencil-square me-1"></i>
               {isMobile ? 'Status' : 'Update Status'}
             </Button>
-            {!isBoltOrWixOrder(selectedOrder) && (
+            {!isBoltDeliveryOrder(selectedOrder) && (
               <Button 
                 variant="success" 
                 onClick={() => openPaymentModal(selectedOrder)}

@@ -5,7 +5,8 @@ export const PAYMENT_METHODS = {
   TELECEL_CASH: 'TELECEL CASH',
   MTN_MOMO: 'MTN MOMO',
   PAYSTACK_USSD: 'PAYSTACK(USSD)',
-  PAYSTACK_API: 'PAYSTACK(API)'
+  PAYSTACK_API: 'PAYSTACK(API)',
+  PAID_ON_WIX: 'PAID_ON_WIX'
 };
 
 export const PAYMENT_STATUSES = {
@@ -14,8 +15,7 @@ export const PAYMENT_STATUSES = {
   PARTIALLY_PAID: 'Partially Paid',
   OVERPAID: 'Overpaid',
   PENDING_PAYMENT: 'Pending Payment',
-  BOLT: 'BOLT',
-  WIX: 'WIX'
+  BOLT: 'BOLT'
 };
 
 /**
@@ -134,6 +134,13 @@ export const getPaymentMethodInfo = (paymentMethod) => {
         requiresMobile: true,
         isImmediate: false 
       };
+    case 'PAID_ON_WIX':
+      return { 
+        display: 'Paid on Wix', 
+        icon: '🌐', 
+        requiresMobile: false,
+        isImmediate: true 
+      };
     default:
       return { 
         display: paymentMethod || 'Unknown', 
@@ -163,7 +170,7 @@ export const getPaymentStatusBadgeVariant = (paymentStatus) => {
       return 'bg-secondary';
     case 'bolt':
       return 'bg-success';
-    case 'wix':
+    case 'paid on wix':
       return 'bg-success';
     default:
       return 'bg-secondary';

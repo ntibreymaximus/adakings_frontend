@@ -54,7 +54,6 @@ const CreateOrderForm = ({ isEditMode: isEditModeProp = false }) => {
   // Further categorize main menu items by type
   const regularMenuItems = mainMenuItems.filter(item => item.item_type === 'regular');
   const boltMenuItems = mainMenuItems.filter(item => item.item_type === 'bolt');
-  const wixMenuItems = mainMenuItems.filter(item => item.item_type === 'wix');
   
   // Fallback: if no main menu items found, show all items that aren't explicitly unavailable
   const displayMenuItems = mainMenuItems.length > 0 ? mainMenuItems : (allMenuItems || []).filter(item => !item.is_extra && (item.is_available !== false));
@@ -200,11 +199,6 @@ useEffect(() => {
       setDeliveryLocation("Bolt Delivery");
       setCustomLocationFee(0);
       // Don't clear customer phone - it's optional for Bolt orders
-    } else if (activeMenuTab === "wix") {
-      setDeliveryType("Delivery");
-      setDeliveryLocation("WIX Delivery");
-      setCustomLocationFee(0);
-      // Don't clear customer phone - it's optional for Wix orders
     }
   }, [activeMenuTab]);
 
@@ -461,12 +455,12 @@ useEffect(() => {
     
     // Only validate customer fields if delivery is selected
     if (deliveryType === 'Delivery') {
-      // Special handling for Bolt and WIX orders - they don't require customer phone
-      const isBoltOrWixOrder = activeMenuTab === 'bolt' || activeMenuTab === 'wix';
-      const isBoltOrWixDelivery = deliveryLocation === 'Bolt Delivery' || deliveryLocation === 'WIX Delivery';
+      // Special handling for Bolt orders - they don't require customer phone
+      const isBoltOrder = activeMenuTab === 'bolt';
+      const isBoltDelivery = deliveryLocation === 'Bolt Delivery';
       
-      // Skip phone validation for Bolt/WIX orders when using their delivery types
-      if (!isBoltOrWixOrder || !isBoltOrWixDelivery) {
+      // Skip phone validation for Bolt orders when using their delivery types
+      if (!isBoltOrder || !isBoltDelivery) {
         if (!customerPhone.trim()) formErrors.customerPhone = 'Customer phone is required for delivery orders';
         if (customerPhone.trim() && !/^(\+233|0)\d{9}$/.test(customerPhone.trim())) {
             formErrors.customerPhone = 'Invalid Ghana phone format (e.g., 0XXXXXXXXX or +233XXXXXXXXX)';
@@ -536,12 +530,12 @@ useEffect(() => {
     
     // Validate delivery orders
     if (deliveryType === 'Delivery') {
-      // Special handling for Bolt and WIX orders - they don't require customer phone
-      const isBoltOrWixOrder = activeMenuTab === 'bolt' || activeMenuTab === 'wix';
-      const isBoltOrWixDelivery = deliveryLocation === 'Bolt Delivery' || deliveryLocation === 'WIX Delivery';
+      // Special handling for Bolt orders - they don't require customer phone
+      const isBoltOrder = activeMenuTab === 'bolt';
+      const isBoltDelivery = deliveryLocation === 'Bolt Delivery';
       
-      // Validate phone for non-Bolt/WIX delivery orders
-      if (!isBoltOrWixOrder || !isBoltOrWixDelivery) {
+      // Validate phone for non-Bolt delivery orders
+      if (!isBoltOrder || !isBoltDelivery) {
         const cleanPhone = customerPhone.trim().replace(/\s+/g, '').replace(/-/g, '');
         if (!cleanPhone) {
           return { isValid: false, error: 'Customer phone number is required for delivery orders' };
@@ -971,12 +965,6 @@ useEffect(() => {
                             Bolt
                           </Nav.Link>
                         </Nav.Item>
-                        <Nav.Item>
-                          <Nav.Link eventKey="wix">
-                            <i className="bi bi-box-fill me-1"></i>
-                            WIX
-                          </Nav.Link>
-                        </Nav.Item>
                       </Nav>
                       <Tab.Content>
                         <Tab.Pane eventKey="regular" style={{ minHeight: '100px' }}>
@@ -1013,29 +1001,6 @@ useEffect(() => {
                                   <Button
                                     key={item.id}
                                     variant="outline-primary"
-                                    size="sm"
-                                    onClick={() => handleAddItem(item.id)}
-                                    className="ada-shadow-sm mb-2"
-                                    style={{ minHeight: '44px' }}
-                                  >
-                                    {item.name} (₵{parseFloat(item.price || 0).toFixed(2)})
-                                    <i className="bi bi-plus-circle ms-1"></i>
-                                  </Button>
-                                ))
-                            )}
-                          </div>
-                        </Tab.Pane>
-                        <Tab.Pane eventKey="wix" style={{ minHeight: '100px' }}>
-                          <div className="d-flex gap-2 flex-wrap">
-                            {wixMenuItems.filter(item => !selectedItems[item.id]).length === 0 ? (
-                              <small className="text-muted fst-italic">All WIX items have been added</small>
-                            ) : (
-                              wixMenuItems
-                                .filter(item => !selectedItems[item.id])
-                                .map(item => (
-                                  <Button
-                                    key={item.id}
-                                    variant="outline-info"
                                     size="sm"
                                     onClick={() => handleAddItem(item.id)}
                                     className="ada-shadow-sm mb-2"
