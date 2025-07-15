@@ -22,32 +22,33 @@ export const initializePaymentService = () => {
  * @returns {Promise<object>} - Payment response
  */
 export const initiatePayment = async (paymentData) => {
-  // Generate custom transaction ID and reference
+  // Generate custom transaction ID and reference for frontend tracking
   const transactionId = generateTransactionId();
   const transactionRef = generateTransactionReference(
     paymentData.order_number, 
     paymentData.payment_type || 'payment'
   );
   
-  // Enhanced payment data with custom transaction identifiers
-  const enhancedPaymentData = {
-    ...paymentData,
-    transaction_id: transactionId,
-    transaction_reference: transactionRef,
-    client_reference: transactionRef, // For frontend tracking
-    metadata: {
-      ...paymentData.metadata,
-      custom_transaction_id: transactionId,
-      order_number: paymentData.order_number,
-      payment_type: paymentData.payment_type || 'payment',
-      generated_at: new Date().toISOString()
-    }
+  // Only send fields that the backend PaymentInitiateSerializer accepts
+  const backendPaymentData = {
+    order_number: paymentData.order_number,
+    amount: paymentData.amount,
+    payment_method: paymentData.payment_method,
+    payment_type: paymentData.payment_type || 'payment'
   };
   
+  // Add optional fields only if they exist
+  if (paymentData.mobile_number) {
+    backendPaymentData.mobile_number = paymentData.mobile_number;
+  }
+  
+  if (paymentData.wix_order_number) {
+    backendPaymentData.wix_order_number = paymentData.wix_order_number;
+  }
   
   const response = await tokenFetch(`${API_BASE_URL}/payments/initiate/`, {
     method: 'POST',
-    body: JSON.stringify(enhancedPaymentData),
+    body: JSON.stringify(backendPaymentData),
   });
 
   if (!response.ok) {
@@ -57,7 +58,7 @@ export const initiatePayment = async (paymentData) => {
 
   const result = await response.json();
   
-  // Include our custom identifiers in the response
+  // Include our custom identifiers in the response for frontend tracking
   return {
     ...result,
     custom_transaction_id: transactionId,

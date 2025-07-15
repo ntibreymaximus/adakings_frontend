@@ -6,6 +6,7 @@ import { API_ENDPOINTS } from '../utils/api';
 import { apiFirstService } from '../services/apiFirstService';
 import { menuCacheService } from '../services/menuCacheService';
 import { useAuth } from '../contexts/AuthContext';
+import useCallDetection from '../hooks/useCallDetection';
 
 // Delivery locations will be fetched from backend
 
@@ -60,6 +61,34 @@ const CreateOrderForm = ({ isEditMode: isEditModeProp = false }) => {
   
   // State for active menu tab
   const [activeMenuTab, setActiveMenuTab] = useState('regular');
+
+  // Call detection hook
+  const {
+    showCallModal,
+    detectedNumber,
+    setDetectedNumber,
+    formatPhoneNumber,
+    closeCallModal,
+    isProcessing,
+    triggerCallModal
+  } = useCallDetection();
+
+  // Effect to autofill customer phone on call modal accept
+  useEffect(() => {
+    if (showCallModal && detectedNumber) {
+      optimizedToast.info('Incoming call detected. You can add the number directly.');
+    }
+  }, [showCallModal, detectedNumber]);
+
+  const handleAcceptCallNumber = () => {
+    setCustomerPhone(formatPhoneNumber(detectedNumber));
+    closeCallModal();
+  };
+
+  const handleRejectCallNumber = () => {
+    setDetectedNumber('');
+    closeCallModal();
+  };
 
   // Filter delivery locations based on search term
   const filteredDeliveryLocations = deliveryLocations.filter(location =>
@@ -118,7 +147,7 @@ const CreateOrderForm = ({ isEditMode: isEditModeProp = false }) => {
     setDeliveryType(order.delivery_type || 'Pickup');
     setNotes(order.notes || '');
     
-    // Set delivery location
+    // Set delivery location using historical data when available
     if (order.delivery_type === 'Delivery') {
       if (order.custom_delivery_location) {
         setDeliveryLocation('Other');
@@ -126,8 +155,19 @@ const CreateOrderForm = ({ isEditMode: isEditModeProp = false }) => {
         setCustomLocationFee(order.custom_delivery_fee?.toString() || '0');
         setLocationSearchTerm('Custom location - use fields below');
       } else if (order.delivery_location) {
+        // Use current delivery location if it exists
         setDeliveryLocation(order.delivery_location);
         setLocationSearchTerm(order.delivery_location);
+      } else if (order.delivery_location_name) {
+        // Use historical delivery location name if current location is deleted
+        setDeliveryLocation(order.delivery_location_name);
+        setLocationSearchTerm(order.delivery_location_name);
+        console.log('📍 Using historical delivery location:', order.delivery_location_name);
+      } else if (order.effective_delivery_location_name) {
+        // Fallback to effective delivery location name
+        setDeliveryLocation(order.effective_delivery_location_name);
+        setLocationSearchTerm(order.effective_delivery_location_name);
+        console.log('📍 Using effective delivery location:', order.effective_delivery_location_name);
       }
     }
     
@@ -328,6 +368,7 @@ useEffect(() => {
   }, []);
 
 
+
   const handleRemoveItem = useCallback((itemId) => {
     setSelectedItems(prev => {
       const newItems = { ...prev };
@@ -349,9 +390,35 @@ useEffect(() => {
     }
   }, [handleRemoveItem]);
 
-  const handleAddItem = useCallback((itemId) => {
+const handleAddItem = useCallback((itemId) => {
     const item = displayMenuItems.find(i => i.id === itemId);
     if (!item) return;
+
+    // Check item type and clear opposite type selections
+    if (item.item_type === 'regular') {
+      const newSelectedItems = { ...selectedItems };
+      boltMenuItems.forEach(boltItem => delete newSelectedItems[boltItem.id]);
+      setSelectedItems(newSelectedItems);
+      activeMenuTab === 'bolt' && setActiveMenuTab('regular');
+      // Only reset delivery if we were on Bolt delivery
+      if (deliveryLocation === 'Bolt Delivery') {
+        setDeliveryType('Pickup');
+        setDeliveryLocation('');
+        setLocationSearchTerm('');
+        setCustomLocationName('');
+        setCustomLocationFee('');
+      }
+    } else if (item.item_type === 'bolt') {
+      const newSelectedItems = { ...selectedItems };
+      regularMenuItems.forEach(regItem => delete newSelectedItems[regItem.id]);
+      setSelectedItems(newSelectedItems);
+      activeMenuTab === 'regular' && setActiveMenuTab('bolt');
+      // Set delivery to Bolt Delivery when adding bolt items
+      setDeliveryType("Delivery");
+      setDeliveryLocation("Bolt Delivery");
+      setLocationSearchTerm("Bolt Delivery");
+      setCustomLocationFee("0");
+    }
 
     if (!selectedItems[itemId] || selectedItems[itemId] === 0) {
         handleQuantityChange(itemId, 1);
@@ -360,7 +427,25 @@ useEffect(() => {
         // Item is already in the order
     }
     setShowMenuDropdown(false);
-  }, [displayMenuItems, selectedItems, handleQuantityChange]);
+  }, [displayMenuItems, selectedItems, handleQuantityChange, boltMenuItems, regularMenuItems, activeMenuTab, deliveryLocation]);
+
+  useEffect(() => {
+    // Check if any bolt items are selected
+    const hasBoltItems = Object.keys(selectedItems).some(itemId => {
+      const item = displayMenuItems.find(i => i.id.toString() === itemId);
+      return item && item.item_type === 'bolt' && selectedItems[itemId] > 0;
+    });
+    
+    // Only reset delivery info if we're switching FROM bolt tab to regular tab with no bolt items
+    // Don't clear if the user has already set up delivery details for regular items
+    if (activeMenuTab === 'regular' && !hasBoltItems && deliveryLocation === 'Bolt Delivery') {
+      setDeliveryLocation('');
+      setLocationSearchTerm('');
+      setCustomLocationName('');
+      setCustomLocationFee('');
+      setDeliveryType('Pickup');
+    }
+  }, [activeMenuTab, selectedItems, displayMenuItems, deliveryLocation]);
 
 
 
@@ -432,8 +517,8 @@ useEffect(() => {
 
   // Handle location selection from search dropdown
   const handleLocationSelect = (location) => {
-    setDeliveryLocation(location.name);
-    setLocationSearchTerm(location.name);
+    setDeliveryLocation(location.id); // Store the ID
+    setLocationSearchTerm(location.name); // Display the name in search field
     setShowLocationDropdown(false);
     
     // Clear custom location fields when regular location is selected
@@ -516,9 +601,22 @@ useEffect(() => {
   const currentDeliveryFee = deliveryType === 'Delivery' && deliveryLocation
                              ? deliveryLocation === 'Other'
                                ? parseFloat(customLocationFee || 0)
-                               : parseFloat(deliveryLocations.find(loc => loc.name === deliveryLocation)?.fee || 0)
+                               : parseFloat(deliveryLocations.find(loc => loc.id === deliveryLocation || loc.id.toString() === deliveryLocation.toString())?.fee || 0)
                              : 0;
   const grandTotal = currentOrderSubTotal + extrasSubTotal + currentDeliveryFee;
+
+  // Helper function to get location name from ID
+  const getLocationDisplayName = (locationId) => {
+    if (!locationId) return '';
+    if (locationId === 'Other') return customLocationName || 'Custom Location';
+    if (locationId === 'Bolt Delivery') return 'Bolt Delivery';
+    
+    // Find location by ID
+    const location = deliveryLocations.find(loc => 
+      loc.id === locationId || loc.id.toString() === locationId.toString()
+    );
+    return location ? location.name : locationId;
+  };
 
   // Separate validation function for order submission
   const validateOrderSubmission = () => {
@@ -700,7 +798,7 @@ useEffect(() => {
       
       // Show success notification with order details
       const actionText = isEditMode ? 'updated' : 'created';
-      const locationText = deliveryType === 'Delivery' && deliveryLocation ? ` to ${deliveryLocation === 'Other' ? (customLocationName || 'Custom Location') : deliveryLocation}` : '';
+      const locationText = deliveryType === 'Delivery' && deliveryLocation ? ` to ${getLocationDisplayName(deliveryLocation)}` : '';
       
       // Use the backend calculated total price instead of frontend calculated
       const finalTotal = result.total_price || grandTotal;
@@ -1169,7 +1267,7 @@ useEffect(() => {
                                   <div className="flex-grow-1">
                                     <small className="text-muted d-block mb-1">Location</small>
                                     <p className="mb-0 fw-semibold" style={{ fontSize: '0.95rem' }}>
-                                      {deliveryLocation === 'Other' ? (customLocationName || 'Custom Location') : deliveryLocation}
+                                      {getLocationDisplayName(deliveryLocation)}
                                     </p>
                                   </div>
                                 </div>
@@ -1532,7 +1630,7 @@ useEffect(() => {
                   
                   {deliveryType === 'Delivery' && deliveryLocation && (
                     <div className="d-flex justify-content-between mb-1">
-                      <span>Delivery ({deliveryLocation === 'Other' ? customLocationName || 'Custom Location' : deliveryLocation}):</span>
+                      <span>Delivery ({getLocationDisplayName(deliveryLocation)}):</span>
                       <span className="fw-semibold">₵{currentDeliveryFee.toFixed(2)}</span>
                     </div>
                   )}
@@ -1549,7 +1647,7 @@ useEffect(() => {
                     <span className={`badge ${deliveryType === 'Delivery' ? 'bg-warning' : 'bg-success'} w-100 py-2`} style={{ fontSize: '1rem' }}>
                       <i className={`bi ${deliveryType === 'Delivery' ? 'bi-truck' : 'bi-shop'} me-1`}></i>
                       {deliveryType} Order
-                      {deliveryType === 'Delivery' && deliveryLocation && ` to ${deliveryLocation === 'Other' ? (customLocationName || 'Custom Location') : deliveryLocation}`}
+                      {deliveryType === 'Delivery' && deliveryLocation && ` to ${getLocationDisplayName(deliveryLocation)}`}
                     </span>
                   </div>
                 </>
@@ -1683,7 +1781,7 @@ useEffect(() => {
                   {deliveryType === 'Delivery' && deliveryLocation && (
                     <div className="d-flex justify-content-between align-items-center mb-2">
                       <span>Location:</span>
-                      <span className="text-muted small">{deliveryLocation === 'Other' ? (customLocationName || 'Custom Location') : deliveryLocation}</span>
+                      <span className="text-muted small">{getLocationDisplayName(deliveryLocation)}</span>
                     </div>
                   )}
                   {deliveryType === 'Delivery' && currentDeliveryFee > 0 && (
@@ -2064,7 +2162,7 @@ useEffect(() => {
                     <div className="d-flex justify-content-between mb-1">
                       <span>Location:</span>
                       <span className="fw-semibold">
-                        {deliveryLocation === 'Other' ? (customLocationName || 'Custom Location') : deliveryLocation}
+                                        {getLocationDisplayName(deliveryLocation)}
                       </span>
                     </div>
                     <div className="d-flex justify-content-between mb-1">
@@ -2144,6 +2242,100 @@ useEffect(() => {
           </Button>
         </Modal.Footer>
       </Modal>
+
+      {/* Call Detection Modal */}
+      <Modal 
+        show={showCallModal} 
+        onHide={handleRejectCallNumber} 
+        centered
+        size="md"
+        backdrop="static"
+        keyboard={false}
+      >
+        <Modal.Header closeButton>
+          <Modal.Title className="d-flex align-items-center">
+            <i className="bi bi-telephone-fill me-2 text-primary"></i>
+            Incoming Call Detected
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <div className="text-center mb-3">
+            <i className="bi bi-phone-vibrate text-primary" style={{ fontSize: '2rem' }}></i>
+            <h6 className="mt-2 mb-3">Phone Call Detected</h6>
+            <p className="text-muted">Would you like to add this phone number to your order?</p>
+          </div>
+          
+          {detectedNumber && (
+            <div className="text-center mb-3 p-3 bg-light rounded">
+              <strong>Detected Number:</strong>
+              <br />
+              <code className="text-primary fs-5">{formatPhoneNumber(detectedNumber)}</code>
+            </div>
+          )}
+          
+          <div className="alert alert-info">
+            <i className="bi bi-info-circle me-2"></i>
+            <small>This will automatically fill the customer phone field for delivery orders.</small>
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <div className="d-flex gap-2 w-100">
+            <Button 
+              variant="secondary" 
+              onClick={handleRejectCallNumber}
+              className="flex-fill"
+            >
+              <i className="bi bi-x-circle me-2"></i>
+              Ignore
+            </Button>
+            <Button 
+              variant="primary" 
+              onClick={handleAcceptCallNumber}
+              className="flex-fill"
+              disabled={!detectedNumber}
+            >
+              <i className="bi bi-check-circle me-2"></i>
+              Use This Number
+            </Button>
+          </div>
+        </Modal.Footer>
+      </Modal>
+
+      {/* OCR Processing Indicator */}
+      <Modal 
+        show={isProcessing} 
+        centered
+        size="sm"
+        backdrop="static"
+        keyboard={false}
+      >
+        <Modal.Body className="text-center py-4">
+          <Spinner animation="border" variant="primary" className="mb-3" />
+          <h6>Detecting Phone Number...</h6>
+          <p className="text-muted mb-0">Processing incoming call information</p>
+        </Modal.Body>
+      </Modal>
+
+      {/* Add floating button for manual trigger (for testing) */}
+      {isMobile && (
+        <Button
+          variant="primary"
+          className="position-fixed"
+          style={{
+            bottom: '20px',
+            right: '20px',
+            borderRadius: '50%',
+            width: '60px',
+            height: '60px',
+            zIndex: 1000,
+            boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+          }}
+          onClick={triggerCallModal}
+          disabled={isProcessing}
+        >
+          <i className="bi bi-telephone-fill fs-4"></i>
+        </Button>
+      )}
 
     </Container>
   );

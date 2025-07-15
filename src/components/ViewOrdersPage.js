@@ -816,11 +816,7 @@ const handleAssignRiderInline = async (order) => {
                 order_number: selectedOrder.order_number || selectedOrder.id,
                 amount: amount,
                 payment_method: newPaymentMode, // Send the method directly
-                payment_type: isRefundMode ? 'refund' : 'payment', // Set correct type based on mode
-                // User tracking information
-                processed_by: userData?.id || userData?.user_id,
-                processed_by_username: userData?.username,
-                processed_by_role: userData?.role || userData?.user_role
+                payment_type: isRefundMode ? 'refund' : 'payment' // Set correct type based on mode
             };
             
             
@@ -2674,9 +2670,18 @@ const handleAssignRiderInline = async (order) => {
                         </div>
                       )}
                       {selectedOrder.delivery_type === 'Delivery' && selectedOrder.delivery_fee && (
-                        <div className="d-flex justify-content-between align-items-center">
+                        <div className="d-flex justify-content-between align-items-center mb-2">
                           <span>Delivery Fee:</span>
                           <span className="fw-bold text-info">₵{parseFloat(selectedOrder.delivery_fee || 0).toFixed(2)}</span>
+                        </div>
+                      )}
+                      {selectedOrder.delivery_type === 'Delivery' && selectedOrder.assigned_rider_name && (
+                        <div className="d-flex justify-content-between align-items-center">
+                          <span>Rider:</span>
+                          <span className="badge bg-secondary">
+                            <i className="bi bi-person-badge me-1"></i>
+                            {selectedOrder.assigned_rider_name}
+                          </span>
                         </div>
                       )}
                     </Card.Body>

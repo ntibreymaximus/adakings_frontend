@@ -75,55 +75,83 @@ export const tokenFetch = async (url, options = {}) => {
     // Try to get error details from response body
     let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
     let errorDetails = null;
+    
     try {
-      const errorData = await response.json();
-      errorDetails = errorData;
-      console.error('🔴 API Error Response:', errorData);
-      if (errorData.items && Array.isArray(errorData.items)) {
-        console.error('🔴 Items errors:', errorData.items);
-        errorData.items.forEach((itemError, index) => {
-          console.error(`🔴 Item error ${index}:`, itemError);
-        });
-      }
+      // First, get the response text to check if it's HTML or JSON
+      const responseText = await response.text();
       
-      if (errorData.detail) {
-        errorMessage = errorData.detail;
-      } else if (errorData.message) {
-        errorMessage = errorData.message;
-      } else if (errorData.error) {
-        errorMessage = errorData.error;
-      } else if (errorData.errors) {
-        // Handle validation errors
-        const errors = Object.entries(errorData.errors)
-          .map(([field, msgs]) => `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`)
-          .join('; ');
-        errorMessage = errors;
-      } else if (errorData.items && Array.isArray(errorData.items) && errorData.items.length > 0) {
-        // Handle items field errors
-        const itemErrors = errorData.items.map(item => {
-          if (typeof item === 'object') {
-            // Extract error messages from objects
-            return Object.entries(item)
-              .map(([field, error]) => `${field}: ${Array.isArray(error) ? error.join(', ') : error}`)
-              .join('; ');
-          }
-          return String(item);
-        });
-        errorMessage = 'Items error: ' + itemErrors.join('. ');
-      } else if (typeof errorData === 'string') {
-        errorMessage = errorData;
+      // Check if the response is HTML (500 errors often return HTML error pages)
+      if (responseText.trim().startsWith('<!DOCTYPE') || responseText.trim().startsWith('<html')) {
+        console.error('🔴 Server returned HTML error page (likely 500 error)');
+        console.error('🔴 Response text:', responseText.substring(0, 200) + '...');
+        
+        // Try to extract error from HTML title or body
+        const titleMatch = responseText.match(/<title>(.*?)<\/title>/i);
+        const errorTitle = titleMatch ? titleMatch[1] : 'Internal Server Error';
+        
+        errorMessage = `Server Error: ${errorTitle}`;
+        
+        // For 500 errors, provide more helpful message
+        if (response.status === 500) {
+          errorMessage = 'Internal Server Error: The server encountered an unexpected condition. Please try again or contact support.';
+        }
       } else {
-        // Try to show any field that has an array of errors
-        const fieldsWithErrors = Object.entries(errorData)
-          .filter(([_, value]) => Array.isArray(value) && value.length > 0)
-          .map(([field, errors]) => `${field}: ${errors.join(', ')}`);
-        if (fieldsWithErrors.length > 0) {
-          errorMessage = fieldsWithErrors.join('; ');
+        // Try to parse as JSON
+        const errorData = JSON.parse(responseText);
+        errorDetails = errorData;
+        console.error('🔴 API Error Response:', errorData);
+        
+        if (errorData.items && Array.isArray(errorData.items)) {
+          console.error('🔴 Items errors:', errorData.items);
+          errorData.items.forEach((itemError, index) => {
+            console.error(`🔴 Item error ${index}:`, itemError);
+          });
+        }
+        
+        if (errorData.detail) {
+          errorMessage = errorData.detail;
+        } else if (errorData.message) {
+          errorMessage = errorData.message;
+        } else if (errorData.error) {
+          errorMessage = errorData.error;
+        } else if (errorData.errors) {
+          // Handle validation errors
+          const errors = Object.entries(errorData.errors)
+            .map(([field, msgs]) => `${field}: ${Array.isArray(msgs) ? msgs.join(', ') : msgs}`)
+            .join('; ');
+          errorMessage = errors;
+        } else if (errorData.items && Array.isArray(errorData.items) && errorData.items.length > 0) {
+          // Handle items field errors
+          const itemErrors = errorData.items.map(item => {
+            if (typeof item === 'object') {
+              // Extract error messages from objects
+              return Object.entries(item)
+                .map(([field, error]) => `${field}: ${Array.isArray(error) ? error.join(', ') : error}`)
+                .join('; ');
+            }
+            return String(item);
+          });
+          errorMessage = 'Items error: ' + itemErrors.join('. ');
+        } else if (typeof errorData === 'string') {
+          errorMessage = errorData;
+        } else {
+          // Try to show any field that has an array of errors
+          const fieldsWithErrors = Object.entries(errorData)
+            .filter(([_, value]) => Array.isArray(value) && value.length > 0)
+            .map(([field, errors]) => `${field}: ${errors.join(', ')}`);
+          if (fieldsWithErrors.length > 0) {
+            errorMessage = fieldsWithErrors.join('; ');
+          }
         }
       }
     } catch (e) {
-      // If response body is not JSON, use default message
+      // If response body is not JSON or HTML parsing failed, use default message
       console.error('Failed to parse error response:', e);
+      
+      // For 500 errors, provide a more user-friendly message
+      if (response.status === 500) {
+        errorMessage = 'Internal Server Error: The server encountered an unexpected condition. Please try again or contact support.';
+      }
     }
     
     const error = new Error(errorMessage);
