@@ -66,51 +66,78 @@ export const useCallDetection = () => {
     try {
       let stream;
       
+      // For mobile devices, try camera first since screen capture might not be available
+      if (isMobile() && source === 'screen') {
+        source = 'camera';
+      }
+      
       // Try screen capture first (for detecting numbers on call screen)
       if (source === 'screen' && navigator.mediaDevices.getDisplayMedia) {
         try {
+          // Don't show dialog, just try to capture
           stream = await navigator.mediaDevices.getDisplayMedia({
             video: {
               displaySurface: 'window',
               logicalSurface: true,
               cursor: 'never'
             },
-            audio: false
+            audio: false,
+            preferCurrentTab: true,
+            selfBrowserSurface: 'exclude',
+            systemAudio: 'exclude'
           });
         } catch (screenError) {
-          console.log('Screen capture failed, falling back to camera:', screenError);
+          console.log('Screen capture not available, using camera:', screenError);
           source = 'camera';
         }
       }
       
       // Fallback to camera if screen capture fails or is not supported
       if (!stream && navigator.mediaDevices.getUserMedia) {
-        stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { 
-            facingMode: 'environment',
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
-          } 
-        });
+        try {
+          // Use front camera on mobile to capture call screen reflection
+          stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { 
+              facingMode: isMobile() ? 'user' : 'environment',
+              width: { ideal: 1920 },
+              height: { ideal: 1080 }
+            } 
+          });
+        } catch (cameraError) {
+          console.log('Camera access denied:', cameraError);
+          // Silently fail - don't show modal or interrupt user
+          setIsProcessing(false);
+          return;
+        }
       }
       
       if (!stream) {
-        throw new Error('No media stream available');
+        setIsProcessing(false);
+        return; // Silently fail
       }
       
+      // Create video element off-screen (not added to DOM)
       const video = document.createElement('video');
+      video.muted = true;
+      video.playsInline = true;
+      video.autoplay = true;
+      video.style.display = 'none'; // Hidden
       video.srcObject = stream;
-      video.play();
+      
+      // Play video without adding to DOM
+      await video.play();
       
       // Wait for video to be ready
       await new Promise((resolve) => {
         video.onloadedmetadata = resolve;
+        // Add timeout to prevent hanging
+        setTimeout(() => resolve(), 3000);
       });
       
-      // Create canvas and capture image
+      // Create canvas off-screen (not added to DOM)
       const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+      canvas.width = video.videoWidth || 1280;
+      canvas.height = video.videoHeight || 720;
       const context = canvas.getContext('2d');
       
       // Capture multiple frames for better OCR accuracy
@@ -125,12 +152,11 @@ export const useCallDetection = () => {
         const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
         const processedCanvas = preprocessImage(imageData);
         
-        // Perform OCR
+        // Perform OCR silently (remove logger to reduce console noise)
         const { data: { text } } = await Tesseract.recognize(
           processedCanvas,
           'eng',
           {
-            logger: m => console.log('OCR Progress:', m),
             tessedit_char_whitelist: '0123456789+',
           }
         );
@@ -222,14 +248,27 @@ export const useCallDetection = () => {
       if (document.hidden) {
         // Page became hidden - might be due to call
         setCallStartTime(Date.now());
+        // Start OCR immediately when page becomes hidden (potential call)
+        if (isMobile()) {
+          setTimeout(() => {
+            // Run in background without blocking
+            detectPhoneNumber('camera').catch(err => {
+              console.log('Background detection failed:', err);
+            });
+          }, 1000); // Small delay to let call UI settle
+        }
       } else if (callStartTime) {
         // Page became visible again
         const callDuration = Date.now() - callStartTime;
         if (callDuration > 3000) { // If hidden for more than 3 seconds
           setIsCallActive(false);
           setCallStartTime(null);
-          // Trigger OCR to detect phone number
-          detectPhoneNumber('screen');
+          // If we haven't detected a number yet, try again
+          if (!detectedNumber && ocrAttempts < 3) {
+            detectPhoneNumber('camera').catch(err => {
+              console.log('Background detection failed:', err);
+            });
+          }
         }
       }
     };
@@ -245,7 +284,9 @@ export const useCallDetection = () => {
           setIsCallActive(false);
           setCallStartTime(null);
           // Trigger OCR to detect phone number
-          detectPhoneNumber('screen');
+          detectPhoneNumber('screen').catch(err => {
+            console.log('Background detection failed:', err);
+          });
         }
       }
     };
@@ -270,7 +311,9 @@ export const useCallDetection = () => {
           setIsCallActive(false);
           setCallStartTime(null);
           // Trigger OCR to detect phone number
-          detectPhoneNumber('screen');
+          detectPhoneNumber('screen').catch(err => {
+            console.log('Background detection failed:', err);
+          });
         }
       }
     };
@@ -327,19 +370,94 @@ export const useCallDetection = () => {
         batteryCleanup();
       }
     };
-  }, [callStartTime, callDetectionEnabled, detectPhoneNumber]);
+  }, [callStartTime, callDetectionEnabled, detectPhoneNumber, detectedNumber, ocrAttempts]);
 
-  // Initialize call detection
-  useEffect(() => {
-    if (isCallDetectionSupported()) {
-      const cleanup = detectCallState();
-      return cleanup;
+// Initialize call detection
+useEffect(() => {
+  if (isCallDetectionSupported()) {
+    const cleanup = detectCallState();
+
+    const checkCameraPermissions = async () => {
+      if ('permissions' in navigator) {
+        try {
+          const permissionStatus = await navigator.permissions.query({ name: 'camera' });
+          // React to permission state changes
+          permissionStatus.onchange = () => {
+            if (permissionStatus.state === 'denied') {
+              console.log('Camera permission was denied');
+            } else if (permissionStatus.state === 'granted') {
+              console.log('Camera permission was granted');
+            } else {
+              console.log('Camera permission is prompt');
+            }
+            // Optionally re-request permission
+            reRequestCameraPermission();
+          };
+        } catch (error) {
+          console.log('Permissions API not supported or camera not accessible:', error);
+        }
+      }
+    };
+
+    const reRequestCameraPermission = () => {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ video: true })
+          .then(stream => {
+            // Got permission, close the stream to conserve resources
+            stream.getTracks().forEach(track => track.stop());
+            console.log('✅ Camera permissions granted for call detection');
+          })
+          .catch(err => {
+            console.log('Camera permissions not granted:', err);
+          });
+      }
+    };
+
+    // Initial check and set up listeners
+    checkCameraPermissions();
+    reRequestCameraPermission();
+
+    return cleanup;
+  }
+}, [detectCallState]);
+
+
+// Add a persistent check for camera permission if supported
+useEffect(() => {
+  if ('permissions' in navigator) {
+    (async () => {
+      const permissionResult = await navigator.permissions.query({ name: 'camera' });
+      if (permissionResult.state === 'denied') {
+        console.warn('Warning: Camera permission already denied.');
+      }
+    })();
+  }
+}, []); // Run once on initialization
+
+
+// Continuously request permission before OCR detection
+useEffect(() => {
+  const permissionInterval = setInterval(() => {
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) { 
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => {
+          stream.getTracks().forEach(track => track.stop());
+        })
+        .catch(err => {
+          console.error('Re-requesting camera permissions failed:', err);
+        });
     }
-  }, [detectCallState]);
+  }, 30000); // every 30 seconds in the background
+
+  return () => clearInterval(permissionInterval);
+}, []); // Run in the background to ensure permissions are maintained.
 
   // Manual trigger for testing
   const triggerCallModal = useCallback(() => {
-    detectPhoneNumber('screen');
+    // Run detection in background without blocking UI
+    detectPhoneNumber('screen').catch(err => {
+      console.log('Background OCR detection failed:', err);
+    });
   }, [detectPhoneNumber]);
 
   // Close modal

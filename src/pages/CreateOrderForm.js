@@ -70,7 +70,8 @@ const CreateOrderForm = ({ isEditMode: isEditModeProp = false }) => {
     formatPhoneNumber,
     closeCallModal,
     isProcessing,
-    triggerCallModal
+    triggerCallModal,
+    isCallDetectionSupported
   } = useCallDetection();
 
   // Effect to autofill customer phone on call modal accept
@@ -79,9 +80,48 @@ const CreateOrderForm = ({ isEditMode: isEditModeProp = false }) => {
       optimizedToast.info('Incoming call detected. You can add the number directly.');
     }
   }, [showCallModal, detectedNumber]);
+  
+  // Request permissions on mount if on mobile
+  useEffect(() => {
+    if (isCallDetectionSupported && isMobile) {
+      // Check if we've already requested permissions (stored in localStorage)
+      const permissionsRequested = localStorage.getItem('callDetectionPermissionsRequested');
+      
+      if (!permissionsRequested) {
+        // Show a message explaining why we need permissions
+        optimizedToast.info('Enable camera access to automatically detect phone numbers from incoming calls', {
+          duration: 5000,
+          position: 'top-center'
+        });
+        
+        // Mark that we've requested permissions
+        localStorage.setItem('callDetectionPermissionsRequested', 'true');
+      }
+    }
+  }, [isCallDetectionSupported, isMobile]);
 
   const handleAcceptCallNumber = () => {
+    // Set the phone number
     setCustomerPhone(formatPhoneNumber(detectedNumber));
+    
+    // Automatically set delivery type to Delivery
+    setDeliveryType('Delivery');
+    
+    // Fetch delivery locations if not already loaded
+    if (deliveryLocations.length === 0 && !loadingLocations) {
+      fetchDeliveryLocations();
+    }
+    
+    // Show delivery modal on mobile after accepting the number
+    if (isMobile) {
+      setTimeout(() => {
+        setShowDeliveryModal(true);
+      }, 300); // Small delay to ensure smooth transition
+    }
+    
+    // Show success message
+    optimizedToast.success('Phone number added. Please select delivery location.');
+    
     closeCallModal();
   };
 
