@@ -45,6 +45,7 @@
 
 /* PWA-specific navigation adjustments */
 /* PWA Mode: Hide navbar ONLY in actual PWA standalone/fullscreen mode */
+/* Commented out to keep navbar visible in PWA mode
 @media (display-mode: standalone) {
   .App.pwa-mode .navbar {
     display: none !important;
@@ -56,6 +57,7 @@
     display: none !important;
   }
 }
+*/
 
 
 /* Content area adjustments for PWA */
