@@ -89,8 +89,16 @@ const getApiBaseUrl = () => {
   
   // Railway environment detection and smart fallback
   if (window.location.hostname.includes('railway.app')) {
-    // For Railway environments, construct backend URL based on naming convention
+    // For Railway environments, check for production/dev environment
     const frontendUrl = window.location.hostname;
+    
+    // Special handling for production URL
+    if (frontendUrl.includes('adaresmansys-prod')) {
+      // Production backend has different naming: adakingsbackend-prod
+      return 'https://adakingsbackend-prod.up.railway.app/api';
+    }
+    
+    // For other environments, use the standard naming convention
     const backendUrl = frontendUrl.replace('adaresmansys-', 'adaresmansys-backend-');
     return `https://${backendUrl}/api`;
   }
@@ -111,8 +119,16 @@ const getBackendBaseUrl = () => {
   
   // Railway environment detection and smart fallback
   if (window.location.hostname.includes('railway.app')) {
-    // For Railway environments, construct backend URL based on naming convention
+    // For Railway environments, check for production/dev environment
     const frontendUrl = window.location.hostname;
+    
+    // Special handling for production URL
+    if (frontendUrl.includes('adaresmansys-prod')) {
+      // Production backend has different naming: adakingsbackend-prod
+      return 'https://adakingsbackend-prod.up.railway.app';
+    }
+    
+    // For other environments, use the standard naming convention
     const backendUrl = frontendUrl.replace('adaresmansys-', 'adaresmansys-backend-');
     return `https://${backendUrl}`;
   }

@@ -62,16 +62,27 @@ const DeliveryRiderSelector = ({
         riderName: selectedRider.name
       });
 
-      const response = await fetch(`${API_BASE_URL}/deliveries/orders/${order.id}/assign-rider/`, {
+      // Log the request details for debugging
+      const requestUrl = `${API_BASE_URL}/deliveries/orders/${order.id}/assign-rider/`;
+      const requestBody = {
+        rider_id: selectedRider.id,
+        delivery_instructions: deliveryInstructions
+      };
+      
+      console.log('Making assignment request:', {
+        url: requestUrl,
+        body: requestBody,
+        orderStatus: order.status,
+        orderDeliveryType: order.delivery_type
+      });
+      
+      const response = await fetch(requestUrl, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          rider_id: selectedRider.id,
-          delivery_instructions: deliveryInstructions
-        })
+        body: JSON.stringify(requestBody)
       });
 
       if (response.ok) {
@@ -101,9 +112,15 @@ const DeliveryRiderSelector = ({
               errorMessage = 'This order has already been assigned to a rider.';
             } else if (errorMessage.includes('not ready for delivery')) {
               errorMessage = 'Order must be in "Accepted" status before assigning a rider.';
+            } else if (errorMessage.includes('Bolt')) {
+              errorMessage = 'Cannot assign regular riders to Bolt delivery orders.';
             }
+          } else if (response.status === 409) {
+            // Conflict - race condition
+            errorMessage = 'This order was just assigned to another rider. Please refresh the page.';
           } else if (response.status === 500) {
-            errorMessage = 'Server error. Please try again later or contact support.';
+            errorMessage = 'Server error occurred. Please try again or contact support if the issue persists.';
+            console.error('Server error details:', errorMessage);
           }
         } catch (parseError) {
           console.error('Error parsing error response:', parseError);
