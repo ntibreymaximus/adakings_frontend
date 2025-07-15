@@ -47,9 +47,21 @@ const DeliveryRiderSelector = ({
       return;
     }
 
+    if (!order || !order.id) {
+      optimizedToast.error('Invalid order data. Please refresh and try again.');
+      return;
+    }
+
     setAssigning(true);
     try {
       const token = localStorage.getItem('token');
+      console.log('Assigning rider to order:', {
+        orderId: order.id,
+        orderNumber: order.order_number,
+        riderId: selectedRider.id,
+        riderName: selectedRider.name
+      });
+
       const response = await fetch(`${API_BASE_URL}/deliveries/orders/${order.id}/assign-rider/`, {
         method: 'POST',
         headers: {
@@ -67,10 +79,41 @@ const DeliveryRiderSelector = ({
         onAssignmentComplete();
         onHide();
       } else {
-        throw new Error('Assignment failed');
+        // Get detailed error message from response
+        let errorMessage = 'Failed to assign rider';
+        try {
+          const errorData = await response.json();
+          console.error('Assignment error response:', errorData);
+          
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          } else if (errorData.detail) {
+            errorMessage = errorData.detail;
+          } else if (errorData.message) {
+            errorMessage = errorData.message;
+          }
+          
+          // Handle specific error cases
+          if (response.status === 404) {
+            errorMessage = `Order ${order.order_number || order.id} not found. Please refresh the page.`;
+          } else if (response.status === 400) {
+            if (errorMessage.includes('already assigned')) {
+              errorMessage = 'This order has already been assigned to a rider.';
+            } else if (errorMessage.includes('not ready for delivery')) {
+              errorMessage = 'Order must be in "Accepted" status before assigning a rider.';
+            }
+          } else if (response.status === 500) {
+            errorMessage = 'Server error. Please try again later or contact support.';
+          }
+        } catch (parseError) {
+          console.error('Error parsing error response:', parseError);
+        }
+        
+        optimizedToast.error(errorMessage);
       }
     } catch (error) {
-      optimizedToast.error('Failed to assign rider');
+      console.error('Network error during assignment:', error);
+      optimizedToast.error('Network error. Please check your connection and try again.');
     } finally {
       setAssigning(false);
     }
@@ -85,11 +128,17 @@ const DeliveryRiderSelector = ({
         </Modal.Title>
       </Modal.Header>
       <Modal.Body>
-        {order && (
+        {order ? (
           <Alert variant="info" className="mb-3">
             <strong>Order #{order.order_number}</strong><br/>
-            Delivery to: {order.delivery_location}<br/>
-            Customer: {order.customer_phone}
+            <small className="text-muted">Order ID: {order.id}</small><br/>
+            Delivery to: {order.delivery_location || 'N/A'}<br/>
+            Customer: {order.customer_phone || 'N/A'}
+          </Alert>
+        ) : (
+          <Alert variant="danger" className="mb-3">
+            <i className="bi bi-exclamation-triangle me-2"></i>
+            <strong>Error:</strong> No order data provided. Please close this window and try again.
           </Alert>
         )}
 

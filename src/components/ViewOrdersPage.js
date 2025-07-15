@@ -624,10 +624,26 @@ const handleAssignRiderInline = async (order) => {
             return;
         }
         
+        // Log the order data for debugging
+        console.log('Updating status for order:', {
+            id: selectedOrder.id,
+            order_number: selectedOrder.order_number,
+            current_status: selectedOrder.status,
+            new_status: newStatus,
+            delivery_type: selectedOrder.delivery_type,
+            assigned_rider_id: selectedOrder.assigned_rider_id
+        });
+        
         // Special handling for "Out for Delivery" status for delivery orders
         if (newStatus === 'Out for Delivery' && selectedOrder.delivery_type === 'Delivery') {
             // Check if rider is already assigned
             if (!selectedOrder.assigned_rider_id) {
+                // Validate order data before proceeding
+                if (!selectedOrder.id || !selectedOrder.order_number) {
+                    optimizedToast.error('Invalid order data. Please refresh and try again.');
+                    return;
+                }
+                
                 // Show rider selector modal
                 setOrderForAssignment(selectedOrder);
                 setShowStatusModal(false);
