@@ -141,12 +141,10 @@ export const PWAProvider = ({ children }) => {
 
   // Check if should hide standard navbar
   const shouldHideStandardNav = useCallback(() => {
-    // Clear separation of concerns:
-    // - PWA mode (standalone/fullscreen): Hide navbar
-    // - Mobile web browser: Show navbar
-    // - Desktop web browser: Show navbar
+    // Updated to always show navbar to enable user actions in PWA
+    // This ensures users can access profile and logout options
     
-    const shouldHide = isPWA; // Only hide in actual PWA mode
+    const shouldHide = false; // Always show navbar
     
     if (process.env.REACT_APP_DEBUG_MODE === 'true') {
       console.log('PWA Debug: Navbar visibility check:', {
