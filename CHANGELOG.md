@@ -2,6 +2,39 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.1] - 2025-07-15
+
+### 🎯 Production Release
+
+**📋 Release Information:**
+- **Environment**: production
+- **Branch**: `prod/2.0.1`
+- **Version**: `2.0.1`
+- **Deployment Time**: 2025-07-15 12:40:56
+- **Description**: Production deployment - optimized React build
+
+**📝 Changes Made:**
+React v2.0.1: Deploy to production environment
+
+**📁 Files Modified:**
+  - Modified: `ERSION`
+  - Modified: `package.json`
+  - Changed: `src/config/`
+
+**🔄 Deployment Details:**
+- **Source Branch**: `prod/2.0.1`
+- **Target Branch**: `prod/2.0.1`
+- **Build Process**: Optimized production build
+- **React Version**: Latest
+
+**🎯 Environment Specific Notes:**
+- Production environment deployment
+- Optimized React build for performance
+- Ready for end users
+- Live branch updated for continuous deployment
+
+---
+
 ## [2.0.0] - 2025-07-15
 
 ### 🎯 Production Release
