@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
-import optimizedToast, { contextToast } from '../utils/toastUtils';
+// import optimizedToast, { contextToast } from '../utils/toastUtils';
 import RecentActivityCard from './RecentActivityCard';
 import AuditActivityCard from './AuditActivityCard';
 
@@ -22,14 +22,7 @@ const DashboardPage = ({ userData }) => {
     navigate(route);
   };
 
-  // Refresh function for pull-to-refresh
-  const handleRefresh = async () => {
-    contextToast.dataRefreshed();
-    // Force refresh of RecentActivityCard by adding a small delay
-    await new Promise(resolve => setTimeout(resolve, 500));
-    // The RecentActivityCard component will handle its own refresh
-    window.dispatchEvent(new CustomEvent('dashboardRefresh'));
-  };
+  // Refresh function for pull-to-refresh - removed unused function
 
   // Custom styles for mobile optimization
   const mobileCardStyle = {

@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Card, Spinner, Alert, Badge, Row, Col, Button } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useAuditLogs } from '../hooks/useAudit';
-import { getRelativeTime } from '../services/activityService';
+// import { getRelativeTime } from '../services/activityService';
 
 /**
  * Audit Activity Card Component

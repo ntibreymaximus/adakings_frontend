@@ -18,7 +18,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import Navbar from './components/Navbar';
 import PWAStatusIndicator from './components/PWAStatusIndicator';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
-import MobilePWABanner from './components/MobilePWABanner';
+// import MobilePWABanner from './components/MobilePWABanner';
 import PWAUpdateNotification from './components/PWAUpdateNotification';
 import PWAManager from './components/PWAManager';
 import EnvironmentTag from './components/EnvironmentTag';

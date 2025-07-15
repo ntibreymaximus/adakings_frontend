@@ -12,12 +12,12 @@ const PWAInstallPrompt = () => {
     installPWA, 
     deferredPrompt, 
     isPWA,
-    isMobile 
+    // isMobile - removed unused
   } = usePWA();
   
   const [showPrompt, setShowPrompt] = useState(false);
   const [installing, setInstalling] = useState(false);
-  const [installResult, setInstallResult] = useState(null);
+  // const [installResult, setInstallResult] = useState(null); - removed unused
   const [slideUp, setSlideUp] = useState(false);
 
   // No longer persisting dismissal state - prompt will show on every reload if not installed
@@ -63,7 +63,7 @@ const PWAInstallPrompt = () => {
       const success = await installPWA();
       
       if (success) {
-        setInstallResult('success');
+        // setInstallResult('success'); - removed unused
         setShowPrompt(false);
         
         // Track installation
@@ -76,12 +76,12 @@ const PWAInstallPrompt = () => {
         
         console.log('PWA installation successful');
       } else {
-        setInstallResult('dismissed');
+        // setInstallResult('dismissed'); - removed unused
         handleDismiss();
       }
     } catch (error) {
       console.error('PWA installation error:', error);
-      setInstallResult('error');
+      // setInstallResult('error'); - removed unused
       
       // Auto-hide error after 3 seconds
       setTimeout(() => {
@@ -107,9 +107,9 @@ const PWAInstallPrompt = () => {
     }, 300);
   };
 
-  const handleLater = () => {
-    handleDismiss();
-  };
+  // const handleLater = () => {
+  //   handleDismiss();
+  // }; - removed unused
 
   // Don't render if conditions aren't met
   if (!showPrompt || isPWA || !isInstallable) {

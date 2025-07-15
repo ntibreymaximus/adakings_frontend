@@ -7,7 +7,7 @@ import { usePWA } from '../contexts/PWAContext';
 import './PWAUpdateNotification.css';
 
 const PWAUpdateNotification = () => {
-  const { isPWA } = usePWA();
+  // const { isPWA } = usePWA(); - removed unused
   
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);

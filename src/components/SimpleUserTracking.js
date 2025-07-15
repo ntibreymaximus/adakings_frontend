@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, Spinner } from 'react-bootstrap';
 import { API_BASE_URL } from '../utils/api';
 
@@ -18,13 +18,7 @@ const SimpleUserTracking = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    if (orderId || orderNumber) {
-      fetchActivitySummary();
-    }
-  }, [orderId, orderNumber]);
-
-  const fetchActivitySummary = async () => {
+  const fetchActivitySummary = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -60,7 +54,13 @@ const SimpleUserTracking = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [orderId, orderNumber]);
+
+  useEffect(() => {
+    if (orderId || orderNumber) {
+      fetchActivitySummary();
+    }
+  }, [orderId, orderNumber, fetchActivitySummary]);
 
   // Loading state
   if (loading) {

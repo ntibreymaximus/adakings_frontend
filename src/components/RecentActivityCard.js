@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Spinner, Alert, Badge, Modal, Button } from 'react-bootstrap';
+import { Card, Spinner, Alert, Modal, Button } from 'react-bootstrap';
 import { API_BASE_URL } from '../utils/api';
 import { useNavigate } from 'react-router-dom';
 import { getRelativeTime } from '../services/activityService';

@@ -2,7 +2,7 @@
  * PWA Manager Component
  * Provides cleanup and manual service worker uninstallation functionality
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { usePWA } from '../contexts/PWAContext';
 import './PWAManager.css';
 
@@ -16,30 +16,6 @@ const PWAManager = ({ isVisible, onClose }) => {
   const [storageInfo, setStorageInfo] = useState(null);
   const [registrations, setRegistrations] = useState([]);
   const [selectedAction, setSelectedAction] = useState(null);
-
-  // Load initial data when component becomes visible
-  useEffect(() => {
-    if (isVisible) {
-      loadPWAStatus();
-    }
-  }, [isVisible]);
-
-  // Load PWA status information
-  const loadPWAStatus = async () => {
-    try {
-      // Get cache status
-      await getCacheStatus();
-      
-      // Get storage information
-      await getStorageInfo();
-      
-      // Get service worker registrations
-      await getServiceWorkerRegistrations();
-      
-    } catch (error) {
-      console.error('Error loading PWA status:', error);
-    }
-  };
 
   // Get cache status from service worker
   const getCacheStatus = async () => {
@@ -263,6 +239,30 @@ const PWAManager = ({ isVisible, onClose }) => {
     if (!storageInfo || !storageInfo.quota) return 0;
     return Math.round((storageInfo.usage / storageInfo.quota) * 100);
   };
+
+  // Load PWA status information
+  const loadPWAStatus = useCallback(async () => {
+    try {
+      // Get cache status
+      await getCacheStatus();
+      
+      // Get storage information
+      await getStorageInfo();
+      
+      // Get service worker registrations
+      await getServiceWorkerRegistrations();
+      
+    } catch (error) {
+      console.error('Error loading PWA status:', error);
+    }
+  }, []);
+
+  // Load initial data when component becomes visible
+  useEffect(() => {
+    if (isVisible) {
+      loadPWAStatus();
+    }
+  }, [isVisible, loadPWAStatus]);
 
   if (!isVisible) return null;
 

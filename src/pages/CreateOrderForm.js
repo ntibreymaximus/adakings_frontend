@@ -6,7 +6,6 @@ import { API_ENDPOINTS } from '../utils/api';
 import { apiFirstService } from '../services/apiFirstService';
 import { menuCacheService } from '../services/menuCacheService';
 import { useAuth } from '../contexts/AuthContext';
-import useCallDetection from '../hooks/useCallDetection';
 
 // Delivery locations will be fetched from backend
 
@@ -43,6 +42,8 @@ const CreateOrderForm = ({ isEditMode: isEditModeProp = false }) => {
   const [showLocationDropdown, setShowLocationDropdown] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
+  const [nextOrderNumber, setNextOrderNumber] = useState('');
+  const [loadingNextNumber, setLoadingNextNumber] = useState(false);
   
   // Refs for cleanup and debouncing
   const searchTimeoutRef = useRef(null);
@@ -62,78 +63,30 @@ const CreateOrderForm = ({ isEditMode: isEditModeProp = false }) => {
   // State for active menu tab
   const [activeMenuTab, setActiveMenuTab] = useState('regular');
 
-  // Call detection hook
-  const {
-    showCallModal,
-    detectedNumber,
-    setDetectedNumber,
-    formatPhoneNumber,
-    closeCallModal,
-    isProcessing,
-    triggerCallModal,
-    isCallDetectionSupported
-  } = useCallDetection();
 
-  // Effect to autofill customer phone on call modal accept
-  useEffect(() => {
-    if (showCallModal && detectedNumber) {
-      optimizedToast.info('Incoming call detected. You can add the number directly.');
-    }
-  }, [showCallModal, detectedNumber]);
-  
-  // Request permissions on mount if on mobile
-  useEffect(() => {
-    if (isCallDetectionSupported && isMobile) {
-      // Check if we've already requested permissions (stored in localStorage)
-      const permissionsRequested = localStorage.getItem('callDetectionPermissionsRequested');
-      
-      if (!permissionsRequested) {
-        // Show a message explaining why we need permissions
-        optimizedToast.info('Enable camera access to automatically detect phone numbers from incoming calls', {
-          duration: 5000,
-          position: 'top-center'
-        });
-        
-        // Mark that we've requested permissions
-        localStorage.setItem('callDetectionPermissionsRequested', 'true');
-      }
-    }
-  }, [isCallDetectionSupported, isMobile]);
-
-  const handleAcceptCallNumber = () => {
-    // Set the phone number
-    setCustomerPhone(formatPhoneNumber(detectedNumber));
-    
-    // Automatically set delivery type to Delivery
-    setDeliveryType('Delivery');
-    
-    // Fetch delivery locations if not already loaded
-    if (deliveryLocations.length === 0 && !loadingLocations) {
-      fetchDeliveryLocations();
-    }
-    
-    // Show delivery modal on mobile after accepting the number
-    if (isMobile) {
-      setTimeout(() => {
-        setShowDeliveryModal(true);
-      }, 300); // Small delay to ensure smooth transition
-    }
-    
-    // Show success message
-    optimizedToast.success('Phone number added. Please select delivery location.');
-    
-    closeCallModal();
-  };
-
-  const handleRejectCallNumber = () => {
-    setDetectedNumber('');
-    closeCallModal();
-  };
 
   // Filter delivery locations based on search term
   const filteredDeliveryLocations = deliveryLocations.filter(location =>
     location.name.toLowerCase().includes(locationSearchTerm.toLowerCase())
   );
+
+  // Fetch next order number
+  const fetchNextOrderNumber = useCallback(async () => {
+    if (!isEditMode && !loadingNextNumber) {
+      setLoadingNextNumber(true);
+      try {
+        const response = await apiFirstService.getNextOrderNumber();
+        if (response && response.next_order_number) {
+          setNextOrderNumber(response.next_order_number);
+        }
+      } catch (error) {
+        console.error('Failed to fetch next order number:', error);
+        // Silently fail - not critical for form operation
+      } finally {
+        setLoadingNextNumber(false);
+      }
+    }
+  }, [isEditMode, loadingNextNumber]);
 
   // Fetch delivery locations from backend
   const fetchDeliveryLocations = useCallback(async () => {
@@ -406,6 +359,13 @@ useEffect(() => {
       }
     };
   }, []);
+
+  // Fetch next order number for new orders
+  useEffect(() => {
+    if (!isEditMode) {
+      fetchNextOrderNumber();
+    }
+  }, [isEditMode, fetchNextOrderNumber]);
 
 
 
@@ -994,7 +954,7 @@ const handleAddItem = useCallback((itemId) => {
             <Card.Header className={`${isEditMode ? 'bg-warning' : 'ada-bg-primary'} text-white py-3`}>
               <h5 className="mb-0">
                 <i className={`bi ${isEditMode ? 'bi-pencil-square' : 'bi-plus-circle'} me-2`}></i>
-                {isEditMode ? `Edit Order ${existingOrder?.order_number || orderNumber || ''}` : 'Create New Order'}
+                {isEditMode ? `Edit Order ${existingOrder?.order_number || orderNumber || ''}` : `Create New Order${nextOrderNumber ? ` (Next: ${nextOrderNumber})` : ''}`}
               </h5>
               {isEditMode && existingOrder && (
                 <small className="d-block mt-1">
@@ -2283,99 +2243,6 @@ const handleAddItem = useCallback((itemId) => {
         </Modal.Footer>
       </Modal>
 
-      {/* Call Detection Modal */}
-      <Modal 
-        show={showCallModal} 
-        onHide={handleRejectCallNumber} 
-        centered
-        size="md"
-        backdrop="static"
-        keyboard={false}
-      >
-        <Modal.Header closeButton>
-          <Modal.Title className="d-flex align-items-center">
-            <i className="bi bi-telephone-fill me-2 text-primary"></i>
-            Incoming Call Detected
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <div className="text-center mb-3">
-            <i className="bi bi-phone-vibrate text-primary" style={{ fontSize: '2rem' }}></i>
-            <h6 className="mt-2 mb-3">Phone Call Detected</h6>
-            <p className="text-muted">Would you like to add this phone number to your order?</p>
-          </div>
-          
-          {detectedNumber && (
-            <div className="text-center mb-3 p-3 bg-light rounded">
-              <strong>Detected Number:</strong>
-              <br />
-              <code className="text-primary fs-5">{formatPhoneNumber(detectedNumber)}</code>
-            </div>
-          )}
-          
-          <div className="alert alert-info">
-            <i className="bi bi-info-circle me-2"></i>
-            <small>This will automatically fill the customer phone field for delivery orders.</small>
-          </div>
-        </Modal.Body>
-        <Modal.Footer>
-          <div className="d-flex gap-2 w-100">
-            <Button 
-              variant="secondary" 
-              onClick={handleRejectCallNumber}
-              className="flex-fill"
-            >
-              <i className="bi bi-x-circle me-2"></i>
-              Ignore
-            </Button>
-            <Button 
-              variant="primary" 
-              onClick={handleAcceptCallNumber}
-              className="flex-fill"
-              disabled={!detectedNumber}
-            >
-              <i className="bi bi-check-circle me-2"></i>
-              Use This Number
-            </Button>
-          </div>
-        </Modal.Footer>
-      </Modal>
-
-      {/* OCR Processing Indicator */}
-      <Modal 
-        show={isProcessing} 
-        centered
-        size="sm"
-        backdrop="static"
-        keyboard={false}
-      >
-        <Modal.Body className="text-center py-4">
-          <Spinner animation="border" variant="primary" className="mb-3" />
-          <h6>Detecting Phone Number...</h6>
-          <p className="text-muted mb-0">Processing incoming call information</p>
-        </Modal.Body>
-      </Modal>
-
-      {/* Add floating button for manual trigger (for testing) */}
-      {isMobile && (
-        <Button
-          variant="primary"
-          className="position-fixed"
-          style={{
-            bottom: '20px',
-            right: '20px',
-            borderRadius: '50%',
-            width: '60px',
-            height: '60px',
-            zIndex: 1000,
-            boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-          }}
-          onClick={triggerCallModal}
-          disabled={isProcessing}
-        >
-          <i className="bi bi-telephone-fill fs-4"></i>
-        </Button>
-      )}
 
     </Container>
   );

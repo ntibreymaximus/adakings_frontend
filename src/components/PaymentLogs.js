@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, Spinner, Badge } from 'react-bootstrap';
 import { API_BASE_URL } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -20,35 +20,7 @@ const PaymentLogs = ({
   const [error, setError] = useState(null);
   const { userData } = useAuth();
 
-  useEffect(() => {
-    if (transactionId || orderNumber) {
-      fetchPaymentLogs();
-    }
-  }, [transactionId, orderNumber, transactionData]);
-
-  // Helper to fetch transaction details with user info
-  const fetchTransactionWithUser = async (transactionId) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/payments/transactions/${transactionId}/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Fetched transaction details:', data);
-        return data;
-      }
-    } catch (error) {
-      console.error('Error fetching transaction details:', error);
-    }
-    return null;
-  };
-
-  const fetchPaymentLogs = async () => {
+  const fetchPaymentLogs = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -217,7 +189,13 @@ const PaymentLogs = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [transactionId, orderNumber, transactionData, userData]);
+
+  useEffect(() => {
+    if (transactionId || orderNumber) {
+      fetchPaymentLogs();
+    }
+  }, [transactionId, orderNumber, transactionData, fetchPaymentLogs]);
 
   const formatTimestamp = (timestamp) => {
     if (!timestamp) return 'N/A';

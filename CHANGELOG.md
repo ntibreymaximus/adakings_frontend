@@ -2,6 +2,52 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.7.2] - 2025-07-15
+
+### 🚀 Development Release
+
+**📋 Release Information:**
+- **Environment**: dev
+- **Branch**: `dev/1.7.2`
+- **Version**: `1.7.2`
+- **Deployment Time**: 2025-07-15 09:03:42
+- **Description**: Development environment deployment with latest React components
+
+**📝 Changes Made:**
+React v1.7.2: Deploy to dev environment
+
+**📁 Files Modified:**
+  - Modified: `ERSION`
+  - Modified: `package.json`
+  - Modified: `src/App.js`
+  - Modified: `src/components/AuditActivityCard.js`
+  - Modified: `src/components/AuditLogViewer.js`
+  - Modified: `src/components/DashboardPage.js`
+  - Modified: `src/components/LoginPage.js`
+  - Modified: `src/components/PWAInstallPrompt.js`
+  - Modified: `src/components/PWAManager.js`
+  - Modified: `src/components/PWAStatusIndicator.js`
+  - Modified: `src/components/PWAUpdateNotification.js`
+  - Modified: `src/components/PaymentLogs.js`
+  - Modified: `src/components/RecentActivityCard.js`
+  - Modified: `src/components/SimpleUserTracking.js`
+  - Deleted: `src/hooks/useCallDetection.js`
+  - Modified: `src/pages/CreateOrderForm.js`
+
+**🔄 Deployment Details:**
+- **Source Branch**: `dev/1.7.2`
+- **Target Branch**: `dev/1.7.2`
+- **Build Process**: Development build with source maps
+- **React Version**: Latest
+
+**🎯 Environment Specific Notes:**
+- Development environment deployment
+- Contains latest React components and changes
+- Used for integration testing before production
+- Devtest branch updated for continuous testing
+
+---
+
 ## [1.7.1] - 2025-07-15
 
 ### 🚀 Development Release
