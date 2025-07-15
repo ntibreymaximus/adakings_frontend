@@ -93,13 +93,13 @@ const getApiBaseUrl = () => {
     const frontendUrl = window.location.hostname;
     
     // Special handling for production URL
-    if (frontendUrl.includes('adaresmansys-prod')) {
+    if (frontendUrl.includes('adaresmansys')) {
       // Production backend has different naming: adakingsbackend-prod
       return 'https://adakingsbackend-prod.up.railway.app/api';
     }
     
     // For other environments, use the standard naming convention
-    const backendUrl = frontendUrl.replace('adaresmansys-', 'adaresmansys-backend-');
+    const backendUrl = frontendUrl.replace('adaresmansys', 'adakingsbackend-');
     return `https://${backendUrl}/api`;
   }
   
@@ -123,7 +123,7 @@ const getBackendBaseUrl = () => {
     const frontendUrl = window.location.hostname;
     
     // Special handling for production URL
-    if (frontendUrl.includes('adaresmansys-prod')) {
+    if (frontendUrl.includes('adaresmansys')) {
       // Production backend has different naming: adakingsbackend-prod
       return 'https://adakingsbackend-prod.up.railway.app';
     }
