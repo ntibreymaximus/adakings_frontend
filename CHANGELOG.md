@@ -2,28 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
-## [2.0.5] - 2025-07-15
+## [2.0.6] - 2025-07-16
 
 ### 🎯 Production Release
 
 **📋 Release Information:**
 - **Environment**: production
-- **Branch**: `prod/2.0.5`
-- **Version**: `2.0.5`
-- **Deployment Time**: 2025-07-15 14:10:24
+- **Branch**: `prod/2.0.6`
+- **Version**: `2.0.6`
+- **Deployment Time**: 2025-07-16 09:31:43
 - **Description**: Production deployment - optimized React build
 
 **📝 Changes Made:**
-React v2.0.5: Deploy to production environment
+React v2.0.6: Deploy to production environment
 
 **📁 Files Modified:**
   - Modified: `ERSION`
   - Modified: `package.json`
-  - Modified: `src/utils/api.js`
 
 **🔄 Deployment Details:**
-- **Source Branch**: `prod/2.0.5`
-- **Target Branch**: `prod/2.0.5`
+- **Source Branch**: `prod/2.0.6`
+- **Target Branch**: `prod/2.0.6`
 - **Build Process**: Optimized production build
 - **React Version**: Latest
 
@@ -35,102 +34,36 @@ React v2.0.5: Deploy to production environment
 
 ---
 
-## [2.0.4] - 2025-07-15
+## [1.7.6] - 2025-07-16
 
-### 🎯 Production Release
+### 🚀 Development Release
 
 **📋 Release Information:**
-- **Environment**: production
-- **Branch**: `prod/2.0.4`
-- **Version**: `2.0.4`
-- **Deployment Time**: 2025-07-15 14:01:54
-- **Description**: Production deployment - optimized React build
+- **Environment**: dev
+- **Branch**: `dev/1.7.6`
+- **Version**: `1.7.6`
+- **Deployment Time**: 2025-07-16 09:27:45
+- **Description**: Development environment deployment with latest React components
 
 **📝 Changes Made:**
-React v2.0.4: Deploy to production environment
+React v1.7.6: Deploy to dev environment
 
 **📁 Files Modified:**
   - Modified: `ERSION`
+  - Modified: `package-lock.json`
   - Modified: `package.json`
 
 **🔄 Deployment Details:**
-- **Source Branch**: `prod/2.0.4`
-- **Target Branch**: `prod/2.0.4`
-- **Build Process**: Optimized production build
+- **Source Branch**: `dev/1.7.6`
+- **Target Branch**: `dev/1.7.6`
+- **Build Process**: Development build with source maps
 - **React Version**: Latest
 
 **🎯 Environment Specific Notes:**
-- Production environment deployment
-- Optimized React build for performance
-- Ready for end users
-- Live branch updated for continuous deployment
-
----
-
-## [2.0.3] - 2025-07-15
-
-### 🎯 Production Release
-
-**📋 Release Information:**
-- **Environment**: production
-- **Branch**: `prod/2.0.3`
-- **Version**: `2.0.3`
-- **Deployment Time**: 2025-07-15 13:14:11
-- **Description**: Production deployment - optimized React build
-
-**📝 Changes Made:**
-React v2.0.3: Deploy to production environment
-
-**📁 Files Modified:**
-  - Modified: `ERSION`
-  - Modified: `package.json`
-  - Modified: `src/components/DeliveryRiderSelector.js`
-  - Modified: `src/utils/api.js`
-  - Changed: `src/utils/debugUtils.js`
-
-**🔄 Deployment Details:**
-- **Source Branch**: `prod/2.0.3`
-- **Target Branch**: `prod/2.0.3`
-- **Build Process**: Optimized production build
-- **React Version**: Latest
-
-**🎯 Environment Specific Notes:**
-- Production environment deployment
-- Optimized React build for performance
-- Ready for end users
-- Live branch updated for continuous deployment
-
----
-
-## [2.0.2] - 2025-07-15
-
-### 🎯 Production Release
-
-**📋 Release Information:**
-- **Environment**: production
-- **Branch**: `prod/2.0.2`
-- **Version**: `2.0.2`
-- **Deployment Time**: 2025-07-15 12:56:41
-- **Description**: Production deployment - optimized React build
-
-**📝 Changes Made:**
-React v2.0.2: Deploy to production environment
-
-**📁 Files Modified:**
-  - Modified: `ERSION`
-  - Modified: `package.json`
-
-**🔄 Deployment Details:**
-- **Source Branch**: `prod/2.0.2`
-- **Target Branch**: `prod/2.0.2`
-- **Build Process**: Optimized production build
-- **React Version**: Latest
-
-**🎯 Environment Specific Notes:**
-- Production environment deployment
-- Optimized React build for performance
-- Ready for end users
-- Live branch updated for continuous deployment
+- Development environment deployment
+- Contains latest React components and changes
+- Used for integration testing before production
+- Devtest branch updated for continuous testing
 
 ---
 
