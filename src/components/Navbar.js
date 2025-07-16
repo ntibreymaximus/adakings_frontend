@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Navbar, Nav, Container, Modal, Button } from 'react-bootstrap';
 import { Link, useNavigate } from 'react-router-dom';
-import SessionTimer from './SessionTimer';
 
 const NavbarComponent = ({ userData, onLogout }) => {
   const navigate = useNavigate();
@@ -46,7 +45,6 @@ const NavbarComponent = ({ userData, onLogout }) => {
             
             {userData && (
               <div className="d-flex align-items-center gap-3">
-                <SessionTimer />
                 <Button 
                   variant="primary" 
                   size="sm" 
