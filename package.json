@@ -32,6 +32,7 @@
     "build:local": "cross-env REACT_APP_ENV=local react-scripts build",
     "build:dev": "cross-env REACT_APP_ENV=development react-scripts build",
     "build:prod": "cross-env REACT_APP_ENV=production react-scripts build",
+    "build:railway": "cross-env REACT_APP_ENV=production CI=true DISABLE_ESLINT_PLUGIN=true react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "deploy:feature": "node smart-deploy.js feature",
