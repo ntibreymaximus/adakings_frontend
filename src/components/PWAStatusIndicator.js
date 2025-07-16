@@ -3,7 +3,7 @@
  * Shows current PWA status and provides installation option
  * Currently disabled - returns null
  */
-import React from 'react';
+// React is imported but not explicitly used due to JSX transformation
 import '../styles/pwa.css'; // Import PWA styles
 
 const PWAStatusIndicator = () => {

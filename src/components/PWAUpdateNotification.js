@@ -3,7 +3,7 @@
  * Displays update notifications and reload prompts when a new service worker becomes available
  */
 import React, { useState, useEffect } from 'react';
-import { usePWA } from '../contexts/PWAContext';
+// import { usePWA } from '../contexts/PWAContext'; // Currently unused
 import './PWAUpdateNotification.css';
 
 const PWAUpdateNotification = () => {

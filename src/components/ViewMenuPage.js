@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Form, InputGroup, Spinner, Alert, Button, Card, Badge } from 'react-bootstrap';
+import { Container, Row, Col, Form, InputGroup, Alert, Button, Card, Badge } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { API_BASE_URL } from '../utils/api';
@@ -15,7 +15,7 @@ const ViewMenuPage = () => {
     const [error, setError] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('all');
-    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+    // const [isMobile, setIsMobile] = useState(window.innerWidth < 768); // Currently unused
 
     // Function to fetch menu items (can be reused for refresh) - Now uses cache service
     const fetchMenuItems = async (forceRefresh = false) => {
@@ -51,15 +51,8 @@ const ViewMenuPage = () => {
     };
 
     useEffect(() => {
-        const handleResize = () => {
-            setIsMobile(window.innerWidth < 768);
-        };
-        
-        window.addEventListener('resize', handleResize);
         fetchMenuItems();
-        
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
 
     // Filter menu items based on search and item type

@@ -83,16 +83,7 @@ const AuditLogViewer = () => {
     }
   };
 
-  const formatChanges = (changes) => {
-    if (!changes || Object.keys(changes).length === 0) return 'No changes recorded';
-    
-    return Object.entries(changes).map(([key, value]) => {
-      if (typeof value === 'object' && value.old !== undefined && value.new !== undefined) {
-        return `${key}: ${value.old} → ${value.new}`;
-      }
-      return `${key}: ${value}`;
-    }).join(', ');
-  };
+  // Removed unused formatChanges function
 
   return (
     <Container className="my-3 my-md-4 px-3 px-md-4" style={{ minHeight: 'calc(100vh - 100px)' }}>
