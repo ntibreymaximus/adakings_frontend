@@ -1,0 +1,59 @@
+.session-timeout-modal .modal-content {
+  border-radius: 12px;
+  border: none;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+}
+
+.session-timeout-modal .modal-header {
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
+  border-radius: 12px 12px 0 0;
+  padding: 1.25rem 1.5rem;
+}
+
+.session-timeout-modal .modal-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.session-timeout-modal .modal-body {
+  padding: 2rem 1.5rem;
+}
+
+.session-timeout-modal .timeout-icon {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.session-timeout-modal .countdown-timer {
+  background-color: #fff3cd;
+  border: 2px solid #ffeaa7;
+  border-radius: 8px;
+  padding: 1rem 2rem;
+  display: inline-block;
+  margin: 0 auto;
+}
+
+.session-timeout-modal .time-display {
+  font-size: 2.5rem;
+  font-weight: bold;
+  color: #856404;
+  font-family: 'Courier New', monospace;
+}
+
+.session-timeout-modal .modal-footer {
+  border-top: 1px solid #dee2e6;
+  padding: 1rem 1.5rem;
+}

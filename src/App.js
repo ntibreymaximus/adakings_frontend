@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { PWAProvider, usePWA } from './contexts/PWAContext';
 import { EnvironmentProvider } from './contexts/EnvironmentContext';
 import { setAuthContext, setupAutoLogoutTimer, setupVisibilityCheck } from './utils/authInterceptor';
+import useInactivityTimeout from './hooks/useInactivityTimeout';
 import { initializeOfflineServices } from './utils/serviceWorkerRegistration';
 import LoginPage from './components/LoginPage';
 import UserProfilePage from './components/UserProfilePage';
@@ -13,6 +14,7 @@ import ViewOrdersPage from './components/ViewOrdersPage';
 import ViewMenuPage from './components/ViewMenuPage';
 import ViewTransactionsPage from './components/ViewTransactionsPage';
 import AuditLogViewer from './components/AuditLogViewer';
+import ApiHealthCheck from './components/ApiHealthCheck';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Navbar from './components/Navbar';
@@ -21,6 +23,7 @@ import PWAInstallPrompt from './components/PWAInstallPrompt';
 // import MobilePWABanner from './components/MobilePWABanner';
 import PWAUpdateNotification from './components/PWAUpdateNotification';
 import PWAManager from './components/PWAManager';
+import SessionTimeoutWarning from './components/SessionTimeoutWarning';
 import EnvironmentTag from './components/EnvironmentTag';
 import Footer from './components/Footer';
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -42,6 +45,9 @@ function AppContent() {
   } = usePWA();
   
   const [showPWAManager, setShowPWAManager] = useState(false);
+
+  // Setup inactivity timeout (30 minutes)
+  const { showWarning, timeRemaining, extendSession } = useInactivityTimeout();
 
   // Setup global authentication interceptor
   useEffect(() => {
@@ -126,9 +132,9 @@ function AppContent() {
             <AuditLogViewer /> : 
             <Navigate to="/dashboard" />} 
         />
+        <Route path="/health-check" element={<ApiHealthCheck />} />
         <Route path="*" element={<Navigate to={userData ? "/dashboard" : "/login"} />} /> 
       </Routes>
-      
       
       {/* PWA status indicator */}
       <PWAStatusIndicator />
@@ -146,6 +152,13 @@ function AppContent() {
       <PWAManager 
         isVisible={showPWAManager} 
         onClose={() => setShowPWAManager(false)} 
+      />
+      
+      {/* Session Timeout Warning Modal */}
+      <SessionTimeoutWarning 
+        show={showWarning}
+        onExtend={extendSession}
+        timeRemaining={timeRemaining}
       />
       
       {/* Environment Tag */}
