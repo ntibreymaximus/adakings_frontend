@@ -963,20 +963,17 @@ const ViewTransactionsPage = () => {
           
           {/* Payment Method Totals */}
           <Row className="g-3 mt-2">
-            {Object.entries(filteredStats.payment_method_totals)
-              .filter(([method, total]) => total > 0)
-              .map(([method, total]) => (
-                <Col xs={6} key={method}>
-                  <Card className="text-center h-100">
-                    <Card.Body>
-                      <i className="bi bi-credit-card-2-back text-primary" style={{ fontSize: '2rem' }}></i>
-                      <h4 className="mt-2 text-primary">{formatCurrency(total)}</h4>
-                      <p className="mb-0 text-muted">{method}</p>
-                    </Card.Body>
-                  </Card>
-                </Col>
-              ))
-            }
+            {filteredStats.payment_method_totals.map((methodTotal, index) => (
+              <Col xs={6} key={methodTotal.method}>
+                <Card className="text-center h-100">
+                  <Card.Body>
+                    <i className="bi bi-credit-card-2-back text-primary" style={{ fontSize: '2rem' }}></i>
+                    <h4 className="mt-2 text-primary">{formatCurrency(methodTotal.total)}</h4>
+                    <p className="mb-0 text-muted">{methodTotal.method}</p>
+                  </Card.Body>
+                </Card>
+              </Col>
+            ))}
           </Row>
           
           {/* Additional Stats Row */}

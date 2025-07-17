@@ -1666,6 +1666,7 @@ if (order.delivery_type === 'Delivery') {
               <Table striped hover className="mb-0">
                 <thead>
                   <tr>
+                    <th>Order #</th>
                     <th>Customer Phone</th>
                     <th>Order Items</th>
                     <th>Delivery Type</th>
@@ -1684,6 +1685,11 @@ if (order.delivery_type === 'Delivery') {
                       style={{ cursor: 'pointer' }}
                       className="table-row-hover"
                     >
+                      <td>
+                        <strong className="ada-text-primary">
+                          #{(order.order_number || order.id).toString().slice(-3)}
+                        </strong>
+                      </td>
                       <td>
                         <strong className="ada-text-primary">
                           <i className="bi bi-phone me-1"></i>
@@ -1788,7 +1794,7 @@ if (order.delivery_type === 'Delivery') {
                         <div className="flex-grow-1">
                           <div className="d-flex align-items-center mb-1">
                               <span className="ada-text-primary fw-bold me-2" style={{ fontSize: '0.95rem' }}>
-                                #{order.order_number || order.id}
+                                #{(order.order_number || order.id).toString().slice(-3)}
                               </span>
                             <span 
                               className="badge rounded-pill"
