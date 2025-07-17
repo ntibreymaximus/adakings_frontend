@@ -257,14 +257,54 @@ a:focus,
 }
 
 /* Mobile-specific modal adjustments */
-@media (max-width: 576px) {
+@media (max-width: 768px) {
   .modal-dialog {
-    margin: 0.5rem;
-    max-height: calc(100vh - 1rem);
+    margin: 0;
+    max-height: 100vh;
+    width: 100vw;
+    height: 100vh;
+  }
+  
+  .modal-content {
+    height: 100vh;
+    max-height: 100vh;
+    border-radius: 0;
+    border: none;
   }
   
   .modal-body {
-    max-height: calc(100vh - 200px); /* Account for header and footer */
+    max-height: calc(100vh - 120px); /* Account for header and footer */
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .modal-header {
+    flex-shrink: 0;
+    border-bottom: 1px solid #dee2e6;
+    padding: 1rem;
+  }
+  
+  .modal-footer {
+    flex-shrink: 0;
+    border-top: 1px solid #dee2e6;
+    padding: 1rem;
+  }
+}
+
+/* Tablet adjustments */
+@media (max-width: 768px) and (min-width: 577px) {
+  .modal-dialog {
+    margin: 1rem;
+    max-height: calc(100vh - 2rem);
+    width: calc(100vw - 2rem);
+    height: calc(100vh - 2rem);
+  }
+  
+  .modal-content {
+    height: 100%;
+    max-height: calc(100vh - 2rem);
+    border-radius: 0.5rem;
   }
 }
 

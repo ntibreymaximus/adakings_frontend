@@ -27,7 +27,7 @@ const StatsCard = ({ className }) => {
       if (!isValid) return;
 
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/stats/quick/`, {
+      const response = await fetch(`${API_BASE_URL}/orders/stats/quick/`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',

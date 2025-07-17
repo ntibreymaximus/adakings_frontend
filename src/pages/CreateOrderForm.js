@@ -261,13 +261,45 @@ useEffect(() => {
         console.log('✅ Order data fetched:', data);
         console.log('📦 Existing order items:', data.items);
         
-        // Check if order can be edited
+        // Enhanced order edit validation with detailed logging
+        console.log('🔍 Validating order edit permissions:', {
+          orderNumber: orderNumber,
+          orderData: {
+            id: data.id,
+            order_number: data.order_number,
+            status: data.status,
+            payment_status: data.payment_status,
+            updated_at: data.updated_at,
+            created_at: data.created_at
+          }
+        });
+        
         const canEdit = canEditOrder(data);
         if (!canEdit.allowed) {
+          console.error('❌ Order cannot be edited:', canEdit.reason);
           setLoadError(canEdit.reason);
           optimizedToast.error(canEdit.reason);
+          
+          // Add additional context for debugging
+          if (data.status === 'Fulfilled' && (data.payment_status === 'PAID' || data.payment_status === 'OVERPAID')) {
+            const lastUpdated = new Date(data.updated_at || data.created_at);
+            const now = new Date();
+            const timeDifference = now - lastUpdated;
+            const hoursPassed = Math.floor(timeDifference / (60 * 60 * 1000));
+            const minutesPassed = Math.floor((timeDifference % (60 * 60 * 1000)) / (60 * 1000));
+            
+            console.log('⏰ Edit window details:', {
+              lastUpdated: lastUpdated.toISOString(),
+              now: now.toISOString(),
+              timePassed: `${hoursPassed}h ${minutesPassed}m`,
+              allowedWindow: '2 hours'
+            });
+          }
+          
           return;
         }
+        
+        console.log('✅ Order can be edited - proceeding with form initialization');
         
         setExistingOrder(data);
         setLoadError(null);

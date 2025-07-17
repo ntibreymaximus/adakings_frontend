@@ -2816,12 +2816,45 @@ if (order.delivery_type === 'Delivery') {
             <Button 
               variant="info" 
               onClick={() => {
-                // Check if order can be edited
+                // Check if order can be edited with enhanced logging
+                console.log('🔍 Edit button clicked for order:', {
+                  id: selectedOrder.id,
+                  order_number: selectedOrder.order_number,
+                  status: selectedOrder.status,
+                  payment_status: selectedOrder.payment_status,
+                  updated_at: selectedOrder.updated_at,
+                  created_at: selectedOrder.created_at
+                });
+                
                 const canEdit = canEditOrder(selectedOrder);
+                console.log('📋 Edit permission result:', canEdit);
+                
                 if (!canEdit.allowed) {
+                  console.warn('❌ Edit not allowed:', canEdit.reason);
                   optimizedToast.warning(canEdit.reason);
+                  
+                  // Show additional debug info for fulfilled and paid orders
+                  if (selectedOrder.status === 'Fulfilled' && (selectedOrder.payment_status === 'PAID' || selectedOrder.payment_status === 'OVERPAID')) {
+                    const lastUpdated = new Date(selectedOrder.updated_at || selectedOrder.created_at);
+                    const now = new Date();
+                    const timeDifference = now - lastUpdated;
+                    const hoursPassed = Math.floor(timeDifference / (60 * 60 * 1000));
+                    const minutesPassed = Math.floor((timeDifference % (60 * 60 * 1000)) / (60 * 1000));
+                    
+                    console.log('⏰ Time window debug:', {
+                      lastUpdated: lastUpdated.toISOString(),
+                      now: now.toISOString(),
+                      timePassed: `${hoursPassed}h ${minutesPassed}m`,
+                      allowedWindow: '2 hours',
+                      timePassedMs: timeDifference,
+                      twoHoursMs: 2 * 60 * 60 * 1000
+                    });
+                  }
+                  
                   return;
                 }
+                
+                console.log('✅ Edit allowed - navigating to edit page');
                 // Close modal before navigating
                 setShowOrderDetailsModal(false);
                 navigate(`/edit-order/${selectedOrder.order_number || selectedOrder.id}`);
@@ -2898,22 +2931,6 @@ if (order.delivery_type === 'Delivery') {
           <Row className="g-3">
             <Col xs={6}>
               <Card 
-                className={`text-center h-100 ${statusFilter === 'total' ? 'border-primary bg-primary bg-opacity-10' : 'border-light'}`}
-                style={{ cursor: 'pointer' }}
-                onClick={() => {
-                  handleStatsClick('total');
-                  setShowStatsModal(false);
-                }}
-              >
-                <Card.Body>
-                  <i className={`bi bi-list-ul ${statusFilter === 'total' ? 'text-primary' : 'text-primary'}`} style={{ fontSize: '2rem' }}></i>
-                  <h4 className={`mt-2 ${statusFilter === 'total' ? 'text-primary fw-bold' : ''}`}>{orderStats.total}</h4>
-                  <p className={`mb-0 ${statusFilter === 'total' ? 'text-primary' : 'text-muted'}`}>Total Orders</p>
-                </Card.Body>
-              </Card>
-            </Col>
-            <Col xs={6}>
-              <Card 
                 className={`text-center h-100 ${statusFilter === 'pending' ? 'border-warning bg-warning bg-opacity-10' : 'border-light'}`}
                 style={{ cursor: 'pointer' }}
                 onClick={() => {
@@ -2924,13 +2941,45 @@ if (order.delivery_type === 'Delivery') {
                 <Card.Body>
                   <i className={`bi bi-clock ${statusFilter === 'pending' ? 'text-warning' : 'text-warning'}`} style={{ fontSize: '2rem' }}></i>
                   <h4 className={`mt-2 ${statusFilter === 'pending' ? 'text-warning fw-bold' : ''}`}>{orderStats.pending}</h4>
-                  <p className={`mb-0 ${statusFilter === 'pending' ? 'text-warning' : 'text-muted'}`}>Pending & Accepted</p>
+                  <p className={`mb-0 ${statusFilter === 'pending' ? 'text-warning' : 'text-muted'}`}>Pending</p>
                 </Card.Body>
               </Card>
             </Col>
             <Col xs={6}>
               <Card 
-                className={`text-center h-100 ${statusFilter === 'outForDelivery' ? 'border-info bg-info bg-opacity-10' : 'border-light'}`}
+                className={`text-center h-100 ${statusFilter === 'accepted' ? 'border-info bg-info bg-opacity-10' : 'border-light'}`}
+                style={{ cursor: 'pointer' }}
+                onClick={() => {
+                  handleStatsClick('accepted');
+                  setShowStatsModal(false);
+                }}
+              >
+                <Card.Body>
+                  <i className={`bi bi-check-lg ${statusFilter === 'accepted' ? 'text-info' : 'text-info'}`} style={{ fontSize: '2rem' }}></i>
+                  <h4 className={`mt-2 ${statusFilter === 'accepted' ? 'text-info fw-bold' : ''}`}>{orderStats.accepted}</h4>
+                  <p className={`mb-0 ${statusFilter === 'accepted' ? 'text-info' : 'text-muted'}`}>Accepted</p>
+                </Card.Body>
+              </Card>
+            </Col>
+            <Col xs={6}>
+              <Card 
+                className={`text-center h-100 ${statusFilter === 'ready' ? 'border-primary bg-primary bg-opacity-10' : 'border-light'}`}
+                style={{ cursor: 'pointer' }}
+                onClick={() => {
+                  handleStatsClick('ready');
+                  setShowStatsModal(false);
+                }}
+              >
+                <Card.Body>
+                  <i className={`bi bi-box-seam ${statusFilter === 'ready' ? 'text-primary' : 'text-primary'}`} style={{ fontSize: '2rem' }}></i>
+                  <h4 className={`mt-2 ${statusFilter === 'ready' ? 'text-primary fw-bold' : ''}`}>{orderStats.ready}</h4>
+                  <p className={`mb-0 ${statusFilter === 'ready' ? 'text-primary' : 'text-muted'}`}>Ready</p>
+                </Card.Body>
+              </Card>
+            </Col>
+            <Col xs={6}>
+              <Card 
+                className={`text-center h-100 ${statusFilter === 'outForDelivery' ? 'border-secondary bg-secondary bg-opacity-10' : 'border-light'}`}
                 style={{ cursor: 'pointer' }}
                 onClick={() => {
                   handleStatsClick('outForDelivery');
@@ -2938,9 +2987,9 @@ if (order.delivery_type === 'Delivery') {
                 }}
               >
                 <Card.Body>
-                  <i className={`bi bi-truck ${statusFilter === 'outForDelivery' ? 'text-info' : 'text-info'}`} style={{ fontSize: '2rem' }}></i>
-                  <h4 className={`mt-2 ${statusFilter === 'outForDelivery' ? 'text-info fw-bold' : ''}`}>{orderStats.outForDelivery}</h4>
-                  <p className={`mb-0 ${statusFilter === 'outForDelivery' ? 'text-info' : 'text-muted'}`}>Out for Delivery</p>
+                  <i className={`bi bi-truck ${statusFilter === 'outForDelivery' ? 'text-secondary' : 'text-secondary'}`} style={{ fontSize: '2rem' }}></i>
+                  <h4 className={`mt-2 ${statusFilter === 'outForDelivery' ? 'text-secondary fw-bold' : ''}`}>{orderStats.outForDelivery}</h4>
+                  <p className={`mb-0 ${statusFilter === 'outForDelivery' ? 'text-secondary' : 'text-muted'}`} style={{ fontSize: '0.85rem' }}>Out for Delivery</p>
                 </Card.Body>
               </Card>
             </Col>
@@ -2959,6 +3008,16 @@ if (order.delivery_type === 'Delivery') {
                   <p className={`mb-0 ${statusFilter === 'fulfilled' ? 'text-success' : 'text-muted'}`}>Fulfilled</p>
                 </Card.Body>
               </Card>
+            </Col>
+          </Row>
+          
+          {/* Menu Items Stats Card for Mobile */}
+          <Row className="mt-4">
+            <Col xs={12}>
+              <MenuItemsStatsCard 
+                selectedDate={selectedDate}
+                className="ada-shadow-sm"
+              />
             </Col>
           </Row>
           

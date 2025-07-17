@@ -961,17 +961,37 @@ const ViewTransactionsPage = () => {
             </Col>
           </Row>
           
+          {/* Payment Method Totals */}
+          <Row className="g-3 mt-2">
+            {Object.entries(filteredStats.payment_method_totals)
+              .filter(([method, total]) => total > 0)
+              .map(([method, total]) => (
+                <Col xs={6} key={method}>
+                  <Card className="text-center h-100">
+                    <Card.Body>
+                      <i className="bi bi-credit-card-2-back text-primary" style={{ fontSize: '2rem' }}></i>
+                      <h4 className="mt-2 text-primary">{formatCurrency(total)}</h4>
+                      <p className="mb-0 text-muted">{method}</p>
+                    </Card.Body>
+                  </Card>
+                </Col>
+              ))
+            }
+          </Row>
+          
           {/* Additional Stats Row */}
           <Row className="g-3 mt-2">
-            <Col xs={6}>
-              <Card className="text-center h-100">
-                <Card.Body>
-                  <i className="bi bi-arrow-return-left text-warning" style={{ fontSize: '2rem' }}></i>
-                  <h4 className="mt-2 text-warning">{formatCurrency(orderStats.total_refunds_due)}</h4>
-                  <p className="mb-0 text-muted">Refunds</p>
-                </Card.Body>
-              </Card>
-            </Col>
+            {filteredStats.refund_total > 0 && (
+              <Col xs={6}>
+                <Card className="text-center h-100">
+                  <Card.Body>
+                    <i className="bi bi-arrow-return-left text-warning" style={{ fontSize: '2rem' }}></i>
+                    <h4 className="mt-2 text-warning">{formatCurrency(filteredStats.refund_total)}</h4>
+                    <p className="mb-0 text-muted">Refunds</p>
+                  </Card.Body>
+                </Card>
+              </Col>
+            )}
             <Col xs={6}>
               <Card className="text-center h-100">
                 <Card.Body>

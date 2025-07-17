@@ -59,7 +59,7 @@ const StatsPage = () => {
     deliveryStats: {},
   });
   const [dateRange, setDateRange] = useState({
-    startDate: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
+    startDate: new Date().toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0]
   });
   const [exportFormat, setExportFormat] = useState('excel');

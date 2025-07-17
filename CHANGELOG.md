@@ -2,6 +2,47 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.1] - 2025-07-17
+
+### 🚀 Development Release
+
+**📋 Release Information:**
+- **Environment**: dev
+- **Branch**: `dev/2.0.1`
+- **Version**: `2.0.1`
+- **Deployment Time**: 2025-07-17 16:19:00
+- **Description**: Development environment deployment with latest React components
+
+**📝 Changes Made:**
+React v2.0.1: Deploy to dev environment
+
+**📁 Files Modified:**
+  - Modified: `ERSION`
+  - Modified: `package.json`
+  - Modified: `src/App.css`
+  - Modified: `src/components/StatsCard.js`
+  - Modified: `src/components/StatsPage.js`
+  - Modified: `src/components/ViewOrdersPage.js`
+  - Modified: `src/components/ViewTransactionsPage.js`
+  - Modified: `src/pages/CreateOrderForm.js`
+  - Modified: `src/utils/orderUtils.js`
+  - Changed: `ORDER_EDIT_ANALYSIS.md`
+  - Changed: `src/styles/mobile-modal.css`
+
+**🔄 Deployment Details:**
+- **Source Branch**: `dev/2.0.1`
+- **Target Branch**: `dev/2.0.1`
+- **Build Process**: Development build with source maps
+- **React Version**: Latest
+
+**🎯 Environment Specific Notes:**
+- Development environment deployment
+- Contains latest React components and changes
+- Used for integration testing before production
+- Devtest branch updated for continuous testing
+
+---
+
 ## [2.2.0] - 2025-07-17
 
 ### 🎯 Production Release
