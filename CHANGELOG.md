@@ -2,6 +2,51 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.2] - 2025-07-17
+
+### 🎯 Production Release
+
+**📋 Release Information:**
+- **Environment**: production
+- **Branch**: `prod/2.1.2`
+- **Version**: `2.1.2`
+- **Deployment Time**: 2025-07-17 11:35:22
+- **Description**: Production deployment - optimized React build
+
+**📝 Changes Made:**
+React v2.1.2: Deploy to production environment
+
+**📁 Files Modified:**
+  - Modified: `ERSION`
+  - Modified: `package-lock.json`
+  - Modified: `package.json`
+  - Modified: `src/App.css`
+  - Modified: `src/App.js`
+  - Modified: `src/components/DashboardPage.js`
+  - Modified: `src/components/ViewOrdersPage.js`
+  - Modified: `src/components/ViewTransactionsPage.js`
+  - Modified: `src/pages/CreateOrderForm.js`
+  - Modified: `src/services/paymentService.js`
+  - Changed: `src/components/MenuItemsStatsCard.js`
+  - Changed: `src/components/StatsCard.js`
+  - Changed: `src/components/StatsPage.js`
+  - Changed: `src/utils/orderUtils.js`
+  - Changed: `test_view_orders_end.js`
+
+**🔄 Deployment Details:**
+- **Source Branch**: `prod/2.1.2`
+- **Target Branch**: `prod/2.1.2`
+- **Build Process**: Optimized production build
+- **React Version**: Latest
+
+**🎯 Environment Specific Notes:**
+- Production environment deployment
+- Optimized React build for performance
+- Ready for end users
+- Live branch updated for continuous deployment
+
+---
+
 ## [2.1.1] - 2025-07-16
 
 ### 🎯 Production Release

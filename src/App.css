@@ -222,9 +222,50 @@ a:focus,
   position: fixed;
 }
 
-/* Prevent overscrolling on mobile modals */
+/* Enhanced modal styling for proper height and scrolling */
+.modal-dialog {
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Modal body with scrollable content */
 .modal-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  max-height: 70vh;
   overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Sticky modal footer */
+.modal-footer {
+  position: sticky;
+  bottom: 0;
+  background: white;
+  box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+  border-top: 1px solid #dee2e6;
+}
+
+/* Ensure modal content fills the dialog */
+.modal-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-height: 90vh;
+}
+
+/* Mobile-specific modal adjustments */
+@media (max-width: 576px) {
+  .modal-dialog {
+    margin: 0.5rem;
+    max-height: calc(100vh - 1rem);
+  }
+  
+  .modal-body {
+    max-height: calc(100vh - 200px); /* Account for header and footer */
+  }
 }
 
 /* Legacy animation styles kept for compatibility */

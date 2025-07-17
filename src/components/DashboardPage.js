@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 // import optimizedToast, { contextToast } from '../utils/toastUtils';
 import RecentActivityCard from './RecentActivityCard';
 import AuditActivityCard from './AuditActivityCard';
+import StatsCard from './StatsCard';
 
 const DashboardPage = ({ userData }) => {
   const navigate = useNavigate();
@@ -53,8 +54,18 @@ const DashboardPage = ({ userData }) => {
     },
   ];
 
-  // Add audit logs item for superadmin users only
+  // Add admin-specific items
   const adminItems = [];
+  if (userData && (userData.role === 'admin' || userData.role === 'superadmin')) {
+    adminItems.push({
+      title: 'View Stats',
+      route: '/stats',
+      description: 'View comprehensive statistics and download reports',
+      icon: 'bi bi-bar-chart-line-fill'
+    });
+  }
+  
+  // Add audit logs item for superadmin users only
   if (userData && userData.role === 'superadmin') {
     adminItems.push({
       title: 'Audit Logs',
@@ -94,9 +105,18 @@ const DashboardPage = ({ userData }) => {
       </Row>
 
 
+      {/* Stats Card for Admin/Super Admin */}
+      {userData && (userData.role === 'admin' || userData.role === 'superadmin') && (
+        <Row className={isMobile ? "mt-3" : "mt-4"}>
+          <Col xs={12}>
+            <StatsCard className="ada-fade-in mb-3" />
+          </Col>
+        </Row>
+      )}
+
       {/* Recent Activity Card */}
       <Row className={isMobile ? "mt-3" : "mt-4"}>
-        <Col xs={12} lg={8}>
+        <Col xs={12} lg={userData && userData.role === 'superadmin' ? 8 : 12}>
           <RecentActivityCard 
             maxItems={isMobile ? 4 : 5}
             showFullHistory={true}

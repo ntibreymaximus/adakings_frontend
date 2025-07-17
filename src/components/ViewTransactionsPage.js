@@ -9,6 +9,7 @@ import {
   formatTransactionId, 
   getShortTransactionId
 } from '../utils/transactionUtils';
+import { PAYMENT_METHODS } from '../utils/paymentUtils';
 import PaymentLogs from './PaymentLogs';
 const ViewTransactionsPage = () => {
     const { logout } = useAuth();
@@ -73,6 +74,55 @@ const ViewTransactionsPage = () => {
         }
     };
 
+    // Add state for API summary data
+    const [apiSummary, setApiSummary] = useState({
+        total_transactions: 0,
+        total_amount: 0,
+        successful_transactions: 0,
+        failed_transactions: 0,
+        payment_amount: 0,
+        refund_amount: 0,
+        net_amount: 0
+    });
+
+    // Add state for order stats data (for proper refund calculation)
+    const [orderStats, setOrderStats] = useState({
+        total_orders: 0,
+        total_revenue: 0,
+        total_refunds_due: 0,
+        payment_status_breakdown: {},
+        status_breakdown: {},
+        delivery_type_breakdown: {}
+    });
+
+    // Fetch order stats with refund details
+    const fetchOrderStats = async () => {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/orders/stats/`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch order stats');
+            }
+
+            const data = await response.json();
+
+            // Store order stats data
+            setOrderStats(data);
+
+        } catch (err) {
+            console.error('Error fetching order stats:', err);
+        }
+    };
+
     // Function to fetch transactions (can be reused for refresh)
     const fetchTransactions = async () => {
         const token = localStorage.getItem('token');
@@ -112,6 +162,19 @@ const ViewTransactionsPage = () => {
                 transactionsArray = [];
             }
             
+            // Store API summary data
+            if (data.summary) {
+                setApiSummary({
+                    total_transactions: data.summary.total_transactions || 0,
+                    total_amount: data.summary.total_amount || 0,
+                    successful_transactions: data.summary.successful_transactions || 0,
+                    failed_transactions: data.summary.failed_transactions || 0,
+                    payment_amount: data.summary.payment_amount || 0,
+                    refund_amount: data.summary.refund_amount || 0,
+                    net_amount: data.summary.net_amount || 0
+                });
+            }
+            
             setAllTransactions(transactionsArray);
         } catch (err) {
             setError(err.message);
@@ -127,6 +190,7 @@ const ViewTransactionsPage = () => {
 
         window.addEventListener('resize', handleResize);
         fetchTransactions();
+        fetchOrderStats();
         
         return () => window.removeEventListener('resize', handleResize);
     }, [logout]);
@@ -144,6 +208,7 @@ const ViewTransactionsPage = () => {
         }
     }, [allTransactions, selectedDate]);
 
+
     // Calculate stats for filtered transactions
     const calculateFilteredStats = () => {
         if (filteredTransactions.length === 0) {
@@ -151,7 +216,9 @@ const ViewTransactionsPage = () => {
                 total_transactions: 0,
                 total_amount: 0,
                 successful_transactions: 0,
-                failed_transactions: 0
+                failed_transactions: 0,
+                payment_method_totals: [],
+                refund_total: orderStats.total_refunds_due || 0
             };
         }
 
@@ -159,28 +226,89 @@ const ViewTransactionsPage = () => {
             total_transactions: filteredTransactions.length,
             total_amount: 0,
             successful_transactions: 0,
-            failed_transactions: 0
+            failed_transactions: 0,
+            payment_method_totals: [],
+            refund_total: orderStats.total_refunds_due || 0
         };
+
+        // Initialize payment method totals - only track methods that have transactions
+        const paymentMethodTotals = {};
 
         filteredTransactions.forEach(transaction => {
             const amount = parseFloat(transaction.amount) || 0;
-            const isRefund = transaction.payment_type === 'Refund' || 
-                           transaction.payment_type === 'refund' || 
-                           amount < 0;
+            const status = transaction.status?.toLowerCase();
+            const orderTotal = parseFloat(transaction.order_total) || 0;
             
-            // Calculate total amount (exclude refunds)
-            if (!isRefund) {
+            // Check if this is an explicit refund transaction
+            const isExplicitRefund = transaction.payment_type === 'Refund' || 
+                                   transaction.payment_type === 'refund' || 
+                                   (transaction.payment_type && transaction.payment_type.toLowerCase() === 'refund') ||
+                                   amount < 0;
+            
+            // Calculate refund based on payment status and order conditions
+            if (isExplicitRefund) {
+                // Explicit refund transactions - add to refund total
+                stats.refund_total += Math.abs(amount);
+            } else if (status === 'overpaid' && orderTotal > 0) {
+                // Overpaid orders - calculate refund as difference between amount paid and order total
+                const overpaidAmount = amount - orderTotal;
+                if (overpaidAmount > 0) {
+                    stats.refund_total += overpaidAmount;
+                }
+                // Add full amount to total (including overpaid portion)
                 stats.total_amount += amount;
+                
+                // Track payment method totals
+                const paymentMethod = transaction.payment_method || 'Unknown';
+                if (!paymentMethodTotals[paymentMethod]) {
+                    paymentMethodTotals[paymentMethod] = 0;
+                }
+                paymentMethodTotals[paymentMethod] += amount;
+            } else if (status === 'fulfilled' && orderTotal > 0) {
+                // Fulfilled orders - check if this was previously overpaid and subtract refund
+                // This logic assumes that if an order was fulfilled after being overpaid,
+                // the refund should be deducted (simulating refund being processed)
+                const previouslyOverpaid = amount > orderTotal;
+                if (previouslyOverpaid) {
+                    const refundAmount = amount - orderTotal;
+                    stats.refund_total = Math.max(0, stats.refund_total - refundAmount);
+                }
+                
+                // Add to total amount
+                stats.total_amount += amount;
+                
+                // Track payment method totals
+                const paymentMethod = transaction.payment_method || 'Unknown';
+                if (!paymentMethodTotals[paymentMethod]) {
+                    paymentMethodTotals[paymentMethod] = 0;
+                }
+                paymentMethodTotals[paymentMethod] += amount;
+            } else {
+                // Regular transactions - add to total amount
+                stats.total_amount += amount;
+
+                // Track payment method totals
+                const paymentMethod = transaction.payment_method || 'Unknown';
+                if (!paymentMethodTotals[paymentMethod]) {
+                    paymentMethodTotals[paymentMethod] = 0;
+                }
+                paymentMethodTotals[paymentMethod] += amount;
             }
 
             // Count successful transactions
-            const status = transaction.status?.toLowerCase();
-            if (status === 'success' || status === 'completed') {
+            if (status === 'success' || status === 'completed' || status === 'paid' || status === 'fulfilled') {
                 stats.successful_transactions++;
-            } else if (status === 'failed') {
+            } else if (status === 'failed' || status === 'error') {
                 stats.failed_transactions++;
             }
         });
+
+        // Convert payment method totals to array and sort by amount (descending)
+        // Only include methods that have transactions (total > 0)
+        stats.payment_method_totals = Object.entries(paymentMethodTotals)
+            .filter(([method, total]) => total > 0)
+            .map(([method, total]) => ({ method, total }))
+            .sort((a, b) => b.total - a.total);
 
         return stats;
     };
@@ -265,40 +393,65 @@ const ViewTransactionsPage = () => {
       
       {/* Summary Cards - Hidden on mobile */}
       {!isMobile && allTransactions.length > 0 && (
-        <Row className="mb-4">
-          <Col md={3}>
-            <Card className="text-center">
-              <Card.Body>
-                <Card.Title>{filteredStats.total_transactions}</Card.Title>
-                <Card.Text>Total Transactions</Card.Text>
-              </Card.Body>
-            </Card>
-          </Col>
-          <Col md={3}>
-            <Card className="text-center">
-              <Card.Body>
-                <Card.Title className="text-success">{formatCurrency(filteredStats.total_amount)}</Card.Title>
-                <Card.Text>Total Amount</Card.Text>
-              </Card.Body>
-            </Card>
-          </Col>
-          <Col md={3}>
-            <Card className="text-center">
-              <Card.Body>
-                <Card.Title className="text-success">{filteredStats.successful_transactions}</Card.Title>
-                <Card.Text>Successful</Card.Text>
-              </Card.Body>
-            </Card>
-          </Col>
-          <Col md={3}>
-            <Card className="text-center">
-              <Card.Body>
-                <Card.Title className="text-danger">{filteredStats.failed_transactions}</Card.Title>
-                <Card.Text>Failed</Card.Text>
-              </Card.Body>
-            </Card>
-          </Col>
-        </Row>
+        <>
+          <Row className="mb-4">
+            <Col md={3}>
+              <Card className="text-center">
+                <Card.Body>
+                  <Card.Title>{filteredStats.total_transactions}</Card.Title>
+                  <Card.Text>Total Transactions</Card.Text>
+                </Card.Body>
+              </Card>
+            </Col>
+            <Col md={3}>
+              <Card className="text-center">
+                <Card.Body>
+                  <Card.Title className="text-success">{formatCurrency(filteredStats.total_amount)}</Card.Title>
+                  <Card.Text>Total Amount</Card.Text>
+                </Card.Body>
+              </Card>
+            </Col>
+            <Col md={3}>
+              <Card className="text-center">
+                <Card.Body>
+                  <Card.Title className="text-success">{filteredStats.successful_transactions}</Card.Title>
+                  <Card.Text>Successful</Card.Text>
+                </Card.Body>
+              </Card>
+            </Col>
+            <Col md={3}>
+              <Card className="text-center">
+                <Card.Body>
+                  <Card.Title className="text-danger">{filteredStats.failed_transactions}</Card.Title>
+                  <Card.Text>Failed</Card.Text>
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
+          
+          {/* Payment Method Total Cards */}
+          <Row className="mb-4">
+            {filteredStats.payment_method_totals.map((methodTotal, index) => (
+              <Col md={3} key={methodTotal.method}>
+                <Card className="text-center">
+                  <Card.Body>
+                    <Card.Title className="text-primary">{formatCurrency(methodTotal.total)}</Card.Title>
+                    <Card.Text>{methodTotal.method}</Card.Text>
+                  </Card.Body>
+                </Card>
+              </Col>
+            ))}
+            {/* Refund Total Card - Always show */}
+            <Col md={3}>
+              <Card className="text-center">
+                <Card.Body>
+                  <Card.Title className="text-warning">{formatCurrency(orderStats.total_refunds_due)}</Card.Title>
+                  <Card.Text>Refunds</Card.Text>
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
+        </>
       )}
 
       <Card className="border-0">
@@ -614,7 +767,7 @@ const ViewTransactionsPage = () => {
             Transaction Details
           </Modal.Title>
         </Modal.Header>
-        <Modal.Body>
+        <Modal.Body style={{ maxHeight: '70vh', overflowY: 'auto' }}>
           {selectedTransaction && (
             <>
               {/* Transaction Overview */}
@@ -768,7 +921,7 @@ const ViewTransactionsPage = () => {
             Transaction Statistics
           </Modal.Title>
         </Modal.Header>
-        <Modal.Body>
+        <Modal.Body style={{ maxHeight: '70vh', overflowY: 'auto' }}>
           <Row className="g-3">
             <Col xs={6}>
               <Card className="text-center h-100">
@@ -803,6 +956,28 @@ const ViewTransactionsPage = () => {
                   <i className="bi bi-x-circle text-danger" style={{ fontSize: '2rem' }}></i>
                   <h4 className="mt-2">{filteredStats.failed_transactions}</h4>
                   <p className="mb-0 text-muted">Failed</p>
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
+          
+          {/* Additional Stats Row */}
+          <Row className="g-3 mt-2">
+            <Col xs={6}>
+              <Card className="text-center h-100">
+                <Card.Body>
+                  <i className="bi bi-arrow-return-left text-warning" style={{ fontSize: '2rem' }}></i>
+                  <h4 className="mt-2 text-warning">{formatCurrency(orderStats.total_refunds_due)}</h4>
+                  <p className="mb-0 text-muted">Refunds</p>
+                </Card.Body>
+              </Card>
+            </Col>
+            <Col xs={6}>
+              <Card className="text-center h-100">
+                <Card.Body>
+                  <i className="bi bi-wallet2 text-info" style={{ fontSize: '2rem' }}></i>
+                  <h4 className="mt-2 text-info">{formatCurrency(apiSummary.net_amount)}</h4>
+                  <p className="mb-0 text-muted">Net Amount</p>
                 </Card.Body>
               </Card>
             </Col>

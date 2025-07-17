@@ -231,14 +231,14 @@ export const formatPaymentError = (error) => {
 
   switch (status) {
     case 400:
-      if (data.mobile_number) {
+      if (data?.mobile_number) {
         return `Mobile number error: ${data.mobile_number}`;
-      } else if (data.order_number) {
+      } else if (data?.order_number) {
         return `Order error: ${data.order_number}`;
-      } else if (data.amount) {
+      } else if (data?.amount) {
         return `Amount error: ${data.amount}`;
       } else {
-        return data.detail || data.message || 'Payment validation failed';
+        return data?.detail || data?.message || 'Payment validation failed';
       }
     case 401:
       return 'Authentication required. Please log in again.';
@@ -251,7 +251,7 @@ export const formatPaymentError = (error) => {
     case 503:
       return 'Server error occurred. Please try again later or contact support.';
     default:
-      return data.detail || data.message || 'Failed to process payment';
+      return data?.detail || data?.message || 'Failed to process payment';
   }
 };
 

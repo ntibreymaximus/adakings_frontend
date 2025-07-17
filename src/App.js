@@ -14,6 +14,7 @@ import ViewOrdersPage from './components/ViewOrdersPage';
 import ViewMenuPage from './components/ViewMenuPage';
 import ViewTransactionsPage from './components/ViewTransactionsPage';
 import AuditLogViewer from './components/AuditLogViewer';
+import StatsPage from './components/StatsPage';
 import ApiHealthCheck from './components/ApiHealthCheck';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -130,6 +131,11 @@ function AppContent() {
         <Route path="/audit-logs" 
           element={userData && (userData.role === 'admin' || userData.role === 'superadmin') ? 
             <AuditLogViewer /> : 
+            <Navigate to="/dashboard" />} 
+        />
+        <Route path="/stats" 
+          element={userData && (userData.role === 'admin' || userData.role === 'superadmin') ? 
+            <StatsPage /> : 
             <Navigate to="/dashboard" />} 
         />
         <Route path="/health-check" element={<ApiHealthCheck />} />

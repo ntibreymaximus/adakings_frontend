@@ -8,6 +8,7 @@ import {
     sanitizeMobileNumberInput,
     openPaymentWindow
 } from '../utils/paymentUtils';
+import { canEditOrder, getEditTimeRemaining } from '../utils/orderUtils';
 import {
     initiatePayment,
     formatPaymentError
@@ -15,6 +16,7 @@ import {
 import { API_BASE_URL } from '../utils/api';
 import SimpleUserTracking from './SimpleUserTracking';
 import DeliveryRiderSelector from './DeliveryRiderSelector';
+import MenuItemsStatsCard from './MenuItemsStatsCard';
 
 // Optimized ViewOrdersPage with instant loading
 const ViewOrdersPage = memo(() => {
@@ -51,8 +53,10 @@ const ViewOrdersPage = memo(() => {
   const [orderStats, setOrderStats] = useState({
     total: 0,
     pending: 0,
-    fulfilled: 0,
-    outForDelivery: 0
+    accepted: 0,
+    ready: 0,
+    outForDelivery: 0,
+    fulfilled: 0
   });
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
@@ -66,10 +70,7 @@ const [orderForAssignment, setOrderForAssignment] = useState(null);
   const [selectedRider, setSelectedRider] = useState(null);
   const [showRiderSelector, setShowRiderSelector] = useState(false);
   
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const ordersPerPage = 10;
-  const [paginatedOrders, setPaginatedOrders] = useState([]);
+// Removed pagination logic as requested
   
   // Ref to track if we're already handling a modal opening
   const isHandlingModalRef = useRef(false);
@@ -404,10 +405,11 @@ const [orderForAssignment, setOrderForAssignment] = useState(null);
     const orderStatsMemo = useMemo(() => {
         const stats = {
             total: allOrders.length,
-            pending: allOrders.filter(order => order.status === 'Pending' || order.status === 'Accepted').length,
+            pending: allOrders.filter(order => order.status === 'Pending').length,
             accepted: allOrders.filter(order => order.status === 'Accepted').length,
-            fulfilled: allOrders.filter(order => order.status === 'Fulfilled').length,
-            outForDelivery: allOrders.filter(order => order.status === 'Out for Delivery').length
+            ready: allOrders.filter(order => order.status === 'Ready').length,
+            outForDelivery: allOrders.filter(order => order.status === 'Out for Delivery').length,
+            fulfilled: allOrders.filter(order => order.status === 'Fulfilled').length
         };
         return stats;
     }, [allOrders]);
@@ -417,36 +419,31 @@ const [orderForAssignment, setOrderForAssignment] = useState(null);
         // Apply status filtering if a filter is selected
         let filtered = allOrders;
         
-        if (statusFilter) {
-            filtered = allOrders.filter(order => {
-                // Map status filter to actual order statuses
-                switch (statusFilter) {
-                    case 'total':
-                        return true; // Show all orders
-                    case 'pending':
-                        return order.status === 'Pending' || order.status === 'Accepted';
-                    case 'outForDelivery':
-                        return order.status === 'Out for Delivery';
-                    case 'fulfilled':
-                        return order.status === 'Fulfilled';
-                    default:
-                        return true;
+                if (statusFilter) {
+                    filtered = allOrders.filter(order => {
+                        // Map status filter to actual order statuses
+                        switch (statusFilter) {
+                            case 'total':
+                                return true; // Show all orders
+                            case 'pending':
+                                return order.status === 'Pending';
+                            case 'accepted':
+                                return order.status === 'Accepted';
+                            case 'ready':
+                                return order.status === 'Ready';
+                            case 'outForDelivery':
+                                return order.status === 'Out for Delivery';
+                            case 'fulfilled':
+                                return order.status === 'Fulfilled';
+                            default:
+                                return true;
+                        }
+                    });
                 }
-            });
-        }
         
         setFilteredOrders(filtered);
         setOrderStats(orderStatsMemo);
-        setCurrentPage(1); // Reset to first page when orders change
-    }, [allOrders, orderStatsMemo, statusFilter]);
-    
-    // Update paginated orders when filteredOrders or currentPage changes
-    useEffect(() => {
-        const startIndex = (currentPage - 1) * ordersPerPage;
-        const endIndex = startIndex + ordersPerPage;
-        const paginatedData = filteredOrders.slice(startIndex, endIndex);
-        setPaginatedOrders(paginatedData);
-    }, [filteredOrders, currentPage, ordersPerPage]);
+    }, [allOrders, statusFilter, orderStatsMemo]);
     
     // Function to handle stats card click for filtering
     const handleStatsClick = useCallback((statType) => {
@@ -689,11 +686,8 @@ const handleAssignRiderInline = async (order) => {
           return;
         }
       } else {
-        // For pickup orders: payment required for Accepted and Fulfilled statuses
-        const restrictedStatuses = ['Accepted', 'Fulfilled'];
-        const isRestrictedStatus = restrictedStatuses.includes(newStatus);
-        
-        if (isRestrictedStatus) {
+// For pickup orders: payment required only for Fulfilled status
+        if (newStatus === 'Fulfilled') {
           if (hasNoPayment) {
             optimizedToast.error('Payment required');
             return;
@@ -702,19 +696,36 @@ const handleAssignRiderInline = async (order) => {
             optimizedToast.error('Payment pending');
             return;
           }
-          if (isPartiallyPaid && newStatus === 'Fulfilled') {
+          if (isPartiallyPaid) {
             optimizedToast.error('Full payment required');
             return;
-          }
-          if (isPartiallyPaid) {
-            optimizedToast.warning('Partially paid order');
-            // Allow but warn for partially paid orders (except Fulfilled)
           }
         }
       }
       
       // Note: Refund processing for cancelled orders is handled in the payment modal
 
+      // Prepare the update payload
+      const updatePayload = {
+        status: newStatus,
+        modified_by: userData?.id || userData?.user_id,
+        modified_by_username: userData?.username,
+        modified_by_role: userData?.role || userData?.user_role
+      };
+      
+      // Check if we need to remove rider assignment
+      // Remove rider when changing FROM "Out for Delivery" TO "Ready" or "Accepted"
+      const currentStatus = selectedOrder.status;
+      const shouldRemoveRider = currentStatus === 'Out for Delivery' && 
+                               (newStatus === 'Ready' || newStatus === 'Accepted') &&
+                               selectedOrder.assigned_rider_id;
+      
+      if (shouldRemoveRider) {
+        updatePayload.assigned_rider_id = null;
+        updatePayload.assigned_rider_name = null;
+        console.log(`🚫 Removing rider assignment: Order ${selectedOrder.order_number} status changed from "${currentStatus}" to "${newStatus}"`);
+      }
+      
       // Use the direct API endpoint with proper authentication
       const token = localStorage.getItem('token');
       const orderNumber = selectedOrder.order_number || selectedOrder.id;
@@ -724,12 +735,7 @@ const handleAssignRiderInline = async (order) => {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
-          status: newStatus,
-          modified_by: userData?.id || userData?.user_id,
-          modified_by_username: userData?.username,
-          modified_by_role: userData?.role || userData?.user_role
-        }),
+        body: JSON.stringify(updatePayload),
       });
 
       if (response.ok) {
@@ -1107,16 +1113,16 @@ const handleAssignRiderInline = async (order) => {
         
         // Use the existing helper function for consistent Bolt detection
         if (isBoltDeliveryOrder(order)) {
-            // Bolt orders: Accepted, Fulfilled, Cancelled
-            return ['Accepted', 'Fulfilled', 'Cancelled'];
+            // Bolt orders: Pending, Accepted, Ready, Fulfilled, Cancelled
+            return ['Pending', 'Accepted', 'Ready', 'Fulfilled', 'Cancelled'];
         }
 
-        if (order.delivery_type === 'Delivery') {
-            // Regular delivery orders: Accepted → Out for Delivery → Fulfilled/Cancelled
-            return ['Accepted', 'Out for Delivery', 'Fulfilled', 'Cancelled'];
+if (order.delivery_type === 'Delivery') {
+            // Regular delivery orders: Pending → Accepted → Ready → Out for Delivery → Fulfilled/Cancelled
+            return ['Pending', 'Accepted', 'Ready', 'Out for Delivery', 'Fulfilled', 'Cancelled'];
         } else {
-            // Pickup orders: Pending → Accepted → Fulfilled/Cancelled
-            return ['Pending', 'Accepted', 'Fulfilled', 'Cancelled'];
+            // Pickup orders: Pending → Accepted → Ready → Fulfilled/Cancelled
+            return ['Pending', 'Accepted', 'Ready', 'Fulfilled', 'Cancelled'];
         }
     };
 
@@ -1159,14 +1165,17 @@ const handleAssignRiderInline = async (order) => {
     };
 
     const getPaymentModeDisplay = (paymentMode) => {
-        switch (paymentMode?.toUpperCase()) {
+        if (!paymentMode) {
+            return 'No payment made';
+        }
+        switch (paymentMode.toUpperCase()) {
             case 'CASH': return 'Cash';
             case 'TELECEL CASH': return 'Telecel Cash';
             case 'MTN MOMO': return 'MTN MoMo';
             case 'PAYSTACK(USSD)': return 'Paystack (USSD)';
             case 'PAYSTACK(API)': return 'Paystack (API)';
             case 'PAID_ON_WIX': return 'Paid On Wix';
-            default: return paymentMode || '-';
+            default: return paymentMode;
         }
     };
 
@@ -1290,6 +1299,24 @@ const handleAssignRiderInline = async (order) => {
         }
     };
 
+    // Function to format order items for display in table
+    const formatOrderItems = (items) => {
+        if (!items || items.length === 0) {
+            return <span className="text-muted" style={{ fontSize: '0.85rem' }}>No items</span>;
+        }
+        
+        // Display all items
+        return (
+            <div style={{ fontSize: '0.85rem' }}>
+                {items.map((item, index) => (
+                    <div key={index} className="mb-1">
+                        <span className="fw-semibold">{item.quantity}x</span> {item.product_name || item.name || item.menu_item_name || item.title || 'Item'}
+                    </div>
+                ))}
+            </div>
+        );
+    };
+
     if (loading) {
         return (
             <Container className="mt-4">
@@ -1346,140 +1373,200 @@ const handleAssignRiderInline = async (order) => {
       
       {/* Order Stats Cards - only shown on desktop */}
       {!isMobile && showStats && (
-        <Row className="mb-4 g-3">
-          <Col xs={6} md={3}>
-            <Card 
-              className="text-center h-100 ada-shadow-sm" 
-              onClick={() => handleStatsClick('total')}
-              style={{ 
-                cursor: 'pointer', 
-                transition: 'all 0.2s ease-in-out',
-                border: statusFilter === 'total' ? '2px solid var(--ada-primary)' : '1px solid #dee2e6',
-                backgroundColor: statusFilter === 'total' ? '#f8f9fa' : 'white'
-              }}
-              onMouseEnter={(e) => {
-                if (statusFilter !== 'total') {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (statusFilter !== 'total') {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
-                }
-              }}
-            >
-              <Card.Body>
-                <i className="bi bi-list-ul text-primary" style={{ fontSize: '2rem' }}></i>
-                <h4 className="mt-2">{orderStats.total}</h4>
-                <p className="mb-0 text-muted">Total Orders</p>
-                {statusFilter === 'total' && (
-                  <small className="text-primary fw-bold">✓ Active Filter</small>
-                )}
-              </Card.Body>
-            </Card>
-          </Col>
-          <Col xs={6} md={3}>
-            <Card 
-              className="text-center h-100 ada-shadow-sm" 
-              onClick={() => handleStatsClick('pending')}
-              style={{ 
-                cursor: 'pointer', 
-                transition: 'all 0.2s ease-in-out',
-                border: statusFilter === 'pending' ? '2px solid var(--ada-primary)' : '1px solid #dee2e6',
-                backgroundColor: statusFilter === 'pending' ? '#f8f9fa' : 'white'
-              }}
-              onMouseEnter={(e) => {
-                if (statusFilter !== 'pending') {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (statusFilter !== 'pending') {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
-                }
-              }}
-            >
-              <Card.Body>
-                <i className="bi bi-clock text-warning" style={{ fontSize: '2rem' }}></i>
-                <h4 className="mt-2">{orderStats.pending}</h4>
-                <p className="mb-0 text-muted">Pending & Accepted</p>
-                {statusFilter === 'pending' && (
-                  <small className="text-primary fw-bold">✓ Active Filter</small>
-                )}
-              </Card.Body>
-            </Card>
-          </Col>
-          <Col xs={6} md={3}>
-            <Card 
-              className="text-center h-100 ada-shadow-sm" 
-              onClick={() => handleStatsClick('outForDelivery')}
-              style={{ 
-                cursor: 'pointer', 
-                transition: 'all 0.2s ease-in-out',
-                border: statusFilter === 'outForDelivery' ? '2px solid var(--ada-primary)' : '1px solid #dee2e6',
-                backgroundColor: statusFilter === 'outForDelivery' ? '#f8f9fa' : 'white'
-              }}
-              onMouseEnter={(e) => {
-                if (statusFilter !== 'outForDelivery') {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (statusFilter !== 'outForDelivery') {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
-                }
-              }}
-            >
-              <Card.Body>
-                <i className="bi bi-truck text-info" style={{ fontSize: '2rem' }}></i>
-                <h4 className="mt-2">{orderStats.outForDelivery}</h4>
-                <p className="mb-0 text-muted">Out for Delivery</p>
-                {statusFilter === 'outForDelivery' && (
-                  <small className="text-primary fw-bold">✓ Active Filter</small>
-                )}
-              </Card.Body>
-            </Card>
-          </Col>
-          <Col xs={6} md={3}>
-            <Card 
-              className="text-center h-100 ada-shadow-sm" 
-              onClick={() => handleStatsClick('fulfilled')}
-              style={{ 
-                cursor: 'pointer', 
-                transition: 'all 0.2s ease-in-out',
-                border: statusFilter === 'fulfilled' ? '2px solid var(--ada-primary)' : '1px solid #dee2e6',
-                backgroundColor: statusFilter === 'fulfilled' ? '#f8f9fa' : 'white'
-              }}
-              onMouseEnter={(e) => {
-                if (statusFilter !== 'fulfilled') {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (statusFilter !== 'fulfilled') {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
-                }
-              }}
-            >
-              <Card.Body>
-                <i className="bi bi-check-circle text-success" style={{ fontSize: '2rem' }}></i>
-                <h4 className="mt-2">{orderStats.fulfilled}</h4>
-                <p className="mb-0 text-muted">Fulfilled</p>
-                {statusFilter === 'fulfilled' && (
-                  <small className="text-primary fw-bold">✓ Active Filter</small>
-                )}
-              </Card.Body>
-            </Card>
+        <>
+          <Row className="mb-4 g-3 d-flex" style={{ display: 'flex' }}>
+            <Col className="d-flex" style={{ flex: '1 1 0' }}>
+              <Card 
+                className="text-center ada-shadow-sm w-100" 
+                onClick={() => handleStatsClick('pending')}
+                style={{ 
+                  cursor: 'pointer', 
+                  transition: 'all 0.2s ease-in-out',
+                  border: statusFilter === 'pending' ? '2px solid var(--ada-primary)' : '1px solid #dee2e6',
+                  backgroundColor: statusFilter === 'pending' ? '#f8f9fa' : 'white',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }}
+                onMouseEnter={(e) => {
+                  if (statusFilter !== 'pending') {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (statusFilter !== 'pending') {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                  }
+                }}
+              >
+                <Card.Body className="d-flex flex-column justify-content-center" style={{ flex: '1' }}>
+                  <i className="bi bi-clock text-warning" style={{ fontSize: '2rem' }}></i>
+                  <h4 className="mt-2">{orderStats.pending}</h4>
+                  <p className="mb-0 text-muted">Pending</p>
+                  {statusFilter === 'pending' && (
+                    <small className="text-primary fw-bold">✓ Active Filter</small>
+                  )}
+                </Card.Body>
+              </Card>
+            </Col>
+            <Col className="d-flex" style={{ flex: '1 1 0' }}>
+              <Card 
+                className="text-center ada-shadow-sm w-100" 
+                onClick={() => handleStatsClick('accepted')}
+                style={{ 
+                  cursor: 'pointer', 
+                  transition: 'all 0.2s ease-in-out',
+                  border: statusFilter === 'accepted' ? '2px solid var(--ada-primary)' : '1px solid #dee2e6',
+                  backgroundColor: statusFilter === 'accepted' ? '#f8f9fa' : 'white',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }}
+                onMouseEnter={(e) => {
+                  if (statusFilter !== 'accepted') {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (statusFilter !== 'accepted') {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                  }
+                }}
+              >
+                <Card.Body className="d-flex flex-column justify-content-center" style={{ flex: '1' }}>
+                  <i className="bi bi-check-lg text-info" style={{ fontSize: '2rem' }}></i>
+                  <h4 className="mt-2">{orderStats.accepted}</h4>
+                  <p className="mb-0 text-muted">Accepted</p>
+                  {statusFilter === 'accepted' && (
+                    <small className="text-primary fw-bold">✓ Active Filter</small>
+                  )}
+                </Card.Body>
+              </Card>
+            </Col>
+            <Col className="d-flex" style={{ flex: '1 1 0' }}>
+              <Card 
+                className="text-center ada-shadow-sm w-100" 
+                onClick={() => handleStatsClick('ready')}
+                style={{ 
+                  cursor: 'pointer', 
+                  transition: 'all 0.2s ease-in-out',
+                  border: statusFilter === 'ready' ? '2px solid var(--ada-primary)' : '1px solid #dee2e6',
+                  backgroundColor: statusFilter === 'ready' ? '#f8f9fa' : 'white',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }}
+                onMouseEnter={(e) => {
+                  if (statusFilter !== 'ready') {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (statusFilter !== 'ready') {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                  }
+                }}
+              >
+                <Card.Body className="d-flex flex-column justify-content-center" style={{ flex: '1' }}>
+                  <i className="bi bi-box-seam text-primary" style={{ fontSize: '2rem' }}></i>
+                  <h4 className="mt-2">{orderStats.ready}</h4>
+                  <p className="mb-0 text-muted">Ready</p>
+                  {statusFilter === 'ready' && (
+                    <small className="text-primary fw-bold">✓ Active Filter</small>
+                  )}
+                </Card.Body>
+              </Card>
+            </Col>
+            <Col className="d-flex" style={{ flex: '1 1 0' }}>
+              <Card 
+                className="text-center ada-shadow-sm w-100" 
+                onClick={() => handleStatsClick('outForDelivery')}
+                style={{ 
+                  cursor: 'pointer', 
+                  transition: 'all 0.2s ease-in-out',
+                  border: statusFilter === 'outForDelivery' ? '2px solid var(--ada-primary)' : '1px solid #dee2e6',
+                  backgroundColor: statusFilter === 'outForDelivery' ? '#f8f9fa' : 'white',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }}
+                onMouseEnter={(e) => {
+                  if (statusFilter !== 'outForDelivery') {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (statusFilter !== 'outForDelivery') {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                  }
+                }}
+              >
+                <Card.Body className="d-flex flex-column justify-content-center" style={{ flex: '1' }}>
+                  <i className="bi bi-truck text-info" style={{ fontSize: '2rem' }}></i>
+                  <h4 className="mt-2">{orderStats.outForDelivery}</h4>
+                  <p className="mb-0 text-muted" style={{ fontSize: '0.85rem' }}>Out for Delivery</p>
+                  {statusFilter === 'outForDelivery' && (
+                    <small className="text-primary fw-bold">✓ Active Filter</small>
+                  )}
+                </Card.Body>
+              </Card>
+            </Col>
+            <Col className="d-flex" style={{ flex: '1 1 0' }}>
+              <Card 
+                className="text-center ada-shadow-sm w-100" 
+                onClick={() => handleStatsClick('fulfilled')}
+                style={{ 
+                  cursor: 'pointer', 
+                  transition: 'all 0.2s ease-in-out',
+                  border: statusFilter === 'fulfilled' ? '2px solid var(--ada-primary)' : '1px solid #dee2e6',
+                  backgroundColor: statusFilter === 'fulfilled' ? '#f8f9fa' : 'white',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }}
+                onMouseEnter={(e) => {
+                  if (statusFilter !== 'fulfilled') {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (statusFilter !== 'fulfilled') {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+                  }
+                }}
+              >
+                <Card.Body className="d-flex flex-column justify-content-center" style={{ flex: '1' }}>
+                  <i className="bi bi-check-circle-fill text-success" style={{ fontSize: '2rem' }}></i>
+                  <h4 className="mt-2">{orderStats.fulfilled}</h4>
+                  <p className="mb-0 text-muted">Fulfilled</p>
+                  {statusFilter === 'fulfilled' && (
+                    <small className="text-primary fw-bold">✓ Active Filter</small>
+                  )}
+                </Card.Body>
+              </Card>
+            </Col>
+        </Row>
+        
+        {/* Menu Items Stats Card */}
+        <Row className="mb-4">
+<Col xs={6} md={3}>
+            <MenuItemsStatsCard 
+              selectedDate={selectedDate}
+              className="ada-shadow-sm"
+            />
           </Col>
         </Row>
+        </>
       )}
       
       <Card className="border-0">
@@ -1579,7 +1666,8 @@ const handleAssignRiderInline = async (order) => {
               <Table striped hover className="mb-0">
                 <thead>
                   <tr>
-                    <th>Order #</th>
+                    <th>Customer Phone</th>
+                    <th>Order Items</th>
                     <th>Delivery Type</th>
                     <th>Total</th>
                     <th>Payment Status</th>
@@ -1588,7 +1676,7 @@ const handleAssignRiderInline = async (order) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedOrders.map((order) => (
+                  {filteredOrders.map((order) => (
                     <tr 
                       key={order.id}
                       onClick={() => openOrderDetailsModal(order)}
@@ -1597,8 +1685,12 @@ const handleAssignRiderInline = async (order) => {
                     >
                       <td>
                         <strong className="ada-text-primary">
-                          #{order.order_number || order.id}
+                          <i className="bi bi-phone me-1"></i>
+                          {order.customer_phone || 'N/A'}
                         </strong>
+                      </td>
+                      <td>
+                        {formatOrderItems(order.items)}
                       </td>
                       <td>
                         <span 
@@ -1612,7 +1704,7 @@ const handleAssignRiderInline = async (order) => {
                         >
                           <i className={`bi ${order.delivery_type === 'Delivery' ? 'bi-truck' : 'bi-shop'} me-2`}></i>
                           {order.delivery_type === 'Delivery' && order.effective_delivery_location_name
-                            ? `Delivery to ${order.effective_delivery_location_name}`
+                            ? order.effective_delivery_location_name
                             : order.delivery_type || 'Pickup'
                           }
                         </span>
@@ -1661,95 +1753,13 @@ const handleAssignRiderInline = async (order) => {
                 </tbody>
               </Table>
               
-              {filteredOrders.length > ordersPerPage && (
-                <div className="d-flex justify-content-between align-items-center mt-3 px-2">
-                  <small className="text-muted">
-                    Showing {((currentPage - 1) * ordersPerPage) + 1} to {Math.min(currentPage * ordersPerPage, filteredOrders.length)} of {filteredOrders.length} orders
-                  </small>
-                  <div className="d-flex gap-1">
-                    <Button
-                      variant="outline-primary"
-                      size="sm"
-                      onClick={() => setCurrentPage(currentPage - 1)}
-                      disabled={currentPage === 1}
-                      style={{ minWidth: '35px' }}
-                    >
-                      <i className="bi bi-chevron-left"></i>
-                    </Button>
-                    
-                    {(() => {
-                      const totalPages = Math.ceil(filteredOrders.length / ordersPerPage);
-                      const pages = [];
-                      const showPages = 5; // Show max 5 page numbers
-                      
-                      let startPage = Math.max(1, currentPage - Math.floor(showPages / 2));
-                      let endPage = Math.min(totalPages, startPage + showPages - 1);
-                      
-                      // Adjust start page if we're near the end
-                      if (endPage - startPage + 1 < showPages) {
-                        startPage = Math.max(1, endPage - showPages + 1);
-                      }
-                      
-                      // Add first page and ellipsis if needed
-                      if (startPage > 1) {
-                        pages.push(
-                          <Button key={1} variant={1 === currentPage ? "primary" : "outline-primary"} size="sm" onClick={() => setCurrentPage(1)} style={{ minWidth: '35px' }}>
-                            1
-                          </Button>
-                        );
-                        if (startPage > 2) {
-                          pages.push(<span key="ellipsis1" className="px-2">...</span>);
-                        }
-                      }
-                      
-                      // Add page numbers
-                      for (let i = startPage; i <= endPage; i++) {
-                        pages.push(
-                          <Button
-                            key={i}
-                            variant={i === currentPage ? "primary" : "outline-primary"}
-                            size="sm"
-                            onClick={() => setCurrentPage(i)}
-                            style={{ minWidth: '35px' }}
-                          >
-                            {i}
-                          </Button>
-                        );
-                      }
-                      
-                      // Add last page and ellipsis if needed
-                      if (endPage < totalPages) {
-                        if (endPage < totalPages - 1) {
-                          pages.push(<span key="ellipsis2" className="px-2">...</span>);
-                        }
-                        pages.push(
-                          <Button key={totalPages} variant={totalPages === currentPage ? "primary" : "outline-primary"} size="sm" onClick={() => setCurrentPage(totalPages)} style={{ minWidth: '35px' }}>
-                            {totalPages}
-                          </Button>
-                        );
-                      }
-                      
-                      return pages;
-                    })()} 
-                    
-                    <Button
-                      variant="outline-primary"
-                      size="sm"
-                      onClick={() => setCurrentPage(currentPage + 1)}
-                      disabled={currentPage === Math.ceil(filteredOrders.length / ordersPerPage)}
-                      style={{ minWidth: '35px' }}
-                    >
-                      <i className="bi bi-chevron-right"></i>
-                    </Button>
-                  </div>
-                </div>
-              )}
+              {/* Pagination logic removed */}
             </div>
           ) : (
             <>
               {/* Minimalist card view for mobile devices */}
               <Row className="g-2 px-1">
-              {paginatedOrders.map((order) => (
+              {filteredOrders.map((order) => (
                 <Col xs={12} key={order.id}>
                   <Card 
                     className="mobile-friendly-card border-0" 
@@ -1858,38 +1868,7 @@ const handleAssignRiderInline = async (order) => {
             </Row>
             
             {/* Pagination Controls for Mobile */}
-            {filteredOrders.length > ordersPerPage && (
-              <div className="d-flex justify-content-between align-items-center mt-3 px-2">
-                <small className="text-muted">
-                  {((currentPage - 1) * ordersPerPage) + 1}-{Math.min(currentPage * ordersPerPage, filteredOrders.length)} of {filteredOrders.length}
-                </small>
-                <div className="d-flex gap-1">
-                  <Button
-                    variant="outline-primary"
-                    size="sm"
-                    onClick={() => setCurrentPage(currentPage - 1)}
-                    disabled={currentPage === 1}
-                    style={{ minWidth: '32px', fontSize: '0.8rem' }}
-                  >
-                    <i className="bi bi-chevron-left"></i>
-                  </Button>
-                  
-                  <span className="px-2 d-flex align-items-center" style={{ fontSize: '0.85rem' }}>
-                    {currentPage} / {Math.ceil(filteredOrders.length / ordersPerPage)}
-                  </span>
-                  
-                  <Button
-                    variant="outline-primary"
-                    size="sm"
-                    onClick={() => setCurrentPage(currentPage + 1)}
-                    disabled={currentPage === Math.ceil(filteredOrders.length / ordersPerPage)}
-                    style={{ minWidth: '32px', fontSize: '0.8rem' }}
-                  >
-                    <i className="bi bi-chevron-right"></i>
-                  </Button>
-                </div>
-              </div>
-            )}
+            {/* Pagination logic removed */}
             </>
           )}
         </Card.Body>
@@ -1910,7 +1889,7 @@ const handleAssignRiderInline = async (order) => {
             Update Order Status
           </Modal.Title>
         </Modal.Header>
-        <Modal.Body>
+        <Modal.Body style={{ maxHeight: '70vh', overflowY: 'auto' }}>
           {selectedOrder && (
             <>
               <div className="mb-3">
@@ -1995,14 +1974,9 @@ const handleAssignRiderInline = async (order) => {
                         }
                         // Other statuses (including "Out for Delivery") are allowed without payment
                     } else {
-                        // For pickup orders: payment required for Accepted and Fulfilled statuses (simplified workflow)
-                        const restrictedStatuses = ['Accepted', 'Fulfilled'];
-                        if (restrictedStatuses.includes(status) && !isPaymentConfirmed) {
+// For pickup orders: payment required only for Fulfilled status
+                        if (status === 'Fulfilled' && !isPaymentConfirmed) {
                             isAllowed = false;
-                        }
-                        // Allow with partial payment for Accepted status, but not Fulfilled
-                        if (status === 'Accepted' && isPartiallyPaid) {
-                            isAllowed = true;
                         }
                     }
                     
@@ -2813,8 +2787,9 @@ const handleAssignRiderInline = async (order) => {
               variant="info" 
               onClick={() => {
                 // Check if order can be edited
-                if (selectedOrder.status === 'Fulfilled' || selectedOrder.status === 'Cancelled') {
-                  optimizedToast.warning(`Cannot edit ${selectedOrder.status.toLowerCase()} orders`);
+                const canEdit = canEditOrder(selectedOrder);
+                if (!canEdit.allowed) {
+                  optimizedToast.warning(canEdit.reason);
                   return;
                 }
                 // Close modal before navigating
@@ -2824,7 +2799,7 @@ const handleAssignRiderInline = async (order) => {
               className="flex-fill order-1 order-sm-2"
               size={isMobile ? "sm" : undefined}
               style={{ minHeight: isMobile ? '36px' : '44px' }}
-              disabled={selectedOrder.status === 'Fulfilled' || selectedOrder.status === 'Cancelled'}
+              disabled={!canEditOrder(selectedOrder).allowed}
             >
               <i className="bi bi-pencil me-1"></i>
               {isMobile ? 'Edit' : 'Edit Order'}
@@ -2930,7 +2905,7 @@ const handleAssignRiderInline = async (order) => {
                 }}
               >
                 <Card.Body>
-                  <i className={`bi bi-check-circle ${statusFilter === 'fulfilled' ? 'text-success' : 'text-success'}`} style={{ fontSize: '2rem' }}></i>
+                  <i className={`bi bi-check-circle-fill ${statusFilter === 'fulfilled' ? 'text-success' : 'text-success'}`} style={{ fontSize: '2rem' }}></i>
                   <h4 className={`mt-2 ${statusFilter === 'fulfilled' ? 'text-success fw-bold' : ''}`}>{orderStats.fulfilled}</h4>
                   <p className={`mb-0 ${statusFilter === 'fulfilled' ? 'text-success' : 'text-muted'}`}>Fulfilled</p>
                 </Card.Body>

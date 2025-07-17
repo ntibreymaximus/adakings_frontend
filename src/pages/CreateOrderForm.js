@@ -6,6 +6,7 @@ import { API_ENDPOINTS } from '../utils/api';
 import { apiFirstService } from '../services/apiFirstService';
 import { menuCacheService } from '../services/menuCacheService';
 import { useAuth } from '../contexts/AuthContext';
+import { canEditOrder } from '../utils/orderUtils';
 
 // Delivery locations will be fetched from backend
 
@@ -261,9 +262,10 @@ useEffect(() => {
         console.log('📦 Existing order items:', data.items);
         
         // Check if order can be edited
-        if (data.status === 'Fulfilled' || data.status === 'Cancelled') {
-          setLoadError(`Cannot edit ${data.status.toLowerCase()} orders`);
-          optimizedToast.error(`This order is ${data.status.toLowerCase()} and cannot be edited`);
+        const canEdit = canEditOrder(data);
+        if (!canEdit.allowed) {
+          setLoadError(canEdit.reason);
+          optimizedToast.error(canEdit.reason);
           return;
         }
         
@@ -498,7 +500,7 @@ const handleAddItem = useCallback((itemId) => {
     // Clear delivery-related fields when switching to pickup
     if (newDeliveryType === 'Pickup') {
       setDeliveryLocation('');
-      setCustomerPhone('');
+      // Don't clear customer phone for pickup - keep it optional
       setCustomLocationName('');
       setCustomLocationFee('');
       setLocationSearchTerm('');
@@ -1500,6 +1502,31 @@ const handleAddItem = useCallback((itemId) => {
                     </Form.Group>
                   </Col>
                 )}
+                
+                {/* Phone input for pickup orders - optional */}
+                {deliveryType === 'Pickup' && !isMobile && (
+                  <Col md={4}>
+                    <Form.Group controlId="customerPhonePickup">
+                      <Form.Label className="fw-semibold">
+                        Customer Phone <span className="text-muted">(Optional)</span>
+                      </Form.Label>
+                      <Form.Control
+                        type="tel"
+                        inputMode="tel"
+                        value={customerPhone}
+                        onChange={(e) => setCustomerPhone(e.target.value)}
+                        isInvalid={!!errors.customerPhone}
+                        placeholder="0XXXXXXXXX or +233XXXXXXXXX"
+                        className="ada-shadow-sm"
+                        style={{ minHeight: '44px', fontSize: '16px' }}
+                      />
+                      <Form.Control.Feedback type="invalid">{errors.customerPhone}</Form.Control.Feedback>
+                      <Form.Text className="text-muted">
+                        Optional: For order notifications and contact purposes
+                      </Form.Text>
+                    </Form.Group>
+                  </Col>
+                )}
               </Row>
             </div>
             
@@ -1700,7 +1727,7 @@ const handleAddItem = useCallback((itemId) => {
             </div>
           </Modal.Title>
         </Modal.Header>
-        <Modal.Body className="order-details-container">
+        <Modal.Body className="order-details-container" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
           {/* Order Items Section - First */}
           {(Object.keys(selectedItems).length > 0 || Object.keys(selectedExtras).length > 0) && (
             <div className="mb-3">
@@ -1913,7 +1940,7 @@ const handleAddItem = useCallback((itemId) => {
             Order Notes
           </Modal.Title>
         </Modal.Header>
-        <Modal.Body>
+        <Modal.Body style={{ maxHeight: '70vh', overflowY: 'auto' }}>
           <Form.Group controlId="notesModal">
             <Form.Label className="fw-semibold">Special instructions or requests:</Form.Label>
             <Form.Control 
@@ -1976,7 +2003,7 @@ const handleAddItem = useCallback((itemId) => {
             Delivery Details
           </Modal.Title>
         </Modal.Header>
-        <Modal.Body>
+        <Modal.Body style={{ maxHeight: '70vh', overflowY: 'auto' }}>
           <Form>
             {/* Delivery Location */}
             <Form.Group className="mb-3" controlId="deliveryModalLocation">
