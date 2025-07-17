@@ -13,8 +13,8 @@ export const getWebSocketUrl = () => {
   
   // Local development
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    // Use the same port as the web server
-    return `${protocol}//${hostname}:${window.location.port || '3000'}/ws`;
+    // Use backend port for WebSocket connection
+    return `${protocol}//${hostname}:8000/ws/`;
   }
   
   // Default: use the same host without port specification
@@ -141,7 +141,7 @@ if (typeof window !== 'undefined') {
   // This prevents unnecessary connections
   window.addEventListener('load', () => {
     // Check if the app needs WebSocket (you can add your logic here)
-    const needsWebSocket = false; // Set to true when you implement WebSocket features
+    const needsWebSocket = true; // Set to true when you implement WebSocket features
     
     if (needsWebSocket) {
       websocketManager.connect();

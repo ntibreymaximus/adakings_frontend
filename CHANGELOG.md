@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.0] - 2025-07-17
+
+### 🚀 Development Release
+
+**📋 Release Information:**
+- **Environment**: dev
+- **Branch**: `dev/2.1.0`
+- **Version**: `2.1.0`
+- **Deployment Time**: 2025-07-17 16:35:27
+- **Description**: Development environment deployment with latest React components
+
+**📝 Changes Made:**
+React v2.1.0: Deploy to dev environment
+
+**📁 Files Modified:**
+  - Modified: `ERSION`
+  - Modified: `package.json`
+  - Modified: `src/App.js`
+  - Modified: `src/config/websocket.js`
+  - Changed: `src/hooks/useWebSocket.js`
+  - Changed: `src/services/websocketService.js`
+
+**🔄 Deployment Details:**
+- **Source Branch**: `dev/2.1.0`
+- **Target Branch**: `dev/2.1.0`
+- **Build Process**: Development build with source maps
+- **React Version**: Latest
+
+**🎯 Environment Specific Notes:**
+- Development environment deployment
+- Contains latest React components and changes
+- Used for integration testing before production
+- Devtest branch updated for continuous testing
+
+---
+
 ## [2.0.1] - 2025-07-17
 
 ### 🚀 Development Release
