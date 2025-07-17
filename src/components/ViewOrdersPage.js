@@ -2814,11 +2814,30 @@ if (order.delivery_type === 'Delivery') {
               <i className="bi bi-pencil-square me-1"></i>
               {isMobile ? 'Status' : 'Update Status'}
             </Button>
+            {/* Show Assign Rider button for delivery orders with Accepted or Ready status and no rider assigned */}
+            {selectedOrder.delivery_type === 'Delivery' && 
+             (selectedOrder.status === 'Accepted' || selectedOrder.status === 'Ready') && 
+             !selectedOrder.assigned_rider_id && (
+              <Button 
+                variant="primary" 
+                onClick={() => {
+                  setOrderForAssignment(selectedOrder);
+                  setShowOrderDetailsModal(false);
+                  setShowRiderSelector(true);
+                }}
+                className="flex-fill order-3 order-sm-4"
+                size={isMobile ? "sm" : undefined}
+                style={{ minHeight: isMobile ? '36px' : '44px' }}
+              >
+                <i className="bi bi-person-plus me-1"></i>
+                {isMobile ? 'Assign' : 'Assign Rider'}
+              </Button>
+            )}
             {!isBoltDeliveryOrder(selectedOrder) && (
               <Button 
                 variant="success" 
                 onClick={() => openPaymentModal(selectedOrder)}
-                className="flex-fill order-3 order-sm-4"
+                className="flex-fill order-4 order-sm-5"
                 size={isMobile ? "sm" : undefined}
                 style={{ minHeight: isMobile ? '36px' : '44px' }}
               >

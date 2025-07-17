@@ -111,7 +111,7 @@ const DeliveryRiderSelector = ({
             if (errorMessage.includes('already assigned')) {
               errorMessage = 'This order has already been assigned to a rider.';
             } else if (errorMessage.includes('not ready for delivery')) {
-              errorMessage = 'Order must be in "Accepted" status before assigning a rider.';
+              errorMessage = 'Order must be in "Accepted" or "Ready" status before assigning a rider.';
             } else if (errorMessage.includes('Bolt')) {
               errorMessage = 'Cannot assign regular riders to Bolt delivery orders.';
             }

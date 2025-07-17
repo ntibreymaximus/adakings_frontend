@@ -2,6 +2,40 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.0] - 2025-07-17
+
+### 🚀 Development Release
+
+**📋 Release Information:**
+- **Environment**: dev
+- **Branch**: `dev/2.0.0`
+- **Version**: `2.0.0`
+- **Deployment Time**: 2025-07-17 12:00:54
+- **Description**: Development environment deployment with latest React components
+
+**📝 Changes Made:**
+React v2.0.0: Deploy to dev environment
+
+**📁 Files Modified:**
+  - Modified: `ERSION`
+  - Modified: `package.json`
+  - Modified: `src/components/DeliveryRiderSelector.js`
+  - Modified: `src/components/ViewOrdersPage.js`
+
+**🔄 Deployment Details:**
+- **Source Branch**: `dev/2.0.0`
+- **Target Branch**: `dev/2.0.0`
+- **Build Process**: Development build with source maps
+- **React Version**: Latest
+
+**🎯 Environment Specific Notes:**
+- Development environment deployment
+- Contains latest React components and changes
+- Used for integration testing before production
+- Devtest branch updated for continuous testing
+
+---
+
 ## [2.1.2] - 2025-07-17
 
 ### 🎯 Production Release
