@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 // import optimizedToast, { contextToast } from '../utils/toastUtils';
 import RecentActivityCard from './RecentActivityCard';
 import AuditActivityCard from './AuditActivityCard';
-import StatsCard from './StatsCard';
 
 const DashboardPage = ({ userData }) => {
   const navigate = useNavigate();
@@ -56,14 +55,7 @@ const DashboardPage = ({ userData }) => {
 
   // Add admin-specific items
   const adminItems = [];
-  if (userData && (userData.role === 'admin' || userData.role === 'superadmin')) {
-    adminItems.push({
-      title: 'View Stats',
-      route: '/stats',
-      description: 'View comprehensive statistics and download reports',
-      icon: 'bi bi-bar-chart-line-fill'
-    });
-  }
+  // View Stats card removed as requested
   
   // Add audit logs item for superadmin users only
   if (userData && userData.role === 'superadmin') {
@@ -105,14 +97,7 @@ const DashboardPage = ({ userData }) => {
       </Row>
 
 
-      {/* Stats Card for Admin/Super Admin */}
-      {userData && (userData.role === 'admin' || userData.role === 'superadmin') && (
-        <Row className={isMobile ? "mt-3" : "mt-4"}>
-          <Col xs={12}>
-            <StatsCard className="ada-fade-in mb-3" />
-          </Col>
-        </Row>
-      )}
+      {/* Quick Stats Card removed as requested */}
 
       {/* Recent Activity Card */}
       <Row className={isMobile ? "mt-3" : "mt-4"}>
