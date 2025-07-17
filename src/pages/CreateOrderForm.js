@@ -831,8 +831,8 @@ const handleAddItem = useCallback((itemId) => {
       const endTime = performance.now();
       console.log(`✅ Order ${actionText} completed in ${(endTime - startTime).toFixed(2)}ms total`);
       
-      // Navigate to view orders page with the order ID to auto-open the order details modal
-      navigate(`/view-orders?openOrder=${result.order_number || result.id}`);
+      // Navigate to view orders page without opening the modal
+      navigate('/view-orders');
     } catch (error) {
       console.error('🚨 Network/Request Error:', error);
       console.error('Error details:', {

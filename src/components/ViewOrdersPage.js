@@ -1673,6 +1673,7 @@ if (order.delivery_type === 'Delivery') {
                     <th>Payment Status</th>
                     <th>Payment Mode</th>
                     <th>Status</th>
+                    <th>Created</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1748,6 +1749,16 @@ if (order.delivery_type === 'Delivery') {
                           {order.status}
                         </span>
                       </td>
+                      <td>
+                        <div style={{ fontSize: '0.85rem' }}>
+                          <div className="fw-semibold">
+                            {order.created_at ? new Date(order.created_at).toLocaleDateString() : 'N/A'}
+                          </div>
+                          <small className="text-muted">
+                            {order.created_at ? new Date(order.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                          </small>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -1798,6 +1809,19 @@ if (order.delivery_type === 'Delivery') {
                                   })()
                                 : order.delivery_type === 'Delivery' ? 'Delivery' : 'Pickup'
                               }
+                            </span>
+                          </div>
+                          
+                          {/* Order timestamp */}
+                          <div className="d-flex align-items-center mb-1">
+                            <span className="text-muted" style={{ fontSize: '0.75rem' }}>
+                              <i className="bi bi-clock me-1"></i>
+                              {order.created_at ? new Date(order.created_at).toLocaleString([], { 
+                                month: 'short', 
+                                day: 'numeric', 
+                                hour: '2-digit', 
+                                minute: '2-digit' 
+                              }) : 'N/A'}
                             </span>
                           </div>
                           
@@ -2642,6 +2666,12 @@ if (order.delivery_type === 'Delivery') {
                       <div className="d-flex justify-content-between align-items-center mb-2">
                         <span>Customer Phone:</span>
                         <span>{selectedOrder.customer_phone || 'N/A'}</span>
+                      </div>
+                      <div className="d-flex justify-content-between align-items-center mb-2">
+                        <span>Created:</span>
+                        <span style={{ fontSize: '0.9rem' }}>
+                          {selectedOrder.created_at ? new Date(selectedOrder.created_at).toLocaleString() : 'N/A'}
+                        </span>
                       </div>
                       <div className="d-flex justify-content-between align-items-center mb-2">
                         <span>Type:</span>
