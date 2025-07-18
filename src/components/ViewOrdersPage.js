@@ -85,6 +85,56 @@ const [orderForAssignment, setOrderForAssignment] = useState(null);
       // Refresh orders without showing loader for smooth experience
       fetchOrders(false);
       
+      // If we have a selected order and modals are open, check if it's the same order
+      if (selectedOrder && data.object_id) {
+        const isSelectedOrderUpdated = selectedOrder.id === data.object_id;
+        
+        if (isSelectedOrderUpdated) {
+          console.log('🔄 Selected order was updated via autoreload - updating modal content');
+          
+          // Refresh the selected order data to update modal content WITHOUT closing modals
+          setTimeout(() => {
+            setAllOrders(currentOrders => {
+              const updatedOrder = currentOrders.find(order => order.id === selectedOrder.id);
+              if (updatedOrder) {
+                console.log('✅ Updating modal with fresh order data:', updatedOrder);
+                setSelectedOrder(updatedOrder);
+                
+                // Show subtle notification that modal content was refreshed
+                if (showOrderDetailsModal || showPaymentModal || showStatusModal) {
+                  optimizedToast.info('Modal content refreshed', {
+                    autoClose: 1000,
+                    hideProgressBar: true,
+                    position: 'bottom-center',
+                    toastId: 'modal-refresh' // Prevent duplicate toasts
+                  });
+                }
+                
+                // If payment modal is open and order payment status changed, update payment form
+                if (showPaymentModal && data.model === 'Payment') {
+                  // Update payment amount if balance changed
+                  const balanceDue = parseFloat(updatedOrder.balance_due || 0);
+                  if (balanceDue > 0 && !isRefundMode) {
+                    setPaymentAmount(balanceDue.toFixed(2));
+                  }
+                  
+                  // Check if we should switch to refund mode
+                  const isOverpaid = updatedOrder.payment_status === 'OVERPAID' || 
+                                    (updatedOrder.amount_overpaid && parseFloat(updatedOrder.amount_overpaid) > 0);
+                  if (isOverpaid && !isRefundMode) {
+                    setIsRefundMode(true);
+                    setNewPaymentMode('CASH');
+                    setPaymentAmount(updatedOrder.amount_overpaid || '0.00');
+                    optimizedToast.info('Switched to refund mode due to overpayment');
+                  }
+                }
+              }
+              return currentOrders;
+            });
+          }, 300); // Small delay to ensure fetchOrders completes
+        }
+      }
+      
       // Show non-intrusive notification about the update
       const message = data.type === 'created' 
         ? `New ${data.model.toLowerCase()} created`
@@ -92,7 +142,8 @@ const [orderForAssignment, setOrderForAssignment] = useState(null);
       
       optimizedToast.info(message, {
         autoClose: 2000,
-        hideProgressBar: true
+        hideProgressBar: true,
+        position: 'bottom-right'
       });
     }
   });

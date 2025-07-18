@@ -11,6 +11,8 @@ import {
 } from '../utils/transactionUtils';
 import { PAYMENT_METHODS } from '../utils/paymentUtils';
 import PaymentLogs from './PaymentLogs';
+import { useAutoreloadUpdates } from '../hooks/useWebSocket';
+
 const ViewTransactionsPage = () => {
     const { logout } = useAuth();
     const navigate = useNavigate();
@@ -93,6 +95,58 @@ const ViewTransactionsPage = () => {
         payment_status_breakdown: {},
         status_breakdown: {},
         delivery_type_breakdown: {}
+    });
+    
+    // Setup autoreload to refresh transactions when system events occur
+    useAutoreloadUpdates((data) => {
+        // Check if the update is for a Payment/Transaction model
+        if (data.model === 'Payment') {
+            console.log('📡 Transaction autoreload update received:', data);
+            
+            // Refresh transactions without showing loader for smooth experience
+            fetchTransactions();
+            fetchOrderStats();
+            
+            // If we have a selected transaction in modal and it was updated
+            if (selectedTransaction && showTransactionModal && data.object_id) {
+                // Check if the updated payment is the one currently displayed
+                const isSelectedTransactionUpdated = 
+                    selectedTransaction.id === data.object_id ||
+                    selectedTransaction.transaction_id === data.object_id ||
+                    selectedTransaction.custom_transaction_id === data.object_id;
+                
+                if (isSelectedTransactionUpdated) {
+                    console.log('🔄 Selected transaction was updated via autoreload');
+                    
+                    // Find the updated transaction in the refreshed data
+                    setTimeout(() => {
+                        setAllTransactions(currentTransactions => {
+                            const updatedTransaction = currentTransactions.find(txn => 
+                                txn.id === selectedTransaction.id ||
+                                txn.transaction_id === selectedTransaction.transaction_id ||
+                                txn.custom_transaction_id === selectedTransaction.custom_transaction_id
+                            );
+                            if (updatedTransaction) {
+                                console.log('✅ Updating modal with fresh transaction data:', updatedTransaction);
+                                setSelectedTransaction(updatedTransaction);
+                            }
+                            return currentTransactions;
+                        });
+                    }, 500); // Small delay to ensure data is refreshed
+                }
+            }
+            
+            // Show non-intrusive notification about the update
+            const message = data.type === 'created' 
+                ? 'New transaction recorded'
+                : 'Transaction updated';
+            
+            optimizedToast.info(message, {
+                autoClose: 2000,
+                hideProgressBar: true,
+                position: 'bottom-right'
+            });
+        }
     });
 
     // Fetch order stats with refund details

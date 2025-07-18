@@ -1359,6 +1359,30 @@ const handleAddItem = useCallback((itemId) => {
                         </Card>
                       </div>
                     )}
+                    {/* Phone input for pickup orders on mobile - optional */}
+                    {isMobile && deliveryType === 'Pickup' && (
+                      <div className="mt-3">
+                        <Form.Group controlId="customerPhonePickupMobile">
+                          <Form.Label className="fw-semibold">
+                            Customer Phone <span className="text-muted">(Optional)</span>
+                          </Form.Label>
+                          <Form.Control
+                            type="tel"
+                            inputMode="tel"
+                            value={customerPhone}
+                            onChange={(e) => setCustomerPhone(e.target.value)}
+                            isInvalid={!!errors.customerPhone}
+                            placeholder="0XXXXXXXXX or +233XXXXXXXXX"
+                            className="ada-shadow-sm"
+                            style={{ minHeight: '44px', fontSize: '16px' }}
+                          />
+                          <Form.Control.Feedback type="invalid">{errors.customerPhone}</Form.Control.Feedback>
+                          <Form.Text className="text-muted">
+                            Optional: For order notifications and contact purposes
+                          </Form.Text>
+                        </Form.Group>
+                      </div>
+                    )}
                   </Form.Group>
                 </Col>
                 {deliveryType === 'Delivery' && !isMobile && (
