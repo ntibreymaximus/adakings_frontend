@@ -192,7 +192,16 @@ const ViewTransactionsPage = () => {
         fetchTransactions();
         fetchOrderStats();
         
-        return () => window.removeEventListener('resize', handleResize);
+        // Set up auto-reload interval (refresh every 30 seconds)
+        const autoReloadInterval = setInterval(() => {
+            fetchTransactions();
+            fetchOrderStats();
+        }, 30000); // 30 seconds
+        
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            clearInterval(autoReloadInterval);
+        };
     }, [logout]);
 
     // Filter transactions by selected date

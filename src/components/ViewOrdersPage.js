@@ -17,6 +17,7 @@ import { API_BASE_URL } from '../utils/api';
 import SimpleUserTracking from './SimpleUserTracking';
 import DeliveryRiderSelector from './DeliveryRiderSelector';
 import MenuItemsStatsCard from './MenuItemsStatsCard';
+import { useAutoreloadUpdates } from '../hooks/useWebSocket';
 
 // Optimized ViewOrdersPage with instant loading
 const ViewOrdersPage = memo(() => {
@@ -74,6 +75,27 @@ const [orderForAssignment, setOrderForAssignment] = useState(null);
   
   // Ref to track if we're already handling a modal opening
   const isHandlingModalRef = useRef(false);
+  
+  // Setup autoreload to refresh orders when system events occur
+  useAutoreloadUpdates((data) => {
+    // Check if the update is for an order model
+    if (data.model === 'Order' || data.model === 'Payment') {
+      console.log('📡 Autoreload update received:', data);
+      
+      // Refresh orders without showing loader for smooth experience
+      fetchOrders(false);
+      
+      // Show non-intrusive notification about the update
+      const message = data.type === 'created' 
+        ? `New ${data.model.toLowerCase()} created`
+        : `${data.model} updated`;
+      
+      optimizedToast.info(message, {
+        autoClose: 2000,
+        hideProgressBar: true
+      });
+    }
+  });
 
     // Fetch orders from API - with consistent loading
     const fetchOrders = useCallback(async (showLoader = true) => {

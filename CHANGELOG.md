@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.3.0] - 2025-07-18
+
+### 🚀 Development Release
+
+**📋 Release Information:**
+- **Environment**: dev
+- **Branch**: `dev/2.3.0`
+- **Version**: `2.3.0`
+- **Deployment Time**: 2025-07-18 15:04:19
+- **Description**: Development environment deployment with latest React components
+
+**📝 Changes Made:**
+React v2.3.0: Deploy to dev environment
+
+**📁 Files Modified:**
+  - Modified: `ERSION`
+  - Modified: `package.json`
+  - Modified: `src/components/ViewOrdersPage.js`
+  - Modified: `src/components/ViewTransactionsPage.js`
+  - Changed: `AUTORELOAD_IMPLEMENTATION.md`
+  - Changed: `src/examples/`
+
+**🔄 Deployment Details:**
+- **Source Branch**: `dev/2.3.0`
+- **Target Branch**: `dev/2.3.0`
+- **Build Process**: Development build with source maps
+- **React Version**: Latest
+
+**🎯 Environment Specific Notes:**
+- Development environment deployment
+- Contains latest React components and changes
+- Used for integration testing before production
+- Devtest branch updated for continuous testing
+
+---
+
 ## [2.2.0] - 2025-07-17
 
 ### 🚀 Development Release
