@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Spinner, Row, Col, Modal, Button } from 'react-bootstrap';
+import { Card, Spinner, Row, Col, Modal, Button, Form, InputGroup } from 'react-bootstrap';
 import { API_BASE_URL } from '../utils/api';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -20,6 +20,14 @@ const MenuItemsStatsCard = ({ selectedDate, className }) => {
 
   // State for controlling modal visibility
   const [showMenuItemsModal, setShowMenuItemsModal] = useState(false);
+  
+  // State for search filter
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  // Filtered items based on search query
+  const filteredItems = menuItemsStats.topItems.filter(item => 
+    item.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const fetchMenuItemsStats = async () => {
     try {
@@ -59,56 +67,77 @@ const MenuItemsStatsCard = ({ selectedDate, className }) => {
       const today = new Date().toISOString().split('T')[0];
       const isToday = date === today;
       
-      const endpoint = isToday 
-        ? `${API_BASE_URL}/orders/today/`
-        : `${API_BASE_URL}/orders/?date=${date}`;
-
-      const response = await fetch(endpoint, {
+      // First, fetch all menu items from the menu
+      const menuResponse = await fetch(`${API_BASE_URL}/menu/items/`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
 
-      if (response.ok) {
-        const orders = await response.json();
+      if (!menuResponse.ok) {
+        throw new Error('Failed to fetch menu items');
+      }
+
+      const allMenuItems = await menuResponse.json();
+      const menuItemsArray = Array.isArray(allMenuItems) ? allMenuItems : (allMenuItems.results || []);
+      
+      // Filter out extras - we only want regular menu items
+      const regularMenuItems = menuItemsArray.filter(item => !item.is_extra);
+      
+      // Initialize all menu items with 0 count
+      const itemsCount = {};
+      regularMenuItems.forEach(item => {
+        itemsCount[item.name] = 0;
+      });
+      
+      // Now fetch orders for the specific date
+      const endpoint = isToday 
+        ? `${API_BASE_URL}/orders/today/`
+        : `${API_BASE_URL}/orders/?date=${date}`;
+
+      const ordersResponse = await fetch(endpoint, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      let totalItemsServed = 0;
+      
+      if (ordersResponse.ok) {
+        const orders = await ordersResponse.json();
         const ordersArray = Array.isArray(orders) ? orders : (orders.results || []);
         
         // Calculate menu items statistics from orders
-        const itemsCount = {};
-        let totalItemsServed = 0;
-        
         ordersArray.forEach(order => {
           if (order.items && Array.isArray(order.items)) {
             order.items.forEach(item => {
               const itemName = item.product_name || item.name || item.menu_item_name || item.title || 'Unknown Item';
               const quantity = parseInt(item.quantity) || 0;
               
-              if (itemsCount[itemName]) {
+              // Only count if the item exists in our menu
+              if (itemsCount.hasOwnProperty(itemName)) {
                 itemsCount[itemName] += quantity;
-              } else {
-                itemsCount[itemName] = quantity;
+                totalItemsServed += quantity;
               }
-              
-              totalItemsServed += quantity;
             });
           }
         });
-
-        // Get top 5 items
-        const topItems = Object.entries(itemsCount)
-          .sort(([,a], [,b]) => b - a)
-          .slice(0, 5)
-          .map(([name, count]) => ({ name, count }));
-
-        setMenuItemsStats({
-          totalItemsServed,
-          uniqueItemsServed: Object.keys(itemsCount).length,
-          topItems
-        });
       }
+
+      // Get all items sorted by count (descending), including items with 0 count
+      const topItems = Object.entries(itemsCount)
+        .sort(([,a], [,b]) => b - a)
+        .map(([name, count]) => ({ name, count }));
+
+      setMenuItemsStats({
+        totalItemsServed,
+        uniqueItemsServed: regularMenuItems.length, // Total number of menu items, not just served ones
+        topItems
+      });
     } catch (error) {
-      console.error('Failed to fetch orders for menu items stats:', error);
+      console.error('Failed to fetch menu items stats:', error);
       setMenuItemsStats({
         totalItemsServed: 0,
         uniqueItemsServed: 0,
@@ -171,10 +200,10 @@ const MenuItemsStatsCard = ({ selectedDate, className }) => {
               {menuItemsStats.topItems.length > 0 && (
                 <>
                   <hr className="my-3" />
-                  <h6 className="text-muted mb-2">
-                    <i className="bi bi-trophy me-2"></i>
-                    Top Regular Item
-                  </h6>
+                    <h6 className="text-muted mb-2">
+                      <i className="bi bi-trophy me-2"></i>
+                      Most Popular Item
+                    </h6>
                   <div className="d-flex justify-content-between align-items-center">
                     <span className="fw-semibold">{menuItemsStats.topItems[0].name}</span>
                     <span className="badge bg-primary">{menuItemsStats.topItems[0].count}</span>
@@ -223,33 +252,73 @@ const MenuItemsStatsCard = ({ selectedDate, className }) => {
             </Col>
           </Row>
 
+          {/* Search Filter */}
+          {menuItemsStats.topItems.length > 0 && (
+            <>
+              <h6 className="text-muted mb-3">
+                <i className="bi bi-search me-2"></i>
+                Search Menu Items
+              </h6>
+              <InputGroup className="mb-4">
+                <InputGroup.Text>
+                  <i className="bi bi-search"></i>
+                </InputGroup.Text>
+                <Form.Control
+                  type="text"
+                  placeholder="Search for menu items..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="ada-shadow-sm"
+                />
+                {searchQuery && (
+                  <Button 
+                    variant="outline-secondary" 
+                    onClick={() => setSearchQuery('')}
+                    title="Clear search"
+                  >
+                    <i className="bi bi-x"></i>
+                  </Button>
+                )}
+              </InputGroup>
+            </>
+          )}
+          
           {/* Full Top Items List */}
           {menuItemsStats.topItems.length > 0 && (
             <>
               <h6 className="text-muted mb-3">
                 <i className="bi bi-trophy me-2"></i>
-                Top Items Ranking
+                {searchQuery ? `Search Results (${filteredItems.length})` : 'All Menu Items'}
               </h6>
-              <div className="top-items-list">
-                {menuItemsStats.topItems.map((item, index) => (
-                  <div key={index} className="d-flex justify-content-between align-items-center mb-3 p-3 bg-light rounded">
-                    <div className="d-flex align-items-center">
-                      <span className="badge bg-secondary me-3" style={{ minWidth: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        #{index + 1}
-                      </span>
-                      <div>
-                        <h6 className="mb-1">{item.name}</h6>
-                        <small className="text-muted">Menu Item</small>
+              
+              {filteredItems.length > 0 ? (
+                <div className="top-items-list">
+                  {filteredItems.map((item, index) => (
+                    <div key={index} className="d-flex justify-content-between align-items-center mb-3 p-3 bg-light rounded">
+                      <div className="d-flex align-items-center">
+                        <span className="badge bg-secondary me-3" style={{ minWidth: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          #{searchQuery ? menuItemsStats.topItems.findIndex(originalItem => originalItem.name === item.name) + 1 : index + 1}
+                        </span>
+                        <div>
+                          <h6 className="mb-1">{item.name}</h6>
+                          <small className="text-muted">Menu Item</small>
+                        </div>
+                      </div>
+                      <div className="text-end">
+                        <span className={`badge ${item.count > 0 ? 'bg-primary' : 'bg-secondary'} fs-6 p-2`}>{item.count}</span>
+                        <br />
+                        <small className="text-muted">{item.count === 1 ? 'Order' : 'Orders'}</small>
                       </div>
                     </div>
-                    <div className="text-end">
-                      <span className="badge bg-primary fs-6 p-2">{item.count}</span>
-                      <br />
-                      <small className="text-muted">Orders</small>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <i className="bi bi-search display-6 text-muted mb-2"></i>
+                  <h6 className="text-muted">No items found</h6>
+                  <p className="text-muted mb-0">No menu items match your search for "{searchQuery}"</p>
+                </div>
+              )}
             </>
           )}
 
@@ -262,10 +331,19 @@ const MenuItemsStatsCard = ({ selectedDate, className }) => {
           )}
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowMenuItemsModal(false)}>
-            <i className="bi bi-x-circle me-2"></i>
-            Close
-          </Button>
+          <div className="d-flex justify-content-between align-items-center w-100">
+            <small className="text-muted">
+              <i className="bi bi-info-circle me-1"></i>
+              {searchQuery ? `Showing ${filteredItems.length} of ${menuItemsStats.topItems.length} items` : `Showing ${menuItemsStats.topItems.length} items`}
+            </small>
+            <Button variant="secondary" onClick={() => {
+              setShowMenuItemsModal(false);
+              setSearchQuery(''); // Clear search when closing modal
+            }}>
+              <i className="bi bi-x-circle me-2"></i>
+              Close
+            </Button>
+          </div>
         </Modal.Footer>
       </Modal>
     </>

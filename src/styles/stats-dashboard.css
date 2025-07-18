@@ -1,0 +1,247 @@
+/* Stats Dashboard Styles */
+
+/* Enhanced Stats Cards */
+.ada-stats-card {
+  transition: all 0.3s ease;
+  border: 1px solid var(--ada-border-light);
+  border-radius: var(--ada-border-radius-lg);
+  overflow: hidden;
+}
+
+.ada-stats-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--ada-shadow-lg);
+}
+
+.ada-stats-card .card-body {
+  padding: 1.5rem;
+}
+
+/* Stats Card Variants with Gradient Backgrounds */
+.ada-stats-card.ada-stats-primary {
+  background: linear-gradient(135deg, rgba(30, 64, 175, 0.05) 0%, rgba(30, 64, 175, 0.02) 100%);
+  border-left: 4px solid var(--ada-primary);
+}
+
+.ada-stats-card.ada-stats-success {
+  background: linear-gradient(135deg, rgba(40, 167, 69, 0.05) 0%, rgba(40, 167, 69, 0.02) 100%);
+  border-left: 4px solid var(--ada-success);
+}
+
+.ada-stats-card.ada-stats-warning {
+  background: linear-gradient(135deg, rgba(255, 193, 7, 0.05) 0%, rgba(255, 193, 7, 0.02) 100%);
+  border-left: 4px solid var(--ada-warning);
+}
+
+.ada-stats-card.ada-stats-danger {
+  background: linear-gradient(135deg, rgba(220, 53, 69, 0.05) 0%, rgba(220, 53, 69, 0.02) 100%);
+  border-left: 4px solid var(--ada-danger);
+}
+
+.ada-stats-card.ada-stats-info {
+  background: linear-gradient(135deg, rgba(23, 162, 184, 0.05) 0%, rgba(23, 162, 184, 0.02) 100%);
+  border-left: 4px solid var(--ada-info);
+}
+
+/* Stats Typography */
+.ada-stats-title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.ada-stats-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--ada-charcoal);
+  margin-bottom: 0.5rem;
+  line-height: 1.2;
+}
+
+.ada-stats-change {
+  font-size: 0.875rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+}
+
+.ada-stats-icon {
+  opacity: 0.7;
+  transition: opacity 0.3s ease;
+}
+
+.ada-stats-card:hover .ada-stats-icon {
+  opacity: 1;
+}
+
+/* Page Header Styles */
+.ada-page-header {
+  background: linear-gradient(135deg, rgba(30, 64, 175, 0.03) 0%, rgba(30, 64, 175, 0.01) 100%);
+  padding: 1.5rem;
+  border-radius: var(--ada-border-radius-lg);
+  margin-bottom: 2rem;
+}
+
+.ada-page-title {
+  color: var(--ada-primary);
+  font-weight: 700;
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+}
+
+.ada-page-subtitle {
+  color: var(--ada-gray);
+  font-size: 1rem;
+  margin-bottom: 0;
+}
+
+.ada-page-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+/* Charts Section */
+.chart-container {
+  padding: 1rem;
+}
+
+/* Enhanced Table Styles */
+.stats-table {
+  font-size: 0.875rem;
+}
+
+.stats-table th {
+  background-color: var(--ada-light-gray);
+  color: var(--ada-dark-gray);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.5px;
+  padding: 0.75rem;
+  border-bottom: 2px solid var(--ada-border-light);
+}
+
+.stats-table td {
+  padding: 0.75rem;
+  vertical-align: middle;
+}
+
+.stats-table tbody tr:hover {
+  background-color: var(--ada-primary-subtle);
+  transition: background-color 0.2s ease;
+}
+
+/* Export Buttons Section */
+.export-section {
+  background-color: var(--ada-light-gray);
+  padding: 2rem;
+  border-radius: var(--ada-border-radius-lg);
+  margin-top: 2rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .ada-stats-value {
+    font-size: 1.5rem;
+  }
+  
+  .ada-stats-card .card-body {
+    padding: 1rem;
+  }
+  
+  .ada-page-title {
+    font-size: 1.5rem;
+  }
+  
+  .ada-page-header {
+    padding: 1rem;
+  }
+  
+  .ada-stats-icon i {
+    font-size: 2rem !important;
+  }
+}
+
+/* Loading States */
+.stats-loading {
+  min-height: 400px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Filter Card */
+.filter-card {
+  background-color: var(--ada-off-white);
+  border: 1px solid var(--ada-border-light);
+}
+
+/* Animation for stats cards */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ada-stats-card {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+.ada-stats-card:nth-child(1) { animation-delay: 0.1s; }
+.ada-stats-card:nth-child(2) { animation-delay: 0.2s; }
+.ada-stats-card:nth-child(3) { animation-delay: 0.3s; }
+.ada-stats-card:nth-child(4) { animation-delay: 0.4s; }
+
+/* Chart Card Headers */
+.chart-card-header {
+  background-color: var(--ada-off-white);
+  border-bottom: 2px solid var(--ada-border-light);
+  padding: 1rem 1.5rem;
+}
+
+/* Custom scrollbar for tables */
+.table-responsive::-webkit-scrollbar {
+  height: 8px;
+}
+
+.table-responsive::-webkit-scrollbar-track {
+  background: var(--ada-light-gray);
+  border-radius: 4px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb {
+  background: var(--ada-gray);
+  border-radius: 4px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb:hover {
+  background: var(--ada-dark-gray);
+}
+
+/* Export button styles */
+.export-btn-group {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 576px) {
+  .export-btn-group {
+    flex-direction: column;
+  }
+  
+  .export-btn-group .btn {
+    width: 100%;
+  }
+}

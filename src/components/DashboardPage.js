@@ -55,7 +55,16 @@ const DashboardPage = ({ userData }) => {
 
   // Add admin-specific items
   const adminItems = [];
-  // View Stats card removed as requested
+  
+  // Add stats dashboard for admin and superadmin users
+  if (userData && (userData.role === 'admin' || userData.role === 'superadmin')) {
+    adminItems.push({
+      title: 'Stats Dashboard',
+      route: '/stats',
+      description: 'View detailed statistics and analytics',
+      icon: 'bi bi-bar-chart-line-fill'
+    });
+  }
   
   // Add audit logs item for superadmin users only
   if (userData && userData.role === 'superadmin') {

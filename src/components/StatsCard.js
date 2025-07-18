@@ -78,7 +78,7 @@ const StatsCard = ({ className }) => {
             <div className="col-6">
               <div className="text-center">
                 <h6 className="text-muted small mb-1">Today's Revenue</h6>
-                <h4 className="ada-text-primary mb-0">₦{quickStats.todayRevenue.toLocaleString()}</h4>
+                <h4 className="ada-text-primary mb-0">₵{quickStats.todayRevenue.toLocaleString()}</h4>
               </div>
             </div>
             <div className="col-6">
@@ -90,7 +90,7 @@ const StatsCard = ({ className }) => {
             <div className="col-6">
               <div className="text-center">
                 <h6 className="text-muted small mb-1">Monthly Revenue</h6>
-                <h4 className="ada-text-primary mb-0">₦{quickStats.monthlyRevenue.toLocaleString()}</h4>
+                <h4 className="ada-text-primary mb-0">₵{quickStats.monthlyRevenue.toLocaleString()}</h4>
               </div>
             </div>
           </div>

@@ -21,6 +21,7 @@ import {
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import '../styles/stats-dashboard.css';
 
 // Register ChartJS components
 ChartJS.register(
@@ -40,6 +41,7 @@ const StatsPage = () => {
   const navigate = useNavigate();
   const { userData, checkTokenValidity } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState({
     totalOrders: 0,
     pendingOrders: 0,
@@ -59,10 +61,11 @@ const StatsPage = () => {
     deliveryStats: {},
   });
   const [dateRange, setDateRange] = useState({
-    startDate: new Date().toISOString().split('T')[0],
+    startDate: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0]
   });
   const [exportFormat, setExportFormat] = useState('excel');
+  const [activeTab, setActiveTab] = useState('overview');
 
   useEffect(() => {
     if (!userData || (userData.role !== 'admin' && userData.role !== 'superadmin')) {
@@ -177,7 +180,7 @@ const StatsPage = () => {
       const summaryData = [
         ['Metric', 'Value'],
         ['Total Orders', stats.totalOrders.toString()],
-        ['Total Revenue', `₦${stats.totalRevenue.toLocaleString()}`],
+        ['Total Revenue', `₵${stats.totalRevenue.toLocaleString()}`],
         ['Completed Orders', stats.completedOrders.toString()],
         ['Pending Orders', stats.pendingOrders.toString()],
         ['Cancelled Orders', stats.cancelledOrders.toString()],
@@ -204,7 +207,7 @@ const StatsPage = () => {
           ...stats.topProducts.map(p => [
             p.name,
             p.quantity.toString(),
-            `₦${p.revenue.toLocaleString()}`
+            `₵${p.revenue.toLocaleString()}`
           ])
         ];
 
@@ -226,7 +229,7 @@ const StatsPage = () => {
         ...stats.recentOrders.map(order => [
           order.id.toString(),
           order.customer_name || 'Guest',
-          `₦${order.total.toLocaleString()}`,
+          `₵${order.total.toLocaleString()}`,
           order.status,
           new Date(order.created_at).toLocaleDateString()
         ])
@@ -244,6 +247,7 @@ const StatsPage = () => {
     doc.save(`${type}_report_${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
+  // Chart configuration with theme colors
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
@@ -251,8 +255,58 @@ const StatsPage = () => {
       legend: {
         display: true,
         position: 'top',
+        labels: {
+          font: {
+            family: 'Poppins',
+            size: 12
+          },
+          padding: 15,
+          usePointStyle: true,
+          pointStyle: 'circle'
+        }
       },
+      tooltip: {
+        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+        titleFont: {
+          family: 'Poppins',
+          size: 14
+        },
+        bodyFont: {
+          family: 'Poppins',
+          size: 13
+        },
+        padding: 12,
+        cornerRadius: 8,
+        displayColors: true,
+        mode: 'index',
+        intersect: false
+      }
     },
+    scales: {
+      x: {
+        grid: {
+          display: false
+        },
+        ticks: {
+          font: {
+            family: 'Poppins',
+            size: 11
+          }
+        }
+      },
+      y: {
+        grid: {
+          borderDash: [5, 5],
+          color: 'rgba(0, 0, 0, 0.05)'
+        },
+        ticks: {
+          font: {
+            family: 'Poppins',
+            size: 11
+          }
+        }
+      }
+    }
   };
 
   const revenueChartData = {
@@ -261,25 +315,37 @@ const StatsPage = () => {
       {
         label: 'Revenue',
         data: stats.monthlyData?.map(d => d.revenue) || [],
-        borderColor: 'rgb(75, 192, 192)',
-        backgroundColor: 'rgba(75, 192, 192, 0.2)',
-        tension: 0.1,
+        borderColor: '#1e40af', // ada-primary
+        backgroundColor: 'rgba(30, 64, 175, 0.1)',
+        tension: 0.4,
         fill: true,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        pointBackgroundColor: '#1e40af',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2
       },
     ],
   };
 
   const orderStatusChartData = {
-    labels: Object.keys(stats.ordersByStatus || {}),
+    labels: ['Pending', 'Completed', 'Cancelled', 'Processing'],
     datasets: [
       {
-        data: Object.values(stats.ordersByStatus || {}),
-        backgroundColor: [
-          'rgba(255, 206, 86, 0.8)',
-          'rgba(75, 192, 192, 0.8)',
-          'rgba(255, 99, 132, 0.8)',
-          'rgba(54, 162, 235, 0.8)',
+        data: [
+          stats.pendingOrders || 0,
+          stats.completedOrders || 0,
+          stats.cancelledOrders || 0,
+          (stats.totalOrders - stats.completedOrders - stats.cancelledOrders - stats.pendingOrders) || 0
         ],
+        backgroundColor: [
+          '#ffc107', // warning
+          '#28a745', // success
+          '#dc3545', // danger
+          '#17a2b8', // info
+        ],
+        borderWidth: 0,
+        hoverOffset: 4
       },
     ],
   };
@@ -290,7 +356,11 @@ const StatsPage = () => {
       {
         label: 'Orders per Hour',
         data: stats.hourlyOrders?.map(h => h.count) || [],
-        backgroundColor: 'rgba(54, 162, 235, 0.8)',
+        backgroundColor: 'rgba(30, 64, 175, 0.8)', // ada-primary
+        borderColor: '#1e40af',
+        borderWidth: 1,
+        borderRadius: 8,
+        hoverBackgroundColor: '#1e3a8a'
       },
     ],
   };
@@ -305,133 +375,365 @@ const StatsPage = () => {
     );
   }
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchStats();
+    setRefreshing(false);
+  };
+
+  // Calculate percentage changes
+  const calculatePercentageChange = (current, previous) => {
+    if (!previous || previous === 0) return 0;
+    return ((current - previous) / previous * 100).toFixed(1);
+  };
+
   return (
-    <Container className="py-4">
-      <Row className="mb-4">
-        <Col>
-          <h2 className="ada-text-primary">
-            Statistics Dashboard
-            {userData.role === 'superadmin' && (
-              <Badge bg="danger" className="ms-2">Super Admin</Badge>
-            )}
-          </h2>
-        </Col>
-      </Row>
+    <Container className="my-3 my-md-4 px-3 px-md-4">
+      {/* Return to Dashboard Button */}
+      <div className="mb-3">
+        <Button
+          variant="outline-primary"
+          size="sm"
+          onClick={() => navigate('/dashboard')}
+          className="d-flex align-items-center ada-shadow-sm"
+          style={{ minHeight: '44px' }}
+        >
+          <i className="bi bi-arrow-left me-2"></i>
+          <span>Return to Dashboard</span>
+        </Button>
+      </div>
 
-      {/* Date Range Filter */}
-      <Row className="mb-4">
-        <Col md={3}>
-          <Form.Group>
-            <Form.Label>Start Date</Form.Label>
-            <Form.Control
-              type="date"
-              value={dateRange.startDate}
-              onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
-            />
-          </Form.Group>
-        </Col>
-        <Col md={3}>
-          <Form.Group>
-            <Form.Label>End Date</Form.Label>
-            <Form.Control
-              type="date"
-              value={dateRange.endDate}
-              onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
-            />
-          </Form.Group>
-        </Col>
-        <Col md={3}>
-          <Form.Group>
-            <Form.Label>Export Format</Form.Label>
-            <Form.Select
-              value={exportFormat}
-              onChange={(e) => setExportFormat(e.target.value)}
-            >
-              <option value="excel">Excel</option>
-              <option value="csv">CSV</option>
-              <option value="pdf">PDF</option>
-            </Form.Select>
-          </Form.Group>
-        </Col>
-        <Col md={3} className="d-flex align-items-end">
-          <Button variant="primary" onClick={() => fetchStats()}>
-            <i className="bi bi-arrow-clockwise me-2"></i>
-            Refresh
-          </Button>
-        </Col>
-      </Row>
+      {/* Page Title */}
+      <div className="mb-4">
+        <h2 className="ada-text-primary mb-2">
+          <i className="bi bi-bar-chart-line-fill me-2"></i>
+          Statistics Dashboard
+        </h2>
+        <p className="text-muted mb-0">
+          Comprehensive analytics and insights for your restaurant
+          {userData.role === 'superadmin' && (
+            <Badge bg="danger" className="ms-2 align-middle">Super Admin</Badge>
+          )}
+        </p>
+      </div>
 
-      {/* Summary Cards */}
-      <Row className="mb-4">
-        <Col xs={12} sm={6} lg={3} className="mb-3">
-          <Card className="h-100 text-center">
-            <Card.Body>
-              <h5 className="text-muted">Total Orders</h5>
-              <h2 className="ada-text-primary">{stats.totalOrders}</h2>
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col xs={12} sm={6} lg={3} className="mb-3">
-          <Card className="h-100 text-center">
-            <Card.Body>
-              <h5 className="text-muted">Total Revenue</h5>
-              <h2 className="ada-text-primary">₦{stats.totalRevenue.toLocaleString()}</h2>
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col xs={12} sm={6} lg={3} className="mb-3">
-          <Card className="h-100 text-center">
-            <Card.Body>
-              <h5 className="text-muted">Today's Revenue</h5>
-              <h2 className="ada-text-primary">₦{stats.todayRevenue.toLocaleString()}</h2>
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col xs={12} sm={6} lg={3} className="mb-3">
-          <Card className="h-100 text-center">
-            <Card.Body>
-              <h5 className="text-muted">Total Customers</h5>
-              <h2 className="ada-text-primary">{stats.totalCustomers}</h2>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+      {/* Filters and Actions Card */}
+      <Card className="ada-shadow-sm mb-4">
+        <Card.Body>
+          <h5 className="mb-4 d-flex align-items-center">
+            <i className="bi bi-funnel me-2"></i>
+            Filters & Export Options
+          </h5>
+          
+          {/* Date Range Section */}
+          <div className="mb-4">
+            <h6 className="text-muted mb-3">Date Range</h6>
+            <Row className="g-3">
+              <Col xs={12} sm={6} md={4} lg={3}>
+                <Form.Group>
+                  <Form.Label className="small fw-semibold">Start Date</Form.Label>
+                  <Form.Control
+                    type="date"
+                    value={dateRange.startDate}
+                    onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
+                    className="ada-form-control"
+                  />
+                </Form.Group>
+              </Col>
+              <Col xs={12} sm={6} md={4} lg={3}>
+                <Form.Group>
+                  <Form.Label className="small fw-semibold">End Date</Form.Label>
+                  <Form.Control
+                    type="date"
+                    value={dateRange.endDate}
+                    onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
+                    className="ada-form-control"
+                  />
+                </Form.Group>
+              </Col>
+              <Col xs={12} sm={12} md={4} lg={3}>
+                <Form.Group>
+                  <Form.Label className="small fw-semibold d-block mb-2">Actions</Form.Label>
+                  <Button 
+                    variant="primary" 
+                    onClick={handleRefresh}
+                    disabled={refreshing}
+                    className="w-100 d-flex align-items-center justify-content-center"
+                    style={{ minHeight: '38px' }}
+                  >
+                    {refreshing ? (
+                      <>
+                        <Spinner size="sm" animation="border" className="me-2" />
+                        <span>Refreshing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <i className="bi bi-arrow-clockwise me-2"></i>
+                        <span>Refresh Data</span>
+                      </>
+                    )}
+                  </Button>
+                </Form.Group>
+              </Col>
+            </Row>
+          </div>
 
-      {/* Order Status Cards */}
-      <Row className="mb-4">
-        <Col xs={12} sm={6} lg={3} className="mb-3">
-          <Card className="h-100 text-center border-warning">
-            <Card.Body>
-              <h5 className="text-warning">Pending Orders</h5>
-              <h2>{stats.pendingOrders}</h2>
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col xs={12} sm={6} lg={3} className="mb-3">
-          <Card className="h-100 text-center border-success">
-            <Card.Body>
-              <h5 className="text-success">Completed Orders</h5>
-              <h2>{stats.completedOrders}</h2>
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col xs={12} sm={6} lg={3} className="mb-3">
-          <Card className="h-100 text-center border-danger">
-            <Card.Body>
-              <h5 className="text-danger">Cancelled Orders</h5>
-              <h2>{stats.cancelledOrders}</h2>
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col xs={12} sm={6} lg={3} className="mb-3">
-          <Card className="h-100 text-center border-info">
-            <Card.Body>
-              <h5 className="text-info">New Customers</h5>
-              <h2>{stats.newCustomers}</h2>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
+          <hr className="my-4" />
+
+          {/* Export Section */}
+          <div>
+            <h6 className="text-muted mb-3">Export Options</h6>
+            <Row className="g-3">
+              <Col xs={12} lg={5}>
+                <div className="p-3 bg-light rounded">
+                  <p className="small fw-semibold mb-2">Export Format</p>
+                  <div className="btn-group w-100" role="group" aria-label="Export format">
+                    <input 
+                      type="radio" 
+                      className="btn-check" 
+                      name="exportFormat" 
+                      id="exportExcel" 
+                      value="excel"
+                      checked={exportFormat === 'excel'}
+                      onChange={(e) => setExportFormat(e.target.value)}
+                    />
+                    <label className="btn btn-outline-primary" htmlFor="exportExcel">
+                      <i className="bi bi-file-earmark-excel me-2"></i>
+                      Excel
+                    </label>
+                    <input 
+                      type="radio" 
+                      className="btn-check" 
+                      name="exportFormat" 
+                      id="exportCSV" 
+                      value="csv"
+                      checked={exportFormat === 'csv'}
+                      onChange={(e) => setExportFormat(e.target.value)}
+                    />
+                    <label className="btn btn-outline-primary" htmlFor="exportCSV">
+                      <i className="bi bi-filetype-csv me-2"></i>
+                      CSV
+                    </label>
+                    <input 
+                      type="radio" 
+                      className="btn-check" 
+                      name="exportFormat" 
+                      id="exportPDF" 
+                      value="pdf"
+                      checked={exportFormat === 'pdf'}
+                      onChange={(e) => setExportFormat(e.target.value)}
+                    />
+                    <label className="btn btn-outline-primary" htmlFor="exportPDF">
+                      <i className="bi bi-file-earmark-pdf me-2"></i>
+                      PDF
+                    </label>
+                  </div>
+                </div>
+              </Col>
+              <Col xs={12} lg={7}>
+                <div className="p-3 bg-light rounded">
+                  <p className="small fw-semibold mb-2">Export Data</p>
+                  <div className="d-flex gap-2 flex-wrap">
+                    <Button 
+                      variant="primary" 
+                      onClick={() => exportData('stats')}
+                      className="flex-fill d-flex align-items-center justify-content-center"
+                      style={{ minWidth: '120px' }}
+                    >
+                      <i className="bi bi-graph-up-arrow me-2"></i>
+                      <span>Export Stats</span>
+                    </Button>
+                    <Button 
+                      variant="success" 
+                      onClick={() => exportData('orders')}
+                      className="flex-fill d-flex align-items-center justify-content-center"
+                      style={{ minWidth: '120px' }}
+                    >
+                      <i className="bi bi-receipt-cutoff me-2"></i>
+                      <span>Export Orders</span>
+                    </Button>
+                    {userData.role === 'superadmin' && (
+                      <Button 
+                        variant="info" 
+                        onClick={() => exportData('customers')}
+                        className="flex-fill d-flex align-items-center justify-content-center text-white"
+                        style={{ minWidth: '140px' }}
+                      >
+                        <i className="bi bi-people-fill me-2"></i>
+                        <span>Export Customers</span>
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-muted small mb-0 mt-2">
+                    <i className="bi bi-info-circle me-1"></i>
+                    Export data for the selected date range in {exportFormat.toUpperCase()} format
+                  </p>
+                </div>
+              </Col>
+            </Row>
+          </div>
+        </Card.Body>
+      </Card>
+
+      {/* Summary Stats Cards */}
+      <div className="mb-4">
+        <h4 className="mb-3">Overview</h4>
+        <Row className="g-3">
+          <Col xs={12} sm={6} lg={3}>
+            <Card className="ada-stats-card ada-stats-primary h-100">
+              <Card.Body>
+                <Row className="align-items-center">
+                  <Col>
+                    <p className="ada-stats-title text-muted mb-1">Total Orders</p>
+                    <h2 className="ada-stats-value">{stats.totalOrders.toLocaleString()}</h2>
+                    <p className="ada-stats-change text-success mb-0">
+                      <i className="bi bi-graph-up-arrow me-1"></i>
+                      +12% from last month
+                    </p>
+                  </Col>
+                  <Col xs="auto">
+                    <div className="ada-stats-icon">
+                      <i className="bi bi-cart-check-fill" style={{fontSize: '2.5rem'}}></i>
+                    </div>
+                  </Col>
+                </Row>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col xs={12} sm={6} lg={3}>
+            <Card className="ada-stats-card ada-stats-success h-100">
+              <Card.Body>
+                <Row className="align-items-center">
+                  <Col>
+                    <p className="ada-stats-title text-muted mb-1">Total Revenue</p>
+                    <h2 className="ada-stats-value">₵{stats.totalRevenue.toLocaleString()}</h2>
+                    <p className="ada-stats-change text-success mb-0">
+                      <i className="bi bi-graph-up-arrow me-1"></i>
+                      +8% from last month
+                    </p>
+                  </Col>
+                  <Col xs="auto">
+                    <div className="ada-stats-icon">
+                      <i className="bi bi-currency-exchange" style={{fontSize: '2.5rem'}}></i>
+                    </div>
+                  </Col>
+                </Row>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col xs={12} sm={6} lg={3}>
+            <Card className="ada-stats-card ada-stats-info h-100">
+              <Card.Body>
+                <Row className="align-items-center">
+                  <Col>
+                    <p className="ada-stats-title text-muted mb-1">Today's Revenue</p>
+                    <h2 className="ada-stats-value">₵{stats.todayRevenue.toLocaleString()}</h2>
+                    <p className="ada-stats-change text-info mb-0">
+                      <i className="bi bi-clock-history me-1"></i>
+                      Last 24 hours
+                    </p>
+                  </Col>
+                  <Col xs="auto">
+                    <div className="ada-stats-icon">
+                      <i className="bi bi-calendar-check" style={{fontSize: '2.5rem'}}></i>
+                    </div>
+                  </Col>
+                </Row>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col xs={12} sm={6} lg={3}>
+            <Card className="ada-stats-card ada-stats-warning h-100">
+              <Card.Body>
+                <Row className="align-items-center">
+                  <Col>
+                    <p className="ada-stats-title text-muted mb-1">Total Customers</p>
+                    <h2 className="ada-stats-value">{stats.totalCustomers.toLocaleString()}</h2>
+                    <p className="ada-stats-change text-success mb-0">
+                      <i className="bi bi-person-plus-fill me-1"></i>
+                      +{stats.newCustomers} new
+                    </p>
+                  </Col>
+                  <Col xs="auto">
+                    <div className="ada-stats-icon">
+                      <i className="bi bi-people-fill" style={{fontSize: '2.5rem'}}></i>
+                    </div>
+                  </Col>
+                </Row>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+      </div>
+
+      {/* Order Status Section */}
+      <div className="mb-4">
+        <h4 className="mb-3">Order Status</h4>
+        <Row className="g-3">
+          <Col xs={12} sm={6} lg={3}>
+            <Card className="ada-stats-card ada-stats-warning h-100">
+              <Card.Body>
+                <div className="d-flex align-items-center justify-content-between">
+                  <div>
+                    <p className="ada-stats-title text-muted mb-1">Pending Orders</p>
+                    <h3 className="ada-stats-value mb-0">{stats.pendingOrders}</h3>
+                  </div>
+                  <div className="ada-stats-icon text-warning">
+                    <i className="bi bi-hourglass-split" style={{fontSize: '2rem'}}></i>
+                  </div>
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col xs={12} sm={6} lg={3}>
+            <Card className="ada-stats-card ada-stats-success h-100">
+              <Card.Body>
+                <div className="d-flex align-items-center justify-content-between">
+                  <div>
+                    <p className="ada-stats-title text-muted mb-1">Completed Orders</p>
+                    <h3 className="ada-stats-value mb-0">{stats.completedOrders}</h3>
+                  </div>
+                  <div className="ada-stats-icon text-success">
+                    <i className="bi bi-check-circle-fill" style={{fontSize: '2rem'}}></i>
+                  </div>
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col xs={12} sm={6} lg={3}>
+            <Card className="ada-stats-card ada-stats-danger h-100">
+              <Card.Body>
+                <div className="d-flex align-items-center justify-content-between">
+                  <div>
+                    <p className="ada-stats-title text-muted mb-1">Cancelled Orders</p>
+                    <h3 className="ada-stats-value mb-0">{stats.cancelledOrders}</h3>
+                  </div>
+                  <div className="ada-stats-icon text-danger">
+                    <i className="bi bi-x-circle-fill" style={{fontSize: '2rem'}}></i>
+                  </div>
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col xs={12} sm={6} lg={3}>
+            <Card className="ada-stats-card ada-stats-info h-100">
+              <Card.Body>
+                <div className="d-flex align-items-center justify-content-between">
+                  <div>
+                    <p className="ada-stats-title text-muted mb-1">Processing</p>
+                    <h3 className="ada-stats-value mb-0">
+                      {stats.totalOrders - stats.completedOrders - stats.cancelledOrders - stats.pendingOrders}
+                    </h3>
+                  </div>
+                  <div className="ada-stats-icon text-info">
+                    <i className="bi bi-arrow-repeat" style={{fontSize: '2rem'}}></i>
+                  </div>
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+      </div>
 
       {/* Charts */}
       <Row className="mb-4">
@@ -500,7 +802,7 @@ const StatsPage = () => {
                     <tr key={index}>
                       <td>{product.name}</td>
                       <td>{product.quantity}</td>
-                      <td>₦{product.revenue.toLocaleString()}</td>
+                      <td>₵{product.revenue.toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -533,7 +835,7 @@ const StatsPage = () => {
                     <tr key={order.id}>
                       <td>#{order.id}</td>
                       <td>{order.customer_name || 'Guest'}</td>
-                      <td>₦{order.total.toLocaleString()}</td>
+                      <td>₵{order.total.toLocaleString()}</td>
                       <td>
                         <Badge bg={
                           order.status === 'completed' ? 'success' :
@@ -574,7 +876,7 @@ const StatsPage = () => {
                       <tr key={method}>
                         <td>{method}</td>
                         <td>{data.count}</td>
-                        <td>₦{data.total?.toLocaleString() || 0}</td>
+                        <td>₵{data.total?.toLocaleString() || 0}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -597,7 +899,7 @@ const StatsPage = () => {
                     <tr>
                       <td>Average Order Value</td>
                       <td className="text-end">
-                        ₦{(stats.totalRevenue / (stats.totalOrders || 1)).toFixed(2)}
+                        ₵{(stats.totalRevenue / (stats.totalOrders || 1)).toFixed(2)}
                       </td>
                     </tr>
                     <tr>
@@ -608,7 +910,7 @@ const StatsPage = () => {
                     </tr>
                     <tr>
                       <td>Monthly Revenue</td>
-                      <td className="text-end">₦{stats.monthlyRevenue?.toLocaleString() || 0}</td>
+                      <td className="text-end">₵{stats.monthlyRevenue?.toLocaleString() || 0}</td>
                     </tr>
                     <tr>
                       <td>Active Delivery Riders</td>
@@ -622,25 +924,6 @@ const StatsPage = () => {
         </Row>
       )}
 
-      {/* Export Actions */}
-      <Row className="mb-4">
-        <Col className="text-center">
-          <Button variant="primary" size="lg" className="me-2" onClick={() => exportData('stats')}>
-            <i className="bi bi-bar-chart me-2"></i>
-            Export Statistics
-          </Button>
-          <Button variant="success" size="lg" className="me-2" onClick={() => exportData('orders')}>
-            <i className="bi bi-cart me-2"></i>
-            Export Orders
-          </Button>
-          {userData.role === 'superadmin' && (
-            <Button variant="info" size="lg" onClick={() => exportData('customers')}>
-              <i className="bi bi-people me-2"></i>
-              Export Customers
-            </Button>
-          )}
-        </Col>
-      </Row>
     </Container>
   );
 };
