@@ -1446,7 +1446,10 @@ const handleAddItem = useCallback((itemId) => {
                       top: '100%', 
                       maxHeight: '200px', 
                       overflowY: 'auto',
-                      border: '1px solid #dee2e6'
+                      overflowX: 'hidden',
+                      border: '1px solid #dee2e6',
+                      scrollBehavior: 'smooth',
+                      WebkitOverflowScrolling: 'touch'
                     }}
                   >
                     {/* Show delivery locations first */}
