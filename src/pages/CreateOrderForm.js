@@ -604,12 +604,16 @@ const handleAddItem = useCallback((itemId) => {
       }
     }
 
+    // Check if we have at least one main item OR at least one extra
     const currentOrderItems = Object.entries(selectedItems)
       .filter(([, quantity]) => quantity > 0)
       .map(([itemId, quantity]) => ({ menu_item_id: itemId, quantity }));
+    
+    const currentExtras = Object.entries(selectedExtras)
+      .filter(([, quantity]) => quantity > 0);
 
-    if (currentOrderItems.length === 0) {
-      formErrors.items = 'At least one item must be added to the order';
+    if (currentOrderItems.length === 0 && currentExtras.length === 0) {
+      formErrors.items = 'At least one item or extra must be added to the order';
     }
     setErrors(formErrors);
     return Object.keys(formErrors).length === 0;
@@ -654,10 +658,12 @@ const handleAddItem = useCallback((itemId) => {
 
   // Separate validation function for order submission
   const validateOrderSubmission = () => {
-    // Validate items
+    // Validate items - allow orders with only extras
     const validItems = Object.entries(selectedItems).filter(([, quantity]) => quantity > 0);
-    if (validItems.length === 0) {
-      return { isValid: false, error: 'At least one item must be added to the order' };
+    const validExtras = Object.entries(selectedExtras).filter(([, quantity]) => quantity > 0);
+    
+    if (validItems.length === 0 && validExtras.length === 0) {
+      return { isValid: false, error: 'At least one item or extra must be added to the order' };
     }
     
     // Validate delivery orders

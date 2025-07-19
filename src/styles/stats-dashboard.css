@@ -165,6 +165,28 @@
   .ada-stats-icon i {
     font-size: 2rem !important;
   }
+  
+  /* Mobile-specific payment methods styling */
+  .mobile-payment-card {
+    margin-bottom: 1rem;
+    min-height: 120px;
+  }
+  
+  .mobile-payment-title {
+    font-size: 0.8rem !important;
+    margin-bottom: 0.5rem;
+  }
+  
+  .mobile-payment-value {
+    font-size: 1.2rem !important;
+    font-weight: 700;
+    margin-bottom: 0.3rem;
+  }
+  
+  .mobile-payment-count {
+    font-size: 0.75rem;
+    color: #6c757d;
+  }
 }
 
 /* Loading States */
@@ -243,5 +265,48 @@
   
   .export-btn-group .btn {
     width: 100%;
+  }
+  
+  /* Small mobile specific styles */
+  .ada-stats-value {
+    font-size: 1.2rem !important;
+  }
+  
+  .ada-stats-title {
+    font-size: 0.7rem !important;
+  }
+  
+  .ada-stats-change {
+    font-size: 0.7rem !important;
+  }
+  
+  /* Payment methods specific for small screens */
+  .payment-methods-mobile {
+    display: block !important;
+  }
+  
+  .payment-method-card-mobile {
+    padding: 0.8rem !important;
+    margin-bottom: 0.8rem;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  }
+  
+  .payment-card-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  
+  .payment-info {
+    flex: 1;
+  }
+  
+  .payment-icon-mobile {
+    font-size: 1.5rem;
+    margin-left: 0.5rem;
+    opacity: 0.6;
   }
 }

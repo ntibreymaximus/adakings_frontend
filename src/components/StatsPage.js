@@ -64,6 +64,15 @@ const StatsPage = () => {
     ordersPercentageChange: 0,
     revenuePercentageChange: 0,
   });
+
+  // Add state for transactions to calculate refunds properly
+  const [transactions, setTransactions] = useState([]);
+  const [refundStats, setRefundStats] = useState({
+    pendingRefunds: 0,
+    pendingRefundsCount: 0,
+    completedRefunds: 0,
+    completedRefundsCount: 0
+  });
   const today = new Date().toISOString().split('T')[0];
   const [dateRange, setDateRange] = useState({
     startDate: today,
@@ -74,6 +83,17 @@ const StatsPage = () => {
   const [selectedRange, setSelectedRange] = useState('today');
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [selectedExportSections, setSelectedExportSections] = useState({
+    summaryStats: true,
+    orderStatus: true,
+    paymentMethods: true,
+    refundStats: true,
+    deliveryStats: true,
+    topProducts: true,
+    recentOrders: true,
+    systemStats: true,
+    hourlyOrders: true
+  });
 
   useEffect(() => {
     if (!userData || (userData.role !== 'admin' && userData.role !== 'superadmin')) {
@@ -82,6 +102,7 @@ const StatsPage = () => {
       return;
     }
     fetchStats();
+    fetchTransactions();
   }, [userData, navigate, dateRange]);
 
   const fetchStats = async () => {
@@ -114,56 +135,301 @@ const StatsPage = () => {
     }
   };
 
+  // Fetch transactions to calculate refunds properly
+  const fetchTransactions = async () => {
+    try {
+      const isValid = await checkTokenValidity();
+      if (!isValid) return;
+
+      const token = localStorage.getItem('token');
+      const response = await fetch(
+        `${API_BASE_URL}/payments/transaction-table/`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch transactions');
+      }
+
+      const data = await response.json();
+      let transactionsArray = [];
+      if (Array.isArray(data)) {
+        transactionsArray = data;
+      } else if (data.transactions && Array.isArray(data.transactions)) {
+        transactionsArray = data.transactions;
+      } else if (data.data && Array.isArray(data.data)) {
+        transactionsArray = data.data;
+      } else if (data.results && Array.isArray(data.results)) {
+        transactionsArray = data.results;
+      }
+      
+      setTransactions(transactionsArray);
+      calculateRefundsFromTransactions(transactionsArray);
+    } catch (error) {
+      console.warn('Failed to fetch transactions for refund calculation:', error);
+      // Don't show error toast for this as it's supplementary data
+    }
+  };
+
+  // Calculate refunds using the same logic as ViewTransactionsPage
+  const calculateRefundsFromTransactions = (transactionsArray) => {
+    let pendingRefunds = 0;
+    let completedRefunds = 0;
+    let pendingRefundsCount = 0;
+    let completedRefundsCount = 0;
+
+    // Filter transactions for the current date range
+    const filteredTransactions = transactionsArray.filter(transaction => {
+      const transactionDate = new Date(transaction.created_at || transaction.date).toISOString().split('T')[0];
+      return transactionDate >= dateRange.startDate && transactionDate <= dateRange.endDate;
+    });
+
+    filteredTransactions.forEach(transaction => {
+      const amount = parseFloat(transaction.amount) || 0;
+      const status = transaction.status?.toLowerCase();
+      const orderTotal = parseFloat(transaction.order_total) || 0;
+      
+      // Check if this is an explicit refund transaction
+      const isExplicitRefund = transaction.payment_type === 'Refund' || 
+                             transaction.payment_type === 'refund' || 
+                             (transaction.payment_type && transaction.payment_type.toLowerCase() === 'refund') ||
+                             amount < 0;
+      
+      if (isExplicitRefund) {
+        // Explicit refund transactions
+        completedRefunds += Math.abs(amount);
+        completedRefundsCount += 1;
+      } else if (status === 'overpaid' && orderTotal > 0) {
+        // Overpaid orders - calculate pending refund as difference between amount paid and order total
+        const overpaidAmount = amount - orderTotal;
+        if (overpaidAmount > 0) {
+          pendingRefunds += overpaidAmount;
+          pendingRefundsCount += 1;
+        }
+      }
+    });
+
+    setRefundStats({
+      pendingRefunds,
+      pendingRefundsCount,
+      completedRefunds,
+      completedRefundsCount
+    });
+  };
+
   const exportData = async (type) => {
     try {
       const isValid = await checkTokenValidity();
       if (!isValid) return;
 
       const token = localStorage.getItem('token');
-      let endpoint = '';
       
-      switch (type) {
-        case 'orders':
-          endpoint = `/orders/export/?format=${exportFormat}&start_date=${dateRange.startDate}&end_date=${dateRange.endDate}`;
-          break;
-        case 'stats':
-          endpoint = `/stats/export/?format=${exportFormat}&start_date=${dateRange.startDate}&end_date=${dateRange.endDate}`;
-          break;
-        case 'customers':
-          endpoint = `/customers/export/?format=${exportFormat}`;
-          break;
-        default:
-          return;
-      }
-
       if (exportFormat === 'pdf') {
         generatePDF(type);
         return;
       }
 
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      // Try server-side export first
+      try {
+        let endpoint = '';
+        
+        switch (type) {
+          case 'orders':
+            endpoint = `/orders/export/?format=${exportFormat}&start_date=${dateRange.startDate}&end_date=${dateRange.endDate}`;
+            break;
+          case 'stats':
+            endpoint = `/stats/export/?format=${exportFormat}&start_date=${dateRange.startDate}&end_date=${dateRange.endDate}`;
+            break;
+          case 'customers':
+            endpoint = `/customers/export/?format=${exportFormat}`;
+            break;
+          default:
+            throw new Error('Invalid export type');
+        }
 
-      if (!response.ok) {
-        throw new Error('Export failed');
+        const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const blob = await response.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${type}_${new Date().toISOString().split('T')[0]}.${exportFormat === 'excel' ? 'xlsx' : 'csv'}`;
+          document.body.appendChild(a);
+          a.click();
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+
+          optimizedToast.success(`${type} exported successfully`);
+          return;
+        }
+      } catch (serverError) {
+        console.warn('Server-side export failed, trying client-side export:', serverError);
       }
 
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${type}_${new Date().toISOString().split('T')[0]}.${exportFormat === 'excel' ? 'xlsx' : 'csv'}`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
-      optimizedToast.success(`${type} exported successfully`);
+      // Fallback to client-side export
+      generateClientSideExport(type);
     } catch (error) {
       optimizedToast.error(error.message || 'Export failed');
+    }
+  };
+
+const generateClientSideExport = (type) => {
+    try {
+      let data = [];
+      let filename = `${type}_${new Date().toISOString().split('T')[0]}`;
+      
+      switch (type) {
+        case 'stats':
+          // Start with header
+          data = [['Section', 'Metric', 'Value']];
+          
+          // Export current statistics based on selected sections
+          if (selectedExportSections.summaryStats) {
+            data.push(['Summary Statistics', 'Total Orders', stats.totalOrders.toString()]);
+            data.push(['Summary Statistics', 'Total Revenue', `GHS ${parseFloat(stats.totalRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`]);
+            data.push(['Summary Statistics', 'Today\'s Revenue', `GHS ${parseFloat(stats.todayRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`]);
+            data.push(['Summary Statistics', 'Monthly Revenue', `GHS ${parseFloat(stats.monthlyRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`]);
+            data.push(['Summary Statistics', 'Total Customers', stats.totalCustomers.toString()]);
+            data.push(['Summary Statistics', 'New Customers', stats.newCustomers.toString()]);
+            data.push(['', '', '']); // Separator
+          }
+
+          if (selectedExportSections.orderStatus) {
+            data.push(['Order Status', 'Pending Orders', stats.pendingOrders.toString()]);
+            data.push(['Order Status', 'Processing Orders', (stats.processingOrders || 0).toString()]);
+            data.push(['Order Status', 'Fulfilled Orders', (stats.fulfilledOrders || stats.completedOrders || 0).toString()]);
+            data.push(['Order Status', 'Cancelled Orders', stats.cancelledOrders.toString()]);
+            data.push(['', '', '']); // Separator
+          }
+
+          if (selectedExportSections.paymentMethods && stats.paymentMethods) {
+            Object.entries(stats.paymentMethods).forEach(([method, methodData]) => {
+              data.push(['Payment Methods', method, `GHS ${parseFloat(methodData.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${methodData.count || 0} transactions)`]);
+            });
+            data.push(['', '', '']); // Separator
+          }
+
+          if (selectedExportSections.refundStats) {
+            data.push(['Refund Statistics', 'Pending Refunds', `GHS ${parseFloat(refundStats.pendingRefunds || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${refundStats.pendingRefundsCount || 0} transactions)`]);
+            data.push(['Refund Statistics', 'Completed Refunds', `GHS ${parseFloat(refundStats.completedRefunds || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${refundStats.completedRefundsCount || 0} transactions)`]);
+            data.push(['', '', '']); // Separator
+          }
+
+          if (selectedExportSections.deliveryStats && stats.deliveryStats) {
+            data.push(['Delivery Statistics', 'Completed Pickups', (stats.deliveryStats.completedPickups || 0).toString()]);
+            data.push(['Delivery Statistics', 'Completed Deliveries', (stats.deliveryStats.completedDeliveries || 0).toString()]);
+            if (stats.deliveryStats.topDeliveryLocations?.length > 0) {
+              data.push(['Delivery Statistics', 'Top Delivery Location', `${stats.deliveryStats.topDeliveryLocations[0].location} (${stats.deliveryStats.topDeliveryLocations[0].orders} orders)`]);
+            }
+            data.push(['', '', '']); // Separator
+          }
+
+          if (selectedExportSections.topProducts && stats.topProducts && stats.topProducts.length > 0) {
+            // Add header for products section
+            data.push(['Top Products', 'Product Name', 'Quantity Sold | Revenue']);
+            stats.topProducts.forEach(product => {
+              data.push(['Top Products', product.name, `${product.quantity} | GHS ${parseFloat(product.revenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`]);
+            });
+            data.push(['', '', '']); // Separator
+          }
+
+          if (selectedExportSections.recentOrders && stats.recentOrders && stats.recentOrders.length > 0) {
+            // Add header for orders section
+            data.push(['Recent Orders', 'Order ID | Customer', 'Total | Status | Date']);
+            stats.recentOrders.slice(0, 10).forEach(order => {
+              data.push(['Recent Orders', `#${order.id} | ${order.customer_name || 'Guest'}`, `GHS ${parseFloat(order.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} | ${order.status} | ${new Date(order.created_at).toLocaleDateString()}`]);
+            });
+            data.push(['', '', '']); // Separator
+          }
+
+          if (selectedExportSections.hourlyOrders && stats.hourlyOrders && stats.hourlyOrders.length > 0) {
+            data.push(['Hourly Orders', 'Hour', 'Order Count']);
+            stats.hourlyOrders.forEach(hourData => {
+              data.push(['Hourly Orders', `${hourData.hour}:00`, hourData.count.toString()]);
+            });
+            data.push(['', '', '']); // Separator
+          }
+
+          if (selectedExportSections.systemStats && userData?.role === 'superadmin') {
+            data.push(['System Statistics', 'Average Order Value', `GHS ${(stats.totalRevenue / (stats.totalOrders || 1)).toFixed(2)}`]);
+            data.push(['System Statistics', 'Order Completion Rate', `${((stats.completedOrders / (stats.totalOrders || 1)) * 100).toFixed(1)}%`]);
+            data.push(['System Statistics', 'Active Delivery Riders', (stats.deliveryStats?.activeRiders || 0).toString()]);
+          }
+          break;
+          
+        case 'orders':
+          // Export recent orders
+          data = [
+            ['Order ID', 'Customer', 'Total', 'Status', 'Date']
+          ];
+          if (stats.recentOrders && stats.recentOrders.length > 0) {
+            stats.recentOrders.forEach(order => {
+              data.push([
+                `#${order.id}`,
+                order.customer_name || 'Guest',
+                order.total,
+                order.status,
+                new Date(order.created_at).toLocaleDateString()
+              ]);
+            });
+          }
+          break;
+          
+        case 'customers':
+          // Basic customer export
+          data = [
+            ['Customer Info', 'Value'],
+            ['Total Customers', stats.totalCustomers.toString()],
+            ['New Customers', stats.newCustomers.toString()]
+          ];
+          break;
+          
+        default:
+          throw new Error('Invalid export type');
+      }
+
+      if (exportFormat === 'excel') {
+        // Create Excel file using XLSX
+        const ws = XLSX.utils.aoa_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, type.charAt(0).toUpperCase() + type.slice(1));
+        XLSX.writeFile(wb, `${filename}.xlsx`);
+      } else {
+        // Create CSV file
+        const csvContent = data.map(row => 
+          row.map(field => {
+            // Handle fields containing commas or quotes
+            if (typeof field === 'string' && (field.includes(',') || field.includes('"') || field.includes('\n'))) {
+              return `"${field.replace(/"/g, '""')}"`;
+            }
+            return field;
+          }).join(',')
+        ).join('\n');
+        
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${filename}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }
+
+      optimizedToast.success(`${type} exported successfully (client-side)`);
+    } catch (error) {
+      optimizedToast.error(`Client-side export failed: ${error.message}`);
     }
   };
 
@@ -180,56 +446,149 @@ const StatsPage = () => {
     doc.text(`Generated on: ${new Date().toLocaleDateString()}`, pageWidth / 2, 40, { align: 'center' });
     doc.text(`Period: ${dateRange.startDate} to ${dateRange.endDate}`, pageWidth / 2, 48, { align: 'center' });
 
+    let currentY = 60;
+
     if (type === 'stats') {
-      // Summary stats
-      doc.setFontSize(14);
-      doc.text('Summary Statistics', 20, 65);
-      
-      const summaryData = [
-        ['Metric', 'Value'],
-        ['Total Orders', stats.totalOrders.toString()],
-        ['Total Revenue', `₵${stats.totalRevenue.toLocaleString()}`],
-        ['Pending Orders', stats.pendingOrders.toString()],
-        ['Processing Orders', (stats.processingOrders || 0).toString()],
-        ['Fulfilled Orders', (stats.fulfilledOrders || stats.completedOrders || 0).toString()],
-        ['Cancelled Orders', stats.cancelledOrders.toString()],
-        ['Total Customers', stats.totalCustomers.toString()],
-        ['New Customers', stats.newCustomers.toString()],
-      ];
+      // Build PDF content based on selected sections
+      const sections = [];
 
-      doc.autoTable({
-        head: [summaryData[0]],
-        body: summaryData.slice(1),
-        startY: 75,
-        theme: 'grid',
-        headStyles: { fillColor: [66, 139, 202] },
-      });
+      // Summary Statistics
+      if (selectedExportSections.summaryStats) {
+        const summaryData = [
+          ['Metric', 'Value'],
+          ['Total Orders', stats.totalOrders.toString()],
+          ['Total Revenue', `GHS ${parseFloat(stats.totalRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+          ['Today\'s Revenue', `GHS ${parseFloat(stats.todayRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+          ['Monthly Revenue', `GHS ${parseFloat(stats.monthlyRevenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+          ['Total Customers', stats.totalCustomers.toString()],
+          ['New Customers', stats.newCustomers.toString()],
+        ];
+        sections.push({ title: 'Summary Statistics', data: summaryData });
+      }
 
-      // Top products
-      if (stats.topProducts && stats.topProducts.length > 0) {
-        const topProductsY = doc.lastAutoTable.finalY + 20;
-        doc.setFontSize(14);
-        doc.text('Top Products', 20, topProductsY);
-        
+      // Order Status
+      if (selectedExportSections.orderStatus) {
+        const orderStatusData = [
+          ['Status', 'Count'],
+          ['Pending Orders', stats.pendingOrders.toString()],
+          ['Processing Orders', (stats.processingOrders || 0).toString()],
+          ['Fulfilled Orders', (stats.fulfilledOrders || stats.completedOrders || 0).toString()],
+          ['Cancelled Orders', stats.cancelledOrders.toString()],
+        ];
+        sections.push({ title: 'Order Status', data: orderStatusData });
+      }
+
+      // Payment Methods
+      if (selectedExportSections.paymentMethods && stats.paymentMethods) {
+        const paymentData = [
+          ['Method', 'Total', 'Transactions'],
+          ...Object.entries(stats.paymentMethods).map(([method, methodData]) => [
+            method,
+            `GHS ${parseFloat(methodData.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+            (methodData.count || 0).toString()
+          ])
+        ];
+        sections.push({ title: 'Payment Methods', data: paymentData });
+      }
+
+      // Refund Statistics
+      if (selectedExportSections.refundStats) {
+        const refundData = [
+          ['Type', 'Amount', 'Count'],
+          ['Pending Refunds', `GHS ${parseFloat(refundStats.pendingRefunds || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, refundStats.pendingRefundsCount.toString()],
+          ['Completed Refunds', `GHS ${parseFloat(refundStats.completedRefunds || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, refundStats.completedRefundsCount.toString()],
+        ];
+        sections.push({ title: 'Refund Statistics', data: refundData });
+      }
+
+      // Delivery Statistics
+      if (selectedExportSections.deliveryStats && stats.deliveryStats) {
+        const deliveryData = [
+          ['Metric', 'Value'],
+          ['Completed Pickups', (stats.deliveryStats.completedPickups || 0).toString()],
+          ['Completed Deliveries', (stats.deliveryStats.completedDeliveries || 0).toString()],
+        ];
+        if (stats.deliveryStats.topDeliveryLocations?.length > 0) {
+          deliveryData.push(['Top Delivery Location', `${stats.deliveryStats.topDeliveryLocations[0].location} (${stats.deliveryStats.topDeliveryLocations[0].orders} orders)`]);
+        }
+        sections.push({ title: 'Delivery Statistics', data: deliveryData });
+      }
+
+      // Top Products
+      if (selectedExportSections.topProducts && stats.topProducts && stats.topProducts.length > 0) {
         const productData = [
           ['Product', 'Quantity Sold', 'Revenue'],
           ...stats.topProducts.map(p => [
             p.name,
             p.quantity.toString(),
-            `₵${p.revenue.toLocaleString()}`
+            `GHS ${parseFloat(p.revenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
           ])
         ];
+        sections.push({ title: 'Top Products', data: productData });
+      }
 
+      // Recent Orders
+      if (selectedExportSections.recentOrders && stats.recentOrders && stats.recentOrders.length > 0) {
+        const ordersData = [
+          ['Order ID', 'Customer', 'Total', 'Status', 'Date'],
+          ...stats.recentOrders.slice(0, 10).map(order => [
+            `#${order.id}`,
+            order.customer_name || 'Guest',
+            `GHS ${parseFloat(order.total || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+            order.status,
+            new Date(order.created_at).toLocaleDateString()
+          ])
+        ];
+        sections.push({ title: 'Recent Orders (Last 10)', data: ordersData });
+      }
+
+      // Hourly Orders
+      if (selectedExportSections.hourlyOrders && stats.hourlyOrders && stats.hourlyOrders.length > 0) {
+        const hourlyData = [
+          ['Hour', 'Order Count'],
+          ...stats.hourlyOrders.map(hourData => [
+            `${hourData.hour}:00`,
+            hourData.count.toString()
+          ])
+        ];
+        sections.push({ title: 'Hourly Order Distribution', data: hourlyData });
+      }
+
+      // System Statistics
+      if (selectedExportSections.systemStats && userData?.role === 'superadmin') {
+        const systemData = [
+          ['Metric', 'Value'],
+          ['Average Order Value', `GHS ${(stats.totalRevenue / (stats.totalOrders || 1)).toFixed(2)}`],
+          ['Order Completion Rate', `${((stats.completedOrders / (stats.totalOrders || 1)) * 100).toFixed(1)}%`],
+          ['Active Delivery Riders', (stats.deliveryStats?.activeRiders || 0).toString()],
+        ];
+        sections.push({ title: 'System Statistics', data: systemData });
+      }
+
+      // Add sections to PDF
+      sections.forEach((section, index) => {
+        if (index > 0 && currentY > 200) {
+          doc.addPage();
+          currentY = 20;
+        }
+
+        doc.setFontSize(14);
+        doc.text(section.title, 20, currentY);
+        
         doc.autoTable({
-          head: [productData[0]],
-          body: productData.slice(1),
-          startY: topProductsY + 10,
+          head: [section.data[0]],
+          body: section.data.slice(1),
+          startY: currentY + 10,
           theme: 'grid',
           headStyles: { fillColor: [66, 139, 202] },
+          margin: { left: 20, right: 20 },
         });
-      }
+
+        currentY = doc.lastAutoTable.finalY + 15;
+      });
+
     } else if (type === 'orders') {
-      // Recent orders
+      // Recent orders (not affected by section selection)
       doc.setFontSize(14);
       doc.text('Recent Orders', 20, 65);
       
@@ -238,7 +597,7 @@ const StatsPage = () => {
         ...stats.recentOrders.map(order => [
           order.id.toString(),
           order.customer_name || 'Guest',
-          `₵${order.total.toLocaleString()}`,
+          `GHS ${order.total.toLocaleString()}`,
           order.status,
           new Date(order.created_at).toLocaleDateString()
         ])
@@ -635,9 +994,214 @@ const StatsPage = () => {
               PDF
             </label>
           </div>
-          <Button variant="success" onClick={() => exportData('stats')}>
-            Export Data
-          </Button>
+          
+          <h6 className="mb-3 mt-4">Select Sections to Export</h6>
+          
+          {/* Core Statistics Section */}
+          <div className="card border-light mb-3">
+            <div className="card-header bg-light py-2">
+              <small className="text-muted fw-semibold">CORE STATISTICS</small>
+            </div>
+            <div className="card-body py-3">
+              <div className="row g-2">
+                <div className="col-md-6">
+                  <div className="form-check">
+                    <input 
+                      className="form-check-input" 
+                      type="checkbox" 
+                      id="summaryStats" 
+                      checked={selectedExportSections.summaryStats}
+                      onChange={(e) => setSelectedExportSections({...selectedExportSections, summaryStats: e.target.checked})}
+                    />
+                    <label className="form-check-label" htmlFor="summaryStats">
+                      Summary Statistics
+                    </label>
+                    <br />
+                    <small className="text-muted">Orders, revenue, customers</small>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-check">
+                    <input 
+                      className="form-check-input" 
+                      type="checkbox" 
+                      id="orderStatus" 
+                      checked={selectedExportSections.orderStatus}
+                      onChange={(e) => setSelectedExportSections({...selectedExportSections, orderStatus: e.target.checked})}
+                    />
+                    <label className="form-check-label" htmlFor="orderStatus">
+                      Order Status Breakdown
+                    </label>
+                    <br />
+                    <small className="text-muted">Pending, completed, cancelled</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Financial & Operations Section */}
+          <div className="card border-light mb-3">
+            <div className="card-header bg-light py-2">
+              <small className="text-muted fw-semibold">FINANCIAL & OPERATIONS</small>
+            </div>
+            <div className="card-body py-3">
+              <div className="row g-2">
+                <div className="col-md-6">
+                  <div className="form-check">
+                    <input 
+                      className="form-check-input" 
+                      type="checkbox" 
+                      id="paymentMethods" 
+                      checked={selectedExportSections.paymentMethods}
+                      onChange={(e) => setSelectedExportSections({...selectedExportSections, paymentMethods: e.target.checked})}
+                    />
+                    <label className="form-check-label" htmlFor="paymentMethods">
+                      Payment Methods
+                    </label>
+                    <br />
+                    <small className="text-muted">Cash, mobile money, card</small>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-check">
+                    <input 
+                      className="form-check-input" 
+                      type="checkbox" 
+                      id="refundStats" 
+                      checked={selectedExportSections.refundStats}
+                      onChange={(e) => setSelectedExportSections({...selectedExportSections, refundStats: e.target.checked})}
+                    />
+                    <label className="form-check-label" htmlFor="refundStats">
+                      Refund Statistics
+                    </label>
+                    <br />
+                    <small className="text-muted">Pending and completed refunds</small>
+                  </div>
+                </div>
+                <div className="col-md-6 mt-3">
+                  <div className="form-check">
+                    <input 
+                      className="form-check-input" 
+                      type="checkbox" 
+                      id="deliveryStats" 
+                      checked={selectedExportSections.deliveryStats}
+                      onChange={(e) => setSelectedExportSections({...selectedExportSections, deliveryStats: e.target.checked})}
+                    />
+                    <label className="form-check-label" htmlFor="deliveryStats">
+                      Delivery & Pickup Stats
+                    </label>
+                    <br />
+                    <small className="text-muted">Distribution by delivery method</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Product & Order Details Section */}
+          <div className="card border-light mb-3">
+            <div className="card-header bg-light py-2">
+              <small className="text-muted fw-semibold">PRODUCT & ORDER DETAILS</small>
+            </div>
+            <div className="card-body py-3">
+              <div className="row g-2">
+                <div className="col-md-6">
+                  <div className="form-check">
+                    <input 
+                      className="form-check-input" 
+                      type="checkbox" 
+                      id="topProducts" 
+                      checked={selectedExportSections.topProducts}
+                      onChange={(e) => setSelectedExportSections({...selectedExportSections, topProducts: e.target.checked})}
+                    />
+                    <label className="form-check-label" htmlFor="topProducts">
+                      Top Products
+                    </label>
+                    <br />
+                    <small className="text-muted">Best selling items</small>
+                  </div>
+                </div>
+                <div className="col-md-6">
+                  <div className="form-check">
+                    <input 
+                      className="form-check-input" 
+                      type="checkbox" 
+                      id="recentOrders" 
+                      checked={selectedExportSections.recentOrders}
+                      onChange={(e) => setSelectedExportSections({...selectedExportSections, recentOrders: e.target.checked})}
+                    />
+                    <label className="form-check-label" htmlFor="recentOrders">
+                      Recent Orders
+                    </label>
+                    <br />
+                    <small className="text-muted">Last 10 orders with details</small>
+                  </div>
+                </div>
+                <div className="col-md-6 mt-3">
+                  <div className="form-check">
+                    <input 
+                      className="form-check-input" 
+                      type="checkbox" 
+                      id="hourlyOrders" 
+                      checked={selectedExportSections.hourlyOrders}
+                      onChange={(e) => setSelectedExportSections({...selectedExportSections, hourlyOrders: e.target.checked})}
+                    />
+                    <label className="form-check-label" htmlFor="hourlyOrders">
+                      Hourly Distribution
+                    </label>
+                    <br />
+                    <small className="text-muted">Orders by time of day</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* System Statistics Section (Superadmin Only) */}
+          {userData?.role === 'superadmin' && (
+            <div className="card border-warning mb-3">
+              <div className="card-header bg-warning bg-opacity-10 py-2">
+                <small className="text-warning fw-semibold">SYSTEM STATISTICS (SUPERADMIN)</small>
+              </div>
+              <div className="card-body py-3">
+                <div className="form-check">
+                  <input 
+                    className="form-check-input" 
+                    type="checkbox" 
+                    id="systemStats" 
+                    checked={selectedExportSections.systemStats}
+                    onChange={(e) => setSelectedExportSections({...selectedExportSections, systemStats: e.target.checked})}
+                  />
+                  <label className="form-check-label" htmlFor="systemStats">
+                    System Statistics
+                  </label>
+                  <br />
+                  <small className="text-muted">Server performance and usage metrics</small>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <div className="d-flex gap-2 mt-4">
+            <Button 
+              variant="outline-secondary" 
+              onClick={() => {
+                const allSelected = Object.values(selectedExportSections).every(val => val === true);
+                const newState = {};
+                Object.keys(selectedExportSections).forEach(key => {
+                  newState[key] = !allSelected;
+                });
+                setSelectedExportSections(newState);
+              }}
+              size="sm"
+            >
+              {Object.values(selectedExportSections).every(val => val === true) ? 'Deselect All' : 'Select All'}
+            </Button>
+            <Button variant="success" onClick={() => exportData('stats')} disabled={!Object.values(selectedExportSections).some(val => val === true)}>
+              Export Selected Data
+            </Button>
+          </div>
         </Modal.Body>
       </Modal>
 
@@ -841,73 +1405,97 @@ const StatsPage = () => {
       <div className="mb-4">
         <h4 className="mb-3">Payment Methods</h4>
         <Row className="g-3">
-          {Object.entries(stats.paymentMethods || {}).map(([method, data], index) => {
-            // Special handling for refunds
-            const isRefund = method.includes('REFUNDS');
-            const isPendingRefund = method === 'PENDING_REFUNDS';
-            const isCompletedRefund = method === 'COMPLETED_REFUNDS';
+          {(() => {
+            // Use the calculated refund stats from transaction data
+            const paymentMethodsWithRefunds = { ...stats.paymentMethods };
             
-            // Get display name
-            let displayName = method;
-            if (isPendingRefund) {
-              displayName = 'Pending Refunds';
-            } else if (isCompletedRefund) {
-              displayName = 'Completed Refunds';
+            // Add calculated refund entries using the actual refund stats
+            // Only show cards if there are refunds to display
+            if (refundStats.pendingRefunds > 0 || refundStats.pendingRefundsCount > 0) {
+              paymentMethodsWithRefunds['PENDING_REFUNDS'] = {
+                total: refundStats.pendingRefunds,
+                count: refundStats.pendingRefundsCount
+              };
             }
             
-            // Get appropriate colors and icons
-            let colorClass, icon, textColor;
-            if (isPendingRefund) {
-              colorClass = 'ada-stats-warning';
-              icon = 'bi bi-arrow-counterclockwise';
-              textColor = 'text-warning';
-            } else if (isCompletedRefund) {
-              colorClass = 'ada-stats-success';
-              icon = 'bi bi-check-circle-fill';
-              textColor = 'text-success';
-            } else {
-              // Regular payment methods
-              const colorClasses = [
-                'ada-stats-primary',
-                'ada-stats-success', 
-                'ada-stats-info',
-                'ada-stats-warning',
-                'ada-stats-danger'
-              ];
-              const icons = [
-                'bi bi-credit-card-fill',
-                'bi bi-cash-coin',
-                'bi bi-phone-fill',
-                'bi bi-wallet2',
-                'bi bi-bank'
-              ];
-              colorClass = colorClasses[index % colorClasses.length];
-              icon = icons[index % icons.length];
-              textColor = 'text-success';
+            if (refundStats.completedRefunds > 0 || refundStats.completedRefundsCount > 0) {
+              paymentMethodsWithRefunds['COMPLETED_REFUNDS'] = {
+                total: refundStats.completedRefunds,
+                count: refundStats.completedRefundsCount
+              };
             }
             
-            return (
-              <Col xs={12} sm={6} lg={3} key={method}>
-                <Card className={`ada-stats-card ${colorClass} h-100`}>
-                  <Card.Body>
-                    <div className="d-flex align-items-center justify-content-between">
-                      <div>
-                        <p className="ada-stats-title text-muted mb-1">{displayName}</p>
-                        <h3 className="ada-stats-value mb-0">₵{(data.total || 0).toLocaleString()}</h3>
-                        <p className={`ada-stats-change ${textColor} mb-0`}>
-                          <i className="bi bi-hash me-1"></i>
-                          {data.count || 0} transactions
-                        </p>
+            const paymentMethodsData = paymentMethodsWithRefunds;
+            
+            return Object.entries(paymentMethodsData || {}).map(([method, data], index) => {
+              // Special handling for refunds
+              const isRefund = method.includes('REFUNDS');
+              const isPendingRefund = method === 'PENDING_REFUNDS';
+              const isCompletedRefund = method === 'COMPLETED_REFUNDS';
+              
+              // Get display name
+              let displayName = method;
+              if (isPendingRefund) {
+                displayName = 'Pending Refunds';
+              } else if (isCompletedRefund) {
+                displayName = 'Completed Refunds';
+              }
+              
+              // Get appropriate colors and icons
+              let colorClass, icon, textColor;
+              if (isPendingRefund) {
+                colorClass = 'ada-stats-warning';
+                icon = 'bi bi-arrow-counterclockwise';
+                textColor = 'text-warning';
+              } else if (isCompletedRefund) {
+                colorClass = 'ada-stats-success';
+                icon = 'bi bi-check-circle-fill';
+                textColor = 'text-success';
+              } else {
+                // Regular payment methods
+                const colorClasses = [
+                  'ada-stats-primary',
+                  'ada-stats-success', 
+                  'ada-stats-info',
+                  'ada-stats-warning',
+                  'ada-stats-danger'
+                ];
+                const icons = [
+                  'bi bi-credit-card-fill',
+                  'bi bi-cash-coin',
+                  'bi bi-phone-fill',
+                  'bi bi-wallet2',
+                  'bi bi-bank'
+                ];
+                colorClass = colorClasses[index % colorClasses.length];
+                icon = icons[index % icons.length];
+                textColor = 'text-success';
+              }
+              
+              return (
+                <Col xs={12} sm={6} lg={3} key={method}>
+                  <Card className={`ada-stats-card ${colorClass} h-100`}>
+                    <Card.Body>
+                      <div className="d-flex align-items-center justify-content-between">
+                        <div>
+                          <p className="ada-stats-title text-muted mb-1">{displayName}</p>
+                          <h3 className="ada-stats-value mb-0">₵{(data.total || 0).toLocaleString()}</h3>
+                          <p className={`ada-stats-change ${textColor} mb-0`}>
+                            <i className="bi bi-hash me-1"></i>
+                            {data.count || 0} transactions
+                          </p>
+                        </div>
+                        <div className="ada-stats-icon">
+                          <i className={icon} style={{fontSize: '2rem'}}></i>
+                        </div>
                       </div>
-                      <div className="ada-stats-icon">
-                        <i className={icon} style={{fontSize: '2rem'}}></i>
-                      </div>
-                    </div>
-                  </Card.Body>
-                </Card>
-              </Col>
-            );
-          })}
+                    </Card.Body>
+                  </Card>
+                </Col>
+              );
+            });
+          })()
+          }
         </Row>
       </div>
 
@@ -950,16 +1538,13 @@ const StatsPage = () => {
               <Card className="ada-stats-card ada-stats-info h-100">
                 <Card.Body>
                   <div className="d-flex align-items-center justify-content-between">
-                    <div>
+                    <div className="w-100">
                       <p className="ada-stats-title text-muted mb-1">Top Delivery Location</p>
-                      <h3 className="ada-stats-value mb-0">{stats.deliveryStats.topDeliveryLocations[0].location}</h3>
+                      <h3 className="ada-stats-value mb-0" style={{fontSize: '1.4rem'}}>{stats.deliveryStats.topDeliveryLocations[0].location}</h3>
                       <p className="ada-stats-change text-success mb-0">
                         <i className="bi bi-box-seam me-1"></i>
                         {stats.deliveryStats.topDeliveryLocations[0].orders.toLocaleString()} orders
                       </p>
-                    </div>
-                    <div className="ada-stats-icon text-info">
-                      <i className="bi bi-geo-alt-fill" style={{fontSize: '2rem'}}></i>
                     </div>
                   </div>
                 </Card.Body>
@@ -968,12 +1553,9 @@ const StatsPage = () => {
               <Card className="ada-stats-card ada-stats-secondary h-100">
                 <Card.Body>
                   <div className="d-flex align-items-center justify-content-between">
-                    <div>
+                    <div className="w-100">
                       <p className="ada-stats-title text-muted mb-1">Top Delivery Location</p>
                       <h3 className="ada-stats-value mb-0">No Data</h3>
-                    </div>
-                    <div className="ada-stats-icon text-muted">
-                      <i className="bi bi-geo-alt-fill" style={{fontSize: '2rem'}}></i>
                     </div>
                   </div>
                 </Card.Body>
