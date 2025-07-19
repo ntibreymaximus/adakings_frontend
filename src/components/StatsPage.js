@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Table, Button, Form, Spinner, Badge } from 'react-bootstrap';
+import { Container, Row, Col, Card, Table, Button, Form, Spinner, Badge, Modal } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../utils/api';
 import optimizedToast from '../utils/toastUtils';
@@ -45,8 +45,10 @@ const StatsPage = () => {
   const [stats, setStats] = useState({
     totalOrders: 0,
     pendingOrders: 0,
-    completedOrders: 0,
+    processingOrders: 0,
+    fulfilledOrders: 0,
     cancelledOrders: 0,
+    completedOrders: 0, // Keep for backward compatibility
     totalRevenue: 0,
     todayRevenue: 0,
     monthlyRevenue: 0,
@@ -59,13 +61,19 @@ const StatsPage = () => {
     paymentMethods: {},
     hourlyOrders: [],
     deliveryStats: {},
+    ordersPercentageChange: 0,
+    revenuePercentageChange: 0,
   });
+  const today = new Date().toISOString().split('T')[0];
   const [dateRange, setDateRange] = useState({
-    startDate: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
-    endDate: new Date().toISOString().split('T')[0]
+    startDate: today,
+    endDate: today
   });
   const [exportFormat, setExportFormat] = useState('excel');
   const [activeTab, setActiveTab] = useState('overview');
+  const [selectedRange, setSelectedRange] = useState('today');
+  const [showFiltersModal, setShowFiltersModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
 
   useEffect(() => {
     if (!userData || (userData.role !== 'admin' && userData.role !== 'superadmin')) {
@@ -181,8 +189,9 @@ const StatsPage = () => {
         ['Metric', 'Value'],
         ['Total Orders', stats.totalOrders.toString()],
         ['Total Revenue', `₵${stats.totalRevenue.toLocaleString()}`],
-        ['Completed Orders', stats.completedOrders.toString()],
         ['Pending Orders', stats.pendingOrders.toString()],
+        ['Processing Orders', (stats.processingOrders || 0).toString()],
+        ['Fulfilled Orders', (stats.fulfilledOrders || stats.completedOrders || 0).toString()],
         ['Cancelled Orders', stats.cancelledOrders.toString()],
         ['Total Customers', stats.totalCustomers.toString()],
         ['New Customers', stats.newCustomers.toString()],
@@ -329,20 +338,20 @@ const StatsPage = () => {
   };
 
   const orderStatusChartData = {
-    labels: ['Pending', 'Completed', 'Cancelled', 'Processing'],
+    labels: ['Pending', 'Processing', 'Fulfilled', 'Cancelled'],
     datasets: [
       {
         data: [
           stats.pendingOrders || 0,
-          stats.completedOrders || 0,
-          stats.cancelledOrders || 0,
-          (stats.totalOrders - stats.completedOrders - stats.cancelledOrders - stats.pendingOrders) || 0
+          stats.processingOrders || 0,
+          stats.fulfilledOrders || stats.completedOrders || 0,
+          stats.cancelledOrders || 0
         ],
         backgroundColor: [
-          '#ffc107', // warning
-          '#28a745', // success
-          '#dc3545', // danger
-          '#17a2b8', // info
+          '#ffc107', // warning - Pending
+          '#17a2b8', // info - Processing
+          '#28a745', // success - Fulfilled
+          '#dc3545', // danger - Cancelled
         ],
         borderWidth: 0,
         hoverOffset: 4
@@ -381,10 +390,74 @@ const StatsPage = () => {
     setRefreshing(false);
   };
 
+  const handleRangeChange = (range) => {
+    setSelectedRange(range);
+    const today = new Date();
+    let startDate, endDate;
+
+    switch (range) {
+      case 'today':
+        startDate = endDate = today.toISOString().split('T')[0];
+        break;
+      case 'yesterday':
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+        startDate = endDate = yesterday.toISOString().split('T')[0];
+        break;
+      case 'week':
+        const weekAgo = new Date(today);
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        startDate = weekAgo.toISOString().split('T')[0];
+        endDate = today.toISOString().split('T')[0];
+        break;
+      case 'month':
+        const monthAgo = new Date(today);
+        monthAgo.setDate(monthAgo.getDate() - 30);
+        startDate = monthAgo.toISOString().split('T')[0];
+        endDate = today.toISOString().split('T')[0];
+        break;
+      case 'custom':
+        // Keep current dates for custom range
+        return;
+      default:
+        startDate = endDate = today.toISOString().split('T')[0];
+    }
+
+    setDateRange({ startDate, endDate });
+  };
+
   // Calculate percentage changes
   const calculatePercentageChange = (current, previous) => {
     if (!previous || previous === 0) return 0;
     return ((current - previous) / previous * 100).toFixed(1);
+  };
+
+  // Get comparison period text based on selected range
+  const getComparisonText = () => {
+    if (dateRange.startDate === dateRange.endDate) {
+      // Single day comparison
+      const selectedDate = new Date(dateRange.startDate);
+      if (selectedRange === 'today') {
+        return 'from yesterday';
+      } else if (selectedRange === 'yesterday') {
+        return 'from previous day';
+      } else {
+        return 'from previous day';
+      }
+    } else {
+      // Multi-day comparison
+      const startDate = new Date(dateRange.startDate);
+      const endDate = new Date(dateRange.endDate);
+      const duration = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
+      
+      if (selectedRange === 'week') {
+        return 'from previous 7 days';
+      } else if (selectedRange === 'month') {
+        return 'from previous 30 days';
+      } else {
+        return `from previous ${duration} days`;
+      }
+    }
   };
 
   return (
@@ -403,181 +476,206 @@ const StatsPage = () => {
         </Button>
       </div>
 
-      {/* Page Title */}
-      <div className="mb-4">
-        <h2 className="ada-text-primary mb-2">
-          <i className="bi bi-bar-chart-line-fill me-2"></i>
-          Statistics Dashboard
-        </h2>
-        <p className="text-muted mb-0">
-          Comprehensive analytics and insights for your restaurant
-          {userData.role === 'superadmin' && (
-            <Badge bg="danger" className="ms-2 align-middle">Super Admin</Badge>
-          )}
-        </p>
-      </div>
-
-      {/* Filters and Actions Card */}
-      <Card className="ada-shadow-sm mb-4">
-        <Card.Body>
-          <h5 className="mb-4 d-flex align-items-center">
-            <i className="bi bi-funnel me-2"></i>
-            Filters & Export Options
-          </h5>
-          
+      {/* Filters and Export Modals */}
+      <Modal show={showFiltersModal} onHide={() => setShowFiltersModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Filter Options</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
           {/* Date Range Section */}
-          <div className="mb-4">
-            <h6 className="text-muted mb-3">Date Range</h6>
-            <Row className="g-3">
-              <Col xs={12} sm={6} md={4} lg={3}>
-                <Form.Group>
-                  <Form.Label className="small fw-semibold">Start Date</Form.Label>
-                  <Form.Control
-                    type="date"
-                    value={dateRange.startDate}
-                    onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
-                    className="ada-form-control"
-                  />
-                </Form.Group>
+          <h6 className="mb-3">Select Date Range</h6>
+          <Row className="g-3">
+            <Col xs={12}>
+              <div className="btn-group w-100" role="group" aria-label="Date range selection">
+                <input
+                  type="radio"
+                  className="btn-check"
+                  name="dateRange"
+                  id="rangeToday"
+                  value="today"
+                  checked={selectedRange === 'today'}
+                  onChange={() => handleRangeChange('today')}
+                />
+                <label className="btn btn-outline-primary m-1" htmlFor="rangeToday">
+                  Today
+                </label>
+                <input
+                  type="radio"
+                  className="btn-check"
+                  name="dateRange"
+                  id="rangeYesterday"
+                  value="yesterday"
+                  checked={selectedRange === 'yesterday'}
+                  onChange={() => handleRangeChange('yesterday')}
+                />
+                <label className="btn btn-outline-primary m-1" htmlFor="rangeYesterday">
+                  Yesterday
+                </label>
+                <input
+                  type="radio"
+                  className="btn-check"
+                  name="dateRange"
+                  id="rangeWeek"
+                  value="week"
+                  checked={selectedRange === 'week'}
+                  onChange={() => handleRangeChange('week')}
+                />
+                <label className="btn btn-outline-primary m-1" htmlFor="rangeWeek">
+                  Last 7 Days
+                </label>
+                <input
+                  type="radio"
+                  className="btn-check"
+                  name="dateRange"
+                  id="rangeMonth"
+                  value="month"
+                  checked={selectedRange === 'month'}
+                  onChange={() => handleRangeChange('month')}
+                />
+                <label className="btn btn-outline-primary m-1" htmlFor="rangeMonth">
+                  Last 30 Days
+                </label>
+                <input
+                  type="radio"
+                  className="btn-check"
+                  name="dateRange"
+                  id="rangeCustom"
+                  value="custom"
+                  checked={selectedRange === 'custom'}
+                  onChange={() => handleRangeChange('custom')}
+                />
+                <label className="btn btn-outline-primary m-1" htmlFor="rangeCustom">
+                  Custom Range
+                </label>
+              </div>
+            </Col>
+            {selectedRange === 'custom' && (
+              <Col xs={12} className="mt-3">
+                <Row className="g-2">
+                  <Col xs={6}>
+                    <Form.Group>
+                      <Form.Label className="small fw-semibold">Start Date</Form.Label>
+                      <Form.Control
+                        type="date"
+                        value={dateRange.startDate}
+                        onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
+                        placeholder="Start Date..."
+                      />
+                    </Form.Group>
+                  </Col>
+                  <Col xs={6}>
+                    <Form.Group>
+                      <Form.Label className="small fw-semibold">End Date</Form.Label>
+                      <Form.Control
+                        type="date"
+                        value={dateRange.endDate}
+                        onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
+                        placeholder="End Date..."
+                      />
+                    </Form.Group>
+                  </Col>
+                </Row>
               </Col>
-              <Col xs={12} sm={6} md={4} lg={3}>
-                <Form.Group>
-                  <Form.Label className="small fw-semibold">End Date</Form.Label>
-                  <Form.Control
-                    type="date"
-                    value={dateRange.endDate}
-                    onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
-                    className="ada-form-control"
-                  />
-                </Form.Group>
-              </Col>
-              <Col xs={12} sm={12} md={4} lg={3}>
-                <Form.Group>
-                  <Form.Label className="small fw-semibold d-block mb-2">Actions</Form.Label>
-                  <Button 
-                    variant="primary" 
-                    onClick={handleRefresh}
-                    disabled={refreshing}
-                    className="w-100 d-flex align-items-center justify-content-center"
-                    style={{ minHeight: '38px' }}
-                  >
-                    {refreshing ? (
-                      <>
-                        <Spinner size="sm" animation="border" className="me-2" />
-                        <span>Refreshing...</span>
-                      </>
-                    ) : (
-                      <>
-                        <i className="bi bi-arrow-clockwise me-2"></i>
-                        <span>Refresh Data</span>
-                      </>
-                    )}
-                  </Button>
-                </Form.Group>
-              </Col>
-            </Row>
-          </div>
+            )}
+          </Row>
+          <Button 
+            variant="primary" 
+            className="mt-3" 
+            onClick={() => {
+              handleRefresh();
+              setShowFiltersModal(false);
+            }}
+          >
+            Apply Filter
+          </Button>
+        </Modal.Body>
+      </Modal>
 
-          <hr className="my-4" />
-
-          {/* Export Section */}
-          <div>
-            <h6 className="text-muted mb-3">Export Options</h6>
-            <Row className="g-3">
-              <Col xs={12} lg={5}>
-                <div className="p-3 bg-light rounded">
-                  <p className="small fw-semibold mb-2">Export Format</p>
-                  <div className="btn-group w-100" role="group" aria-label="Export format">
-                    <input 
-                      type="radio" 
-                      className="btn-check" 
-                      name="exportFormat" 
-                      id="exportExcel" 
-                      value="excel"
-                      checked={exportFormat === 'excel'}
-                      onChange={(e) => setExportFormat(e.target.value)}
-                    />
-                    <label className="btn btn-outline-primary" htmlFor="exportExcel">
-                      <i className="bi bi-file-earmark-excel me-2"></i>
-                      Excel
-                    </label>
-                    <input 
-                      type="radio" 
-                      className="btn-check" 
-                      name="exportFormat" 
-                      id="exportCSV" 
-                      value="csv"
-                      checked={exportFormat === 'csv'}
-                      onChange={(e) => setExportFormat(e.target.value)}
-                    />
-                    <label className="btn btn-outline-primary" htmlFor="exportCSV">
-                      <i className="bi bi-filetype-csv me-2"></i>
-                      CSV
-                    </label>
-                    <input 
-                      type="radio" 
-                      className="btn-check" 
-                      name="exportFormat" 
-                      id="exportPDF" 
-                      value="pdf"
-                      checked={exportFormat === 'pdf'}
-                      onChange={(e) => setExportFormat(e.target.value)}
-                    />
-                    <label className="btn btn-outline-primary" htmlFor="exportPDF">
-                      <i className="bi bi-file-earmark-pdf me-2"></i>
-                      PDF
-                    </label>
-                  </div>
-                </div>
-              </Col>
-              <Col xs={12} lg={7}>
-                <div className="p-3 bg-light rounded">
-                  <p className="small fw-semibold mb-2">Export Data</p>
-                  <div className="d-flex gap-2 flex-wrap">
-                    <Button 
-                      variant="primary" 
-                      onClick={() => exportData('stats')}
-                      className="flex-fill d-flex align-items-center justify-content-center"
-                      style={{ minWidth: '120px' }}
-                    >
-                      <i className="bi bi-graph-up-arrow me-2"></i>
-                      <span>Export Stats</span>
-                    </Button>
-                    <Button 
-                      variant="success" 
-                      onClick={() => exportData('orders')}
-                      className="flex-fill d-flex align-items-center justify-content-center"
-                      style={{ minWidth: '120px' }}
-                    >
-                      <i className="bi bi-receipt-cutoff me-2"></i>
-                      <span>Export Orders</span>
-                    </Button>
-                    {userData.role === 'superadmin' && (
-                      <Button 
-                        variant="info" 
-                        onClick={() => exportData('customers')}
-                        className="flex-fill d-flex align-items-center justify-content-center text-white"
-                        style={{ minWidth: '140px' }}
-                      >
-                        <i className="bi bi-people-fill me-2"></i>
-                        <span>Export Customers</span>
-                      </Button>
-                    )}
-                  </div>
-                  <p className="text-muted small mb-0 mt-2">
-                    <i className="bi bi-info-circle me-1"></i>
-                    Export data for the selected date range in {exportFormat.toUpperCase()} format
-                  </p>
-                </div>
-              </Col>
-            </Row>
+      <Modal show={showExportModal} onHide={() => setShowExportModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Export Options</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <h6 className="mb-3">Select Export Format</h6>
+          <div className="btn-group w-100 mb-3" role="group" aria-label="Export format selection">
+            <input 
+              type="radio" 
+              className="btn-check" 
+              name="exportFormat" 
+              id="exportExcel"
+              value="excel"
+              checked={exportFormat === 'excel'}
+              onChange={(e) => setExportFormat(e.target.value)}
+            />
+            <label className="btn btn-outline-primary" htmlFor="exportExcel">
+              Excel
+            </label>
+            <input 
+              type="radio" 
+              className="btn-check" 
+              name="exportFormat" 
+              id="exportCSV"
+              value="csv"
+              checked={exportFormat === 'csv'}
+              onChange={(e) => setExportFormat(e.target.value)}
+            />
+            <label className="btn btn-outline-primary" htmlFor="exportCSV">
+              CSV
+            </label>
+            <input 
+              type="radio" 
+              className="btn-check" 
+              name="exportFormat" 
+              id="exportPDF"
+              value="pdf"
+              checked={exportFormat === 'pdf'}
+              onChange={(e) => setExportFormat(e.target.value)}
+            />
+            <label className="btn btn-outline-primary" htmlFor="exportPDF">
+              PDF
+            </label>
           </div>
-        </Card.Body>
-      </Card>
+          <Button variant="success" onClick={() => exportData('stats')}>
+            Export Data
+          </Button>
+        </Modal.Body>
+      </Modal>
+
 
       {/* Summary Stats Cards */}
       <div className="mb-4">
-        <h4 className="mb-3">Overview</h4>
+        <div className="d-flex justify-content-between align-items-center mb-2">
+          <h4 className="mb-0">Overview</h4>
+          <div>
+            <Button 
+              variant="outline-primary" 
+              size="sm"
+              onClick={() => setShowFiltersModal(true)} 
+              className="me-2"
+            >
+              <i className="bi bi-funnel me-1"></i>
+              Filters
+            </Button>
+            <Button 
+              variant="outline-success" 
+              size="sm"
+              onClick={() => setShowExportModal(true)}
+            >
+              <i className="bi bi-download me-1"></i>
+              Export
+            </Button>
+          </div>
+        </div>
+        {/* Display selected date range info */}
+        <div className="mb-3">
+          <p className="text-muted small mb-0">
+            <i className="bi bi-info-circle me-1"></i>
+            Showing data from <strong>{new Date(dateRange.startDate).toLocaleDateString()}</strong>
+            {dateRange.startDate !== dateRange.endDate && (
+              <> to <strong>{new Date(dateRange.endDate).toLocaleDateString()}</strong></>
+            )}
+          </p>
+        </div>
         <Row className="g-3">
           <Col xs={12} sm={6} lg={3}>
             <Card className="ada-stats-card ada-stats-primary h-100">
@@ -586,9 +684,11 @@ const StatsPage = () => {
                   <Col>
                     <p className="ada-stats-title text-muted mb-1">Total Orders</p>
                     <h2 className="ada-stats-value">{stats.totalOrders.toLocaleString()}</h2>
-                    <p className="ada-stats-change text-success mb-0">
-                      <i className="bi bi-graph-up-arrow me-1"></i>
-                      +12% from last month
+                    <p className={`ada-stats-change mb-0 ${
+                      stats.ordersPercentageChange >= 0 ? 'text-success' : 'text-danger'
+                    }`}>
+                      <i className={`bi ${stats.ordersPercentageChange >= 0 ? 'bi-graph-up-arrow' : 'bi-graph-down-arrow'} me-1`}></i>
+                      {stats.ordersPercentageChange >= 0 ? '+' : ''}{stats.ordersPercentageChange}% {getComparisonText()}
                     </p>
                   </Col>
                   <Col xs="auto">
@@ -607,9 +707,11 @@ const StatsPage = () => {
                   <Col>
                     <p className="ada-stats-title text-muted mb-1">Total Revenue</p>
                     <h2 className="ada-stats-value">₵{stats.totalRevenue.toLocaleString()}</h2>
-                    <p className="ada-stats-change text-success mb-0">
-                      <i className="bi bi-graph-up-arrow me-1"></i>
-                      +8% from last month
+                    <p className={`ada-stats-change mb-0 ${
+                      stats.revenuePercentageChange >= 0 ? 'text-success' : 'text-danger'
+                    }`}>
+                      <i className={`bi ${stats.revenuePercentageChange >= 0 ? 'bi-graph-up-arrow' : 'bi-graph-down-arrow'} me-1`}></i>
+                      {stats.revenuePercentageChange >= 0 ? '+' : ''}{stats.revenuePercentageChange}% {getComparisonText()}
                     </p>
                   </Col>
                   <Col xs="auto">
@@ -686,12 +788,29 @@ const StatsPage = () => {
             </Card>
           </Col>
           <Col xs={12} sm={6} lg={3}>
+            <Card className="ada-stats-card ada-stats-info h-100">
+              <Card.Body>
+                <div className="d-flex align-items-center justify-content-between">
+                  <div>
+                    <p className="ada-stats-title text-muted mb-1">Processing</p>
+                    <h3 className="ada-stats-value mb-0">
+                      {stats.processingOrders || 0}
+                    </h3>
+                  </div>
+                  <div className="ada-stats-icon text-info">
+                    <i className="bi bi-arrow-repeat" style={{fontSize: '2rem'}}></i>
+                  </div>
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col xs={12} sm={6} lg={3}>
             <Card className="ada-stats-card ada-stats-success h-100">
               <Card.Body>
                 <div className="d-flex align-items-center justify-content-between">
                   <div>
-                    <p className="ada-stats-title text-muted mb-1">Completed Orders</p>
-                    <h3 className="ada-stats-value mb-0">{stats.completedOrders}</h3>
+                    <p className="ada-stats-title text-muted mb-1">Fulfilled Orders</p>
+                    <h3 className="ada-stats-value mb-0">{stats.fulfilledOrders || stats.completedOrders || 0}</h3>
                   </div>
                   <div className="ada-stats-icon text-success">
                     <i className="bi bi-check-circle-fill" style={{fontSize: '2rem'}}></i>
@@ -715,22 +834,151 @@ const StatsPage = () => {
               </Card.Body>
             </Card>
           </Col>
+        </Row>
+      </div>
+
+      {/* Payment Methods Section */}
+      <div className="mb-4">
+        <h4 className="mb-3">Payment Methods</h4>
+        <Row className="g-3">
+          {Object.entries(stats.paymentMethods || {}).map(([method, data], index) => {
+            // Special handling for refunds
+            const isRefund = method.includes('REFUNDS');
+            const isPendingRefund = method === 'PENDING_REFUNDS';
+            const isCompletedRefund = method === 'COMPLETED_REFUNDS';
+            
+            // Get display name
+            let displayName = method;
+            if (isPendingRefund) {
+              displayName = 'Pending Refunds';
+            } else if (isCompletedRefund) {
+              displayName = 'Completed Refunds';
+            }
+            
+            // Get appropriate colors and icons
+            let colorClass, icon, textColor;
+            if (isPendingRefund) {
+              colorClass = 'ada-stats-warning';
+              icon = 'bi bi-arrow-counterclockwise';
+              textColor = 'text-warning';
+            } else if (isCompletedRefund) {
+              colorClass = 'ada-stats-success';
+              icon = 'bi bi-check-circle-fill';
+              textColor = 'text-success';
+            } else {
+              // Regular payment methods
+              const colorClasses = [
+                'ada-stats-primary',
+                'ada-stats-success', 
+                'ada-stats-info',
+                'ada-stats-warning',
+                'ada-stats-danger'
+              ];
+              const icons = [
+                'bi bi-credit-card-fill',
+                'bi bi-cash-coin',
+                'bi bi-phone-fill',
+                'bi bi-wallet2',
+                'bi bi-bank'
+              ];
+              colorClass = colorClasses[index % colorClasses.length];
+              icon = icons[index % icons.length];
+              textColor = 'text-success';
+            }
+            
+            return (
+              <Col xs={12} sm={6} lg={3} key={method}>
+                <Card className={`ada-stats-card ${colorClass} h-100`}>
+                  <Card.Body>
+                    <div className="d-flex align-items-center justify-content-between">
+                      <div>
+                        <p className="ada-stats-title text-muted mb-1">{displayName}</p>
+                        <h3 className="ada-stats-value mb-0">₵{(data.total || 0).toLocaleString()}</h3>
+                        <p className={`ada-stats-change ${textColor} mb-0`}>
+                          <i className="bi bi-hash me-1"></i>
+                          {data.count || 0} transactions
+                        </p>
+                      </div>
+                      <div className="ada-stats-icon">
+                        <i className={icon} style={{fontSize: '2rem'}}></i>
+                      </div>
+                    </div>
+                  </Card.Body>
+                </Card>
+              </Col>
+            );
+          })}
+        </Row>
+      </div>
+
+      {/* Delivery & Pickup Stats Section */}
+      <div className="mb-4">
+        <h4 className="mb-3">Delivery & Pickup Statistics</h4>
+        <Row className="g-3">
           <Col xs={12} sm={6} lg={3}>
-            <Card className="ada-stats-card ada-stats-info h-100">
+            <Card className="ada-stats-card ada-stats-success h-100">
               <Card.Body>
                 <div className="d-flex align-items-center justify-content-between">
                   <div>
-                    <p className="ada-stats-title text-muted mb-1">Processing</p>
-                    <h3 className="ada-stats-value mb-0">
-                      {stats.totalOrders - stats.completedOrders - stats.cancelledOrders - stats.pendingOrders}
-                    </h3>
+                    <p className="ada-stats-title text-muted mb-1">Completed Pickups</p>
+                    <h3 className="ada-stats-value mb-0">{stats.deliveryStats?.completedPickups || 0}</h3>
                   </div>
-                  <div className="ada-stats-icon text-info">
-                    <i className="bi bi-arrow-repeat" style={{fontSize: '2rem'}}></i>
+                  <div className="ada-stats-icon text-success">
+                    <i className="bi bi-bag-check-fill" style={{fontSize: '2rem'}}></i>
                   </div>
                 </div>
               </Card.Body>
             </Card>
+          </Col>
+          <Col xs={12} sm={6} lg={3}>
+            <Card className="ada-stats-card ada-stats-primary h-100">
+              <Card.Body>
+                <div className="d-flex align-items-center justify-content-between">
+                  <div>
+                    <p className="ada-stats-title text-muted mb-1">Completed Deliveries</p>
+                    <h3 className="ada-stats-value mb-0">{stats.deliveryStats?.completedDeliveries || 0}</h3>
+                  </div>
+                  <div className="ada-stats-icon text-primary">
+                    <i className="bi bi-truck-flatbed" style={{fontSize: '2rem'}}></i>
+                  </div>
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col xs={12} sm={6} lg={3}>
+            {stats.deliveryStats?.topDeliveryLocations?.length > 0 ? (
+              <Card className="ada-stats-card ada-stats-info h-100">
+                <Card.Body>
+                  <div className="d-flex align-items-center justify-content-between">
+                    <div>
+                      <p className="ada-stats-title text-muted mb-1">Top Delivery Location</p>
+                      <h3 className="ada-stats-value mb-0">{stats.deliveryStats.topDeliveryLocations[0].location}</h3>
+                      <p className="ada-stats-change text-success mb-0">
+                        <i className="bi bi-box-seam me-1"></i>
+                        {stats.deliveryStats.topDeliveryLocations[0].orders.toLocaleString()} orders
+                      </p>
+                    </div>
+                    <div className="ada-stats-icon text-info">
+                      <i className="bi bi-geo-alt-fill" style={{fontSize: '2rem'}}></i>
+                    </div>
+                  </div>
+                </Card.Body>
+              </Card>
+            ) : (
+              <Card className="ada-stats-card ada-stats-secondary h-100">
+                <Card.Body>
+                  <div className="d-flex align-items-center justify-content-between">
+                    <div>
+                      <p className="ada-stats-title text-muted mb-1">Top Delivery Location</p>
+                      <h3 className="ada-stats-value mb-0">No Data</h3>
+                    </div>
+                    <div className="ada-stats-icon text-muted">
+                      <i className="bi bi-geo-alt-fill" style={{fontSize: '2rem'}}></i>
+                    </div>
+                  </div>
+                </Card.Body>
+              </Card>
+            )}
           </Col>
         </Row>
       </div>

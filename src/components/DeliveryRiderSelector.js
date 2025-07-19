@@ -198,7 +198,7 @@ const DeliveryRiderSelector = ({
                       </Badge>
                       <br/>
                       <small className="text-muted">
-                        Rating: {rider.rating}/5.0
+                        Today: {rider.today_deliveries || 0} deliveries
                       </small>
                     </div>
                   </div>

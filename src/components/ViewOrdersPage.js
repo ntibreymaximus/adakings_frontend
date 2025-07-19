@@ -69,6 +69,7 @@ const [availableRiders, setAvailableRiders] = useState([]);
 const [orderForAssignment, setOrderForAssignment] = useState(null);
   const [isSelectingRiderForStatus, setIsSelectingRiderForStatus] = useState(false);
   const [selectedRider, setSelectedRider] = useState(null);
+  const scrollPositionRef = useRef(0);
   const [showRiderSelector, setShowRiderSelector] = useState(false);
   
 // Removed pagination logic as requested
@@ -1049,9 +1050,10 @@ const handleAssignRiderInline = async (order) => {
         return isBolt;
     };
 
-    const openPaymentModal = (order) => {
-        setSelectedOrder(order);
-        setNewPaymentMode('');
+  const openPaymentModal = (order) => {
+    scrollPositionRef.current = window.scrollY;
+    setSelectedOrder(order);
+    setNewPaymentMode('');
         setMobileNumber('');
         setShowPaymentConfirmation(false);
         
@@ -1092,10 +1094,10 @@ const handleAssignRiderInline = async (order) => {
         setShowOrderDetailsModal(false); // Close order details modal
     };
 
-    const closePaymentModal = () => {
-        setShowPaymentModal(false);
-        // Don't set selectedOrder to null, keep it for order details modal
-        setNewPaymentMode('');
+  const closePaymentModal = () => {
+    setShowPaymentModal(false);
+    // Don't set selectedOrder to null, keep it for order details modal
+    setNewPaymentMode('');
         setPaymentAmount('');
         setMobileNumber('');
         setShowPaymentConfirmation(false);
@@ -1105,17 +1107,18 @@ const handleAssignRiderInline = async (order) => {
         }
     };
 
-    const openStatusModal = (order) => {
-        setSelectedOrder(order);
-        setNewStatus(order.status);
+  const openStatusModal = (order) => {
+    scrollPositionRef.current = window.scrollY;
+    setSelectedOrder(order);
+    setNewStatus(order.status);
         setShowOrderDetailsModal(false); // Close order details modal
         setShowStatusModal(true);
     };
 
-    const closeStatusModal = () => {
-        setShowStatusModal(false);
-        // Reset inline rider selection state
-        setIsSelectingRiderForStatus(false);
+  const closeStatusModal = () => {
+    setShowStatusModal(false);
+    // Reset inline rider selection state
+    setIsSelectingRiderForStatus(false);
         setSelectedRider(null);
         setAvailableRiders([]);
         setOrderForAssignment(null);
@@ -1127,21 +1130,24 @@ const handleAssignRiderInline = async (order) => {
         }
     };
 
-    const openOrderDetailsModal = (order) => {
-        // Clear any previous selection
-        setSelectedOrder(null);
-        // Set order and show modal
-        setSelectedOrder(order);
-        setShowOrderDetailsModal(true);
+  const openOrderDetailsModal = (order) => {
+    scrollPositionRef.current = window.scrollY;
+    // Set order and show modal directly without clearing first
+    setSelectedOrder(order);
+    setShowOrderDetailsModal(true);
     };
 
-    const closeOrderDetailsModal = () => {
-        setShowOrderDetailsModal(false);
-        setSelectedOrder(null);
+  const closeOrderDetailsModal = () => {
+    setShowOrderDetailsModal(false);
+    setSelectedOrder(null);
         // Reset the handling ref when modal is closed
         isHandlingModalRef.current = false;
     };
     
+    const restoreScrollPosition = () => {
+        window.scrollTo(0, scrollPositionRef.current);
+    };
+
     const refreshOrderData = useCallback(async () => {
         try {
             // Store the current selected order ID before refresh
@@ -1982,6 +1988,7 @@ if (order.delivery_type === 'Delivery') {
       <Modal 
         show={showStatusModal} 
         onHide={closeStatusModal} 
+        onExited={restoreScrollPosition}
         centered
         size={isMobile ? undefined : "lg"}
         fullscreen={isMobile ? "sm-down" : false}
@@ -2141,6 +2148,7 @@ if (order.delivery_type === 'Delivery') {
       <Modal 
         show={showPaymentModal} 
         onHide={closePaymentModal} 
+        onExited={restoreScrollPosition}
         centered
         size={isMobile ? undefined : "lg"}
         fullscreen={isMobile ? "sm-down" : false}
@@ -2475,6 +2483,7 @@ if (order.delivery_type === 'Delivery') {
             setShowOrderDetailsModal(true);
           }
         }} 
+        onExited={restoreScrollPosition}
         centered 
         size="lg"
         fullscreen="md-down"
@@ -2655,7 +2664,9 @@ if (order.delivery_type === 'Delivery') {
         </Modal.Body>
         <Modal.Footer>
           <div className="d-grid w-100">
-            <Button variant="danger" onClick={() => setShowPaymentHistoryModal(false)}>
+            <Button variant="danger" onClick={() => {
+              setShowPaymentHistoryModal(false);
+            }}>
               <i className="bi bi-x-circle me-2"></i>
               Close
             </Button>
@@ -2667,6 +2678,7 @@ if (order.delivery_type === 'Delivery') {
       <Modal 
         show={showOrderDetailsModal} 
         onHide={closeOrderDetailsModal} 
+        onExited={restoreScrollPosition}
         centered 
         size="lg"
         fullscreen="md-down"
@@ -2824,6 +2836,7 @@ if (order.delivery_type === 'Delivery') {
                             variant="primary"
                             size="sm"
                             onClick={() => {
+                              scrollPositionRef.current = window.scrollY;
                               // Close order details modal first to prevent stacking
                               setShowOrderDetailsModal(false);
                               // Then open payment history modal with a small delay
@@ -2997,6 +3010,7 @@ if (order.delivery_type === 'Delivery') {
       <Modal 
         show={showStatsModal} 
         onHide={() => setShowStatsModal(false)} 
+        onExited={restoreScrollPosition}
         centered
         fullscreen="sm-down"
       >
