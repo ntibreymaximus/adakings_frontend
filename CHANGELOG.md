@@ -2,6 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.5.0] - 2025-07-19
+
+### 🚀 Development Release
+
+**📋 Release Information:**
+- **Environment**: dev
+- **Branch**: `dev/2.5.0`
+- **Version**: `2.5.0`
+- **Deployment Time**: 2025-07-19 17:42:19
+- **Description**: Development environment deployment with latest React components
+
+**📝 Changes Made:**
+React v2.5.0: Deploy to dev environment
+
+**📁 Files Modified:**
+  - Modified: `ERSION`
+  - Modified: `package.json`
+
+**🔄 Deployment Details:**
+- **Source Branch**: `dev/2.5.0`
+- **Target Branch**: `dev/2.5.0`
+- **Build Process**: Development build with source maps
+- **React Version**: Latest
+
+**🎯 Environment Specific Notes:**
+- Development environment deployment
+- Contains latest React components and changes
+- Used for integration testing before production
+- Devtest branch updated for continuous testing
+
+---
+
 ## [2.6.0] - 2025-07-19
 
 ### 🎯 Production Release
