@@ -183,11 +183,34 @@ const StatsPage = () => {
     let pendingRefundsCount = 0;
     let completedRefundsCount = 0;
 
-    // Filter transactions for the current date range
+    console.log(`📋 Stats Dashboard: Filtering ${transactionsArray.length} transactions for date range: ${dateRange.startDate} to ${dateRange.endDate}`);
+
+    // Filter transactions for the current date range with robust timezone handling
     const filteredTransactions = transactionsArray.filter(transaction => {
-      const transactionDate = new Date(transaction.created_at || transaction.date).toISOString().split('T')[0];
-      return transactionDate >= dateRange.startDate && transactionDate <= dateRange.endDate;
+      const transactionDate = new Date(transaction.created_at || transaction.date);
+      
+      // Get the transaction date in multiple formats to handle timezone issues
+      const transactionDateUTC = transactionDate.toISOString().split('T')[0];
+      const transactionDateLocal = transactionDate.toLocaleDateString('en-CA'); // YYYY-MM-DD format
+      
+      // Check if transaction falls within date range using multiple methods
+      const startDate = new Date(dateRange.startDate + 'T00:00:00');
+      const endDate = new Date(dateRange.endDate + 'T23:59:59');
+      
+      const matchesDateRange = transactionDate >= startDate && transactionDate <= endDate;
+      const matchesUTCRange = transactionDateUTC >= dateRange.startDate && transactionDateUTC <= dateRange.endDate;
+      const matchesLocalRange = transactionDateLocal >= dateRange.startDate && transactionDateLocal <= dateRange.endDate;
+      
+      const matches = matchesDateRange || matchesUTCRange || matchesLocalRange;
+      
+      if (matches) {
+        console.log(`✅ Stats Dashboard: Transaction ${transaction.transaction_id || transaction.id} matches date filter`);
+      }
+      
+      return matches;
     });
+    
+    console.log(`📊 Stats Dashboard: Found ${filteredTransactions.length} transactions in date range`);
 
     filteredTransactions.forEach(transaction => {
       const amount = parseFloat(transaction.amount) || 0;
@@ -754,34 +777,47 @@ const generateClientSideExport = (type) => {
     const today = new Date();
     let startDate, endDate;
 
+    console.log(`📅 Stats Dashboard: Changing date range to '${range}'`);
+    console.log(`Current timezone offset: ${today.getTimezoneOffset()} minutes`);
+    console.log(`Current time: ${today.toISOString()}`);
+    
+    // Use local date to avoid timezone issues
+    const getLocalDateString = (date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
     switch (range) {
       case 'today':
-        startDate = endDate = today.toISOString().split('T')[0];
+        startDate = endDate = getLocalDateString(today);
         break;
       case 'yesterday':
         const yesterday = new Date(today);
         yesterday.setDate(yesterday.getDate() - 1);
-        startDate = endDate = yesterday.toISOString().split('T')[0];
+        startDate = endDate = getLocalDateString(yesterday);
         break;
       case 'week':
         const weekAgo = new Date(today);
         weekAgo.setDate(weekAgo.getDate() - 7);
-        startDate = weekAgo.toISOString().split('T')[0];
-        endDate = today.toISOString().split('T')[0];
+        startDate = getLocalDateString(weekAgo);
+        endDate = getLocalDateString(today);
         break;
       case 'month':
         const monthAgo = new Date(today);
         monthAgo.setDate(monthAgo.getDate() - 30);
-        startDate = monthAgo.toISOString().split('T')[0];
-        endDate = today.toISOString().split('T')[0];
+        startDate = getLocalDateString(monthAgo);
+        endDate = getLocalDateString(today);
         break;
       case 'custom':
         // Keep current dates for custom range
         return;
       default:
-        startDate = endDate = today.toISOString().split('T')[0];
+        startDate = endDate = getLocalDateString(today);
     }
 
+    console.log(`📋 Stats Dashboard: New date range - Start: ${startDate}, End: ${endDate}`);
     setDateRange({ startDate, endDate });
   };
 

@@ -1779,21 +1779,31 @@ if (order.delivery_type === 'Delivery') {
                         {formatOrderItems(order.items)}
                       </td>
                       <td>
-                        <span 
-                          className="badge"
-                          style={{ 
-                            fontSize: '0.85rem', 
-                            padding: '0.5rem 0.75rem',
-                            backgroundColor: order.delivery_type === 'Delivery' ? '#ffc107' : '#198754',
-                            color: order.delivery_type === 'Delivery' ? '#000' : '#fff'
-                          }}
-                        >
-                          <i className={`bi ${order.delivery_type === 'Delivery' ? 'bi-truck' : 'bi-shop'} me-2`}></i>
-                          {order.delivery_type === 'Delivery' && order.effective_delivery_location_name
-                            ? order.effective_delivery_location_name
-                            : order.delivery_type || 'Pickup'
-                          }
-                        </span>
+                        <div>
+                          <span 
+                            className="badge"
+                            style={{ 
+                              fontSize: '0.85rem', 
+                              padding: '0.5rem 0.75rem',
+                              backgroundColor: order.delivery_type === 'Delivery' ? '#ffc107' : '#198754',
+                              color: order.delivery_type === 'Delivery' ? '#000' : '#fff'
+                            }}
+                          >
+                            <i className={`bi ${order.delivery_type === 'Delivery' ? 'bi-truck' : 'bi-shop'} me-2`}></i>
+                            {order.delivery_type === 'Delivery' && order.effective_delivery_location_name
+                              ? order.effective_delivery_location_name
+                              : order.delivery_type || 'Pickup'
+                            }
+                          </span>
+                          {order.delivery_type === 'Delivery' && order.assigned_rider_name && (
+                            <div>
+                              <small className="text-muted mt-1" style={{ fontSize: '0.75rem' }}>
+                                <i className="bi bi-person-badge me-1"></i>
+                                {order.assigned_rider_name}
+                              </small>
+                            </div>
+                          )}
+                        </div>
                       </td>
                       <td>
                         <strong>₵{parseFloat(order.total_price || 0).toFixed(2)}</strong>
@@ -1919,6 +1929,13 @@ if (order.delivery_type === 'Delivery') {
                               </span>
                             </div>
                           )}
+                          
+                          {/* Order Items - Between customer info and badges */}
+                                <div className="mb-2" style={{ fontSize: '0.75rem', lineHeight: '1.2', marginTop: '8px', marginBottom: '60px' }}>
+                                  <div style={{ color: '#666', marginBottom: '2px' }}>
+                                    {formatOrderItems(order.items)}
+                                  </div>
+                                </div>
                           
                           <div className="d-flex align-items-center">
                             <span 

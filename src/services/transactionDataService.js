@@ -206,22 +206,33 @@ class TransactionDataService {
       return [];
     }
 
+    console.log(`🔍 Filtering transactions for date: ${dateString}`);
 
     const filtered = transactions.filter(transaction => {
-      const transactionDateUTC = new Date(transaction.created_at || transaction.date)
-        .toISOString().split('T')[0];
-      const transactionDateLocal = new Date(transaction.created_at || transaction.date)
-        .toLocaleDateString('en-CA'); // YYYY-MM-DD format
+      const transactionDate = new Date(transaction.created_at || transaction.date);
       
-      // Check both UTC and local date interpretations
+      // Get the transaction date in multiple formats to handle timezone issues
+      const transactionDateUTC = transactionDate.toISOString().split('T')[0];
+      const transactionDateLocal = transactionDate.toLocaleDateString('en-CA'); // YYYY-MM-DD format
+      
+      // Also check if the transaction falls within the full day range (00:00 to 23:59)
+      const targetDate = new Date(dateString + 'T00:00:00');
+      const nextDay = new Date(targetDate.getTime() + 24 * 60 * 60 * 1000);
+      
+      const matchesDateRange = transactionDate >= targetDate && transactionDate < nextDay;
       const matchesUTC = transactionDateUTC === dateString;
       const matchesLocal = transactionDateLocal === dateString;
       
+      const matches = matchesUTC || matchesLocal || matchesDateRange;
       
-      return matchesUTC || matchesLocal;
+      if (matches) {
+        console.log(`✅ Transaction ${transaction.transaction_id || transaction.id} matches date filter`);
+      }
+      
+      return matches;
     });
     
-    
+    console.log(`📊 Found ${filtered.length} transactions for ${dateString}`);
     return filtered;
   }
 
@@ -310,11 +321,39 @@ class TransactionDataService {
   }
 
   /**
+   * Debug timezone and date issues
+   */
+  debugTransactionDates(transactions, targetDate) {
+    console.log('🐛 DEBUG: Transaction Date Analysis');
+    console.log(`Target date: ${targetDate}`);
+    console.log(`Current timezone offset: ${new Date().getTimezoneOffset()} minutes`);
+    console.log(`Current time: ${new Date().toISOString()}`);
+    console.log(`Local date string: ${new Date().toLocaleDateString('en-CA')}`);
+    
+    if (transactions && transactions.length > 0) {
+      const sampleTransactions = transactions.slice(0, 5); // Debug first 5 transactions
+      sampleTransactions.forEach((txn, idx) => {
+        const txnDate = new Date(txn.created_at || txn.date);
+        console.log(`Transaction ${idx + 1}:`);
+        console.log(`  - Raw date: ${txn.created_at || txn.date}`);
+        console.log(`  - Parsed date: ${txnDate.toISOString()}`);
+        console.log(`  - UTC date string: ${txnDate.toISOString().split('T')[0]}`);
+        console.log(`  - Local date string: ${txnDate.toLocaleDateString('en-CA')}`);
+        console.log(`  - Local time string: ${txnDate.toLocaleString()}`);
+      });
+    }
+  }
+
+  /**
    * Get transactions for today
    */
   async getTodayTransactions(forceRefresh = false) {
     const data = await this.getTransactions(forceRefresh);
     const today = new Date().toISOString().split('T')[0];
+    
+    console.log('🔍 Getting today\'s transactions');
+    this.debugTransactionDates(data.transactions, today);
+    
     return this.filterTransactionsByDate(data.transactions, today);
   }
 

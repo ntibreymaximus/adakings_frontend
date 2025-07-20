@@ -261,10 +261,28 @@ const ViewTransactionsPage = () => {
     // Filter transactions by selected date
     useEffect(() => {
         if (allTransactions.length > 0) {
+            console.log(`🔍 Filtering ${allTransactions.length} transactions for date: ${selectedDate}`);
+            
             const filtered = allTransactions.filter(transaction => {
-                const transactionDate = new Date(transaction.created_at || transaction.date).toISOString().split('T')[0];
-                return transactionDate === selectedDate;
+                const transactionDate = new Date(transaction.created_at || transaction.date);
+                
+                // Get the transaction date in multiple formats to handle timezone issues
+                const transactionDateUTC = transactionDate.toISOString().split('T')[0];
+                const transactionDateLocal = transactionDate.toLocaleDateString('en-CA'); // YYYY-MM-DD format
+                
+                // Also check if the transaction falls within the full day range (00:00 to 23:59)
+                // Handle timezone issues by checking if transaction is within the selected day
+                const targetDate = new Date(selectedDate + 'T00:00:00');
+                const nextDay = new Date(targetDate.getTime() + 24 * 60 * 60 * 1000);
+                
+                const matchesDateRange = transactionDate >= targetDate && transactionDate < nextDay;
+                const matchesUTC = transactionDateUTC === selectedDate;
+                const matchesLocal = transactionDateLocal === selectedDate;
+                
+                return matchesUTC || matchesLocal || matchesDateRange;
             });
+            
+            console.log(`📊 Found ${filtered.length} transactions for ${selectedDate}`);
             setFilteredTransactions(filtered);
         } else {
             setFilteredTransactions([]);

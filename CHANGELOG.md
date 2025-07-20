@@ -2,6 +2,42 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.5.1] - 2025-07-20
+
+### 🚀 Development Release
+
+**📋 Release Information:**
+- **Environment**: dev
+- **Branch**: `dev/2.5.1`
+- **Version**: `2.5.1`
+- **Deployment Time**: 2025-07-20 16:37:01
+- **Description**: Development environment deployment with latest React components
+
+**📝 Changes Made:**
+React v2.5.1: Deploy to dev environment
+
+**📁 Files Modified:**
+  - Modified: `ERSION`
+  - Modified: `package.json`
+  - Modified: `src/components/StatsPage.js`
+  - Modified: `src/components/ViewOrdersPage.js`
+  - Modified: `src/components/ViewTransactionsPage.js`
+  - Modified: `src/services/transactionDataService.js`
+
+**🔄 Deployment Details:**
+- **Source Branch**: `dev/2.5.1`
+- **Target Branch**: `dev/2.5.1`
+- **Build Process**: Development build with source maps
+- **React Version**: Latest
+
+**🎯 Environment Specific Notes:**
+- Development environment deployment
+- Contains latest React components and changes
+- Used for integration testing before production
+- Devtest branch updated for continuous testing
+
+---
+
 ## [2.5.0] - 2025-07-19
 
 ### 🚀 Development Release
