@@ -154,7 +154,7 @@ useEffect(() => {
             <Navigate to="/dashboard" />} 
         />
         <Route path="/health-check" element={<ApiHealthCheck />} />
-        <Route path="*" element={<Navigate to={userData ? "/dashboard" : "/login"} />} /> 
+        <Route path="*" element={<Navigate to={userData ? "/dashboard" : "/login"} />} />
       </Routes>
       
       {/* PWA status indicator */}

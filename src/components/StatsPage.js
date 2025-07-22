@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../utils/api';
 import optimizedToast from '../utils/toastUtils';
 import { useAuth } from '../contexts/AuthContext';
+import { debugRefundCalculations } from '../utils/debugRefunds';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -170,6 +171,9 @@ const StatsPage = () => {
       
       setTransactions(transactionsArray);
       calculateRefundsFromTransactions(transactionsArray);
+      
+      // Debug: Store transactions globally for debugging
+      window.__DEBUG_TRANSACTIONS__ = transactionsArray;
     } catch (error) {
       console.warn('Failed to fetch transactions for refund calculation:', error);
       // Don't show error toast for this as it's supplementary data

@@ -101,7 +101,6 @@ const ViewTransactionsPage = () => {
     useAutoreloadUpdates((data) => {
         // Check if the update is for a Payment/Transaction model
         if (data.model === 'Payment') {
-            console.log('📡 Transaction autoreload update received:', data);
             
             // Refresh transactions without showing loader for smooth experience
             fetchTransactions();
@@ -116,7 +115,6 @@ const ViewTransactionsPage = () => {
                     selectedTransaction.custom_transaction_id === data.object_id;
                 
                 if (isSelectedTransactionUpdated) {
-                    console.log('🔄 Selected transaction was updated via autoreload');
                     
                     // Find the updated transaction in the refreshed data
                     setTimeout(() => {
@@ -127,7 +125,6 @@ const ViewTransactionsPage = () => {
                                 txn.custom_transaction_id === selectedTransaction.custom_transaction_id
                             );
                             if (updatedTransaction) {
-                                console.log('✅ Updating modal with fresh transaction data:', updatedTransaction);
                                 setSelectedTransaction(updatedTransaction);
                             }
                             return currentTransactions;
@@ -230,6 +227,7 @@ const ViewTransactionsPage = () => {
             }
             
             setAllTransactions(transactionsArray);
+            
         } catch (err) {
             setError(err.message);
         } finally {
@@ -261,8 +259,6 @@ const ViewTransactionsPage = () => {
     // Filter transactions by selected date
     useEffect(() => {
         if (allTransactions.length > 0) {
-            console.log(`🔍 Filtering ${allTransactions.length} transactions for date: ${selectedDate}`);
-            
             const filtered = allTransactions.filter(transaction => {
                 const transactionDate = new Date(transaction.created_at || transaction.date);
                 
@@ -282,7 +278,6 @@ const ViewTransactionsPage = () => {
                 return matchesUTC || matchesLocal || matchesDateRange;
             });
             
-            console.log(`📊 Found ${filtered.length} transactions for ${selectedDate}`);
             setFilteredTransactions(filtered);
         } else {
             setFilteredTransactions([]);
@@ -298,8 +293,7 @@ const ViewTransactionsPage = () => {
                 total_amount: 0,
                 successful_transactions: 0,
                 failed_transactions: 0,
-                payment_method_totals: [],
-                refund_total: orderStats.total_refunds_due || 0
+                payment_method_totals: []
             };
         }
 
@@ -308,8 +302,7 @@ const ViewTransactionsPage = () => {
             total_amount: 0,
             successful_transactions: 0,
             failed_transactions: 0,
-            payment_method_totals: [],
-            refund_total: orderStats.total_refunds_due || 0
+            payment_method_totals: []
         };
 
         // Initialize payment method totals - only track methods that have transactions
@@ -320,54 +313,10 @@ const ViewTransactionsPage = () => {
             const status = transaction.status?.toLowerCase();
             const orderTotal = parseFloat(transaction.order_total) || 0;
             
-            // Check if this is an explicit refund transaction
-            const isExplicitRefund = transaction.payment_type === 'Refund' || 
-                                   transaction.payment_type === 'refund' || 
-                                   (transaction.payment_type && transaction.payment_type.toLowerCase() === 'refund') ||
-                                   amount < 0;
-            
-            // Calculate refund based on payment status and order conditions
-            if (isExplicitRefund) {
-                // Explicit refund transactions - add to refund total
-                stats.refund_total += Math.abs(amount);
-            } else if (status === 'overpaid' && orderTotal > 0) {
-                // Overpaid orders - calculate refund as difference between amount paid and order total
-                const overpaidAmount = amount - orderTotal;
-                if (overpaidAmount > 0) {
-                    stats.refund_total += overpaidAmount;
-                }
-                // Add full amount to total (including overpaid portion)
+            // Add to total amount for all non-refund transactions
+            if (transaction.payment_type !== 'Refund' && transaction.payment_type !== 'refund') {
                 stats.total_amount += amount;
                 
-                // Track payment method totals
-                const paymentMethod = transaction.payment_method || 'Unknown';
-                if (!paymentMethodTotals[paymentMethod]) {
-                    paymentMethodTotals[paymentMethod] = 0;
-                }
-                paymentMethodTotals[paymentMethod] += amount;
-            } else if (status === 'fulfilled' && orderTotal > 0) {
-                // Fulfilled orders - check if this was previously overpaid and subtract refund
-                // This logic assumes that if an order was fulfilled after being overpaid,
-                // the refund should be deducted (simulating refund being processed)
-                const previouslyOverpaid = amount > orderTotal;
-                if (previouslyOverpaid) {
-                    const refundAmount = amount - orderTotal;
-                    stats.refund_total = Math.max(0, stats.refund_total - refundAmount);
-                }
-                
-                // Add to total amount
-                stats.total_amount += amount;
-                
-                // Track payment method totals
-                const paymentMethod = transaction.payment_method || 'Unknown';
-                if (!paymentMethodTotals[paymentMethod]) {
-                    paymentMethodTotals[paymentMethod] = 0;
-                }
-                paymentMethodTotals[paymentMethod] += amount;
-            } else {
-                // Regular transactions - add to total amount
-                stats.total_amount += amount;
-
                 // Track payment method totals
                 const paymentMethod = transaction.payment_method || 'Unknown';
                 if (!paymentMethodTotals[paymentMethod]) {
@@ -522,15 +471,6 @@ const ViewTransactionsPage = () => {
                 </Card>
               </Col>
             ))}
-            {/* Refund Total Card - Always show */}
-            <Col md={3}>
-              <Card className="text-center">
-                <Card.Body>
-                  <Card.Title className="text-warning">{formatCurrency(orderStats.total_refunds_due)}</Card.Title>
-                  <Card.Text>Refunds</Card.Text>
-                </Card.Body>
-              </Card>
-            </Col>
           </Row>
         </>
       )}
@@ -1059,17 +999,6 @@ const ViewTransactionsPage = () => {
           
           {/* Additional Stats Row */}
           <Row className="g-3 mt-2">
-            {filteredStats.refund_total > 0 && (
-              <Col xs={6}>
-                <Card className="text-center h-100">
-                  <Card.Body>
-                    <i className="bi bi-arrow-return-left text-warning" style={{ fontSize: '2rem' }}></i>
-                    <h4 className="mt-2 text-warning">{formatCurrency(filteredStats.refund_total)}</h4>
-                    <p className="mb-0 text-muted">Refunds</p>
-                  </Card.Body>
-                </Card>
-              </Col>
-            )}
             <Col xs={6}>
               <Card className="text-center h-100">
                 <Card.Body>

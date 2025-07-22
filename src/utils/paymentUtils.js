@@ -136,7 +136,7 @@ export const getPaymentMethodInfo = (paymentMethod) => {
       };
     case 'PAID_ON_WIX':
       return { 
-        display: 'Paid on Wix', 
+        display: 'Paid On WIX', 
         icon: '🌐', 
         requiresMobile: false,
         isImmediate: true 

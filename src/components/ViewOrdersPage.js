@@ -24,6 +24,16 @@ const ViewOrdersPage = memo(() => {
     const { logout, userData } = useAuth();
     const navigate = useNavigate();
     const location = useLocation();
+    
+    // Debug: Log user role to check exact value
+    console.log('🔍 User role debug:', {
+        userData: userData,
+        role: userData?.role,
+        user_role: userData?.user_role,
+        roleType: typeof userData?.role,
+        roleIsAdmin: userData?.role === 'Admin',
+        roleIsSuperAdmin: userData?.role === 'SuperAdmin'
+    });
     const [loading, setLoading] = useState(true);
     const [showStatusModal, setShowStatusModal] = useState(false);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -57,7 +67,8 @@ const ViewOrdersPage = memo(() => {
     accepted: 0,
     ready: 0,
     outForDelivery: 0,
-    fulfilled: 0
+    fulfilled: 0,
+    overpaid: 0
   });
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
@@ -267,12 +278,23 @@ const [orderForAssignment, setOrderForAssignment] = useState(null);
             }
 
             const data = await response.json();
-            const orders = Array.isArray(data) ? data : (data.results || []);
+            let orders = Array.isArray(data) ? data : (data.results || []);
             
             console.log('✅ Orders fetched successfully:', {
                 totalOrders: orders.length,
                 data: data,
                 selectedDate
+            });
+            
+            // Transform Bolt orders to have 'BOLT' payment status
+            orders = orders.map(order => {
+                if (isBoltDeliveryOrder(order)) {
+                    return {
+                        ...order,
+                        payment_status: 'BOLT'
+                    };
+                }
+                return order;
             });
             
             // Update state immediately
@@ -483,7 +505,8 @@ const [orderForAssignment, setOrderForAssignment] = useState(null);
             accepted: allOrders.filter(order => order.status === 'Accepted').length,
             ready: allOrders.filter(order => order.status === 'Ready').length,
             outForDelivery: allOrders.filter(order => order.status === 'Out for Delivery').length,
-            fulfilled: allOrders.filter(order => order.status === 'Fulfilled').length
+            fulfilled: allOrders.filter(order => order.status === 'Fulfilled').length,
+            overpaid: allOrders.filter(order => order.payment_status === 'OVERPAID').length
         };
         return stats;
     }, [allOrders]);
@@ -509,6 +532,8 @@ const [orderForAssignment, setOrderForAssignment] = useState(null);
                                 return order.status === 'Out for Delivery';
                             case 'fulfilled':
                                 return order.status === 'Fulfilled';
+                            case 'overpaid':
+                                return order.payment_status === 'OVERPAID';
                             default:
                                 return true;
                         }
@@ -1227,7 +1252,7 @@ if (order.delivery_type === 'Delivery') {
             case 'overpaid': return 'bg-info';
             case 'pending payment': return 'bg-secondary';
             case 'refunded': return 'bg-dark text-white';
-            case 'bolt-delivery': return 'bg-primary';
+            case 'bolt': return 'bg-success';
             default: return 'bg-secondary';
         }
     };
@@ -1239,6 +1264,7 @@ if (order.delivery_type === 'Delivery') {
             case 'MTN MOMO': return 'bi-phone';
             case 'PAYSTACK(USSD)': return 'bi-telephone';
             case 'PAYSTACK(API)': return 'bi-credit-card';
+            case 'BOLT': return 'bi-truck';
             default: return 'bi-question-circle';
         }
     };
@@ -1253,7 +1279,8 @@ if (order.delivery_type === 'Delivery') {
             case 'MTN MOMO': return 'MTN MoMo';
             case 'PAYSTACK(USSD)': return 'Paystack (USSD)';
             case 'PAYSTACK(API)': return 'Paystack (API)';
-            case 'PAID_ON_WIX': return 'Paid On Wix';
+            case 'PAID_ON_WIX': return 'Paid On WIX';
+            case 'BOLT': return 'Bolt';
             default: return paymentMode;
         }
     };
@@ -1330,7 +1357,6 @@ if (order.delivery_type === 'Delivery') {
           case 'refunded':
             return '#343a40'; // Bootstrap dark
           case 'bolt':
-          case 'bolt-delivery':
             return '#198754'; // Bootstrap success (green)
           default:
             return '#6c757d'; // Bootstrap secondary
@@ -1355,7 +1381,6 @@ if (order.delivery_type === 'Delivery') {
           case 'refunded':
             return '#fff'; // White text for dark background
           case 'bolt':
-          case 'bolt-delivery':
             return '#fff'; // White text for success (green) background
           default:
             return '#fff'; // White text for secondary background
@@ -1372,6 +1397,8 @@ if (order.delivery_type === 'Delivery') {
           case 'Not Paid':
             return 'Unpaid';
           case 'Bolt-Delivery':
+          case 'Bolt Delivery':
+          case 'BOLT':
             return 'BOLT';
           default:
             return paymentStatus;
@@ -1795,7 +1822,7 @@ if (order.delivery_type === 'Delivery') {
                               : order.delivery_type || 'Pickup'
                             }
                           </span>
-                          {order.delivery_type === 'Delivery' && order.assigned_rider_name && (
+                          {order.delivery_type === 'Delivery' && order.assigned_rider_name && !isBoltDeliveryOrder(order) && (
                             <div>
                               <small className="text-muted mt-1" style={{ fontSize: '0.75rem' }}>
                                 <i className="bi bi-person-badge me-1"></i>
@@ -1979,7 +2006,7 @@ if (order.delivery_type === 'Delivery') {
                             <i className="bi bi-chevron-right"></i>
                           </button>
                           {/* Delivery Rider - Only show for delivery orders with assigned rider */}
-                          {order.delivery_type === 'Delivery' && order.assigned_rider_name && (
+                          {order.delivery_type === 'Delivery' && order.assigned_rider_name && !isBoltDeliveryOrder(order) && (
                             <span className="text-muted" style={{ fontSize: '0.7rem', marginTop: '2px' }}>
                               <i className="bi bi-person-badge me-1" style={{ fontSize: '0.65rem' }}></i>
                               {order.assigned_rider_name}
@@ -2803,7 +2830,7 @@ if (order.delivery_type === 'Delivery') {
                           <span className="fw-bold text-info">₵{parseFloat(selectedOrder.delivery_fee || 0).toFixed(2)}</span>
                         </div>
                       )}
-                      {selectedOrder.delivery_type === 'Delivery' && selectedOrder.assigned_rider_name && (
+{selectedOrder.delivery_type === 'Delivery' && selectedOrder.assigned_rider_name && !isBoltDeliveryOrder(selectedOrder) && (
                         <div className="d-flex justify-content-between align-items-center">
                           <span>Rider:</span>
                           <span className="badge bg-secondary">
@@ -2989,7 +3016,8 @@ if (order.delivery_type === 'Delivery') {
             {/* Show Assign Rider button for delivery orders with Accepted or Ready status and no rider assigned */}
             {selectedOrder.delivery_type === 'Delivery' && 
              (selectedOrder.status === 'Accepted' || selectedOrder.status === 'Ready') && 
-             !selectedOrder.assigned_rider_id && (
+             !selectedOrder.assigned_rider_id && 
+             !isBoltDeliveryOrder(selectedOrder) && (
               <Button 
                 variant="primary" 
                 onClick={() => {

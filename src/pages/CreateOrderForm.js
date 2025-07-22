@@ -231,8 +231,10 @@ useEffect(() => {
     if (activeMenuTab === "bolt") {
       setDeliveryType("Delivery");
       setDeliveryLocation("Bolt Delivery");
+      setLocationSearchTerm("Bolt Delivery");
       setCustomLocationFee(0);
-      // Don't clear customer phone - it's optional for Bolt orders
+      // Automatically set customer phone to 0501013855 for Bolt orders
+      setCustomerPhone("0501013855");
     }
   }, [activeMenuTab]);
 
@@ -452,6 +454,8 @@ const handleAddItem = useCallback((itemId) => {
       setDeliveryLocation("Bolt Delivery");
       setLocationSearchTerm("Bolt Delivery");
       setCustomLocationFee("0");
+      // Automatically set customer phone to 0501013855 for Bolt orders
+      setCustomerPhone("0501013855");
     }
 
     if (!selectedItems[itemId] || selectedItems[itemId] === 0) {
