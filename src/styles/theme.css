@@ -947,6 +947,180 @@ body {
   100% { transform: rotate(360deg); }
 }
 
+/* Enhanced loading container styles */
+.ada-loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  min-height: 200px;
+}
+
+.ada-loading-spinner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ada-loading-content {
+  text-align: center;
+  max-width: 300px;
+}
+
+.ada-loading-context {
+  font-size: 1.25rem;
+  color: var(--ada-primary);
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.ada-loading-message {
+  font-size: 1rem;
+  color: var(--ada-gray);
+  margin-bottom: 0;
+  font-weight: 500;
+}
+
+/* Loading dots animation */
+.ada-loading-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.ada-loading-dots .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--ada-primary);
+  opacity: 0.3;
+  animation: ada-loading-dots 1.4s infinite ease-in-out;
+}
+
+.ada-loading-dots .dot:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.ada-loading-dots .dot:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+.ada-loading-dots .dot:nth-child(3) {
+  animation-delay: 0;
+}
+
+@keyframes ada-loading-dots {
+  0%, 80%, 100% {
+    transform: scale(0.8);
+    opacity: 0.3;
+  }
+  40% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+}
+
+/* Centered loading states for specific use cases */
+.ada-page-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 70vh;
+  flex-direction: column;
+  text-align: center;
+}
+
+.ada-card-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 150px;
+  flex-direction: column;
+  text-align: center;
+  padding: 2rem 1rem;
+}
+
+.ada-modal-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  flex-direction: column;
+  text-align: center;
+  padding: 3rem 2rem;
+}
+
+.ada-table-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+  flex-direction: column;
+  text-align: center;
+  padding: 2rem;
+}
+
+/* Loading overlay for full-screen loading */
+.ada-loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+
+.ada-loading-overlay.dark {
+  background: rgba(0, 0, 0, 0.85);
+  color: var(--ada-white);
+}
+
+/* Mobile optimizations for loading states */
+@media (max-width: 768px) {
+  .ada-loading-container {
+    padding: 1.5rem 1rem;
+    min-height: 150px;
+  }
+  
+  .ada-loading-context {
+    font-size: 1.1rem;
+  }
+  
+  .ada-loading-message {
+    font-size: 0.9rem;
+  }
+  
+  .ada-loading-dots .dot {
+    width: 6px;
+    height: 6px;
+  }
+  
+  .ada-page-loading {
+    min-height: 50vh;
+    padding: 1rem;
+  }
+  
+  .ada-card-loading {
+    min-height: 120px;
+    padding: 1.5rem 1rem;
+  }
+  
+  .ada-modal-loading {
+    min-height: 150px;
+    padding: 2rem 1rem;
+  }
+}
+
 
 /* Ada Card specific styles */
 .ada-card {

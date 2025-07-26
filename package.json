@@ -1,6 +1,6 @@
 {
   "name": "ADARESMANSYS",
-  "version": "2.7.1",
+  "version": "2.7.0",
   "private": true,
   "dependencies": {
     "@testing-library/dom": "^10.4.0",

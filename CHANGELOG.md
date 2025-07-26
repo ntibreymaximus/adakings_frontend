@@ -2,6 +2,52 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.7.0] - 2025-07-26
+
+### 🚀 Development Release
+
+**📋 Release Information:**
+- **Environment**: dev
+- **Branch**: `dev/2.7.0`
+- **Version**: `2.7.0`
+- **Deployment Time**: 2025-07-26 04:57:07
+- **Description**: Development environment deployment with latest React components
+
+**📝 Changes Made:**
+React v2.7.0: Deploy to dev environment
+
+**📁 Files Modified:**
+  - Modified: `ERSION`
+  - Modified: `package.json`
+  - Modified: `src/App.js`
+  - Modified: `src/components/RecentActivityCard.js`
+  - Modified: `src/components/ViewOrdersPage.js`
+  - Modified: `src/components/ViewTransactionsPage.js`
+  - Deleted: `src/config/websocket.js`
+  - Modified: `src/hooks/useModalWithAutoreload.js`
+  - Deleted: `src/hooks/useWebSocket.js`
+  - Modified: `src/styles/theme.css`
+  - Modified: `src/utils/envConfig.js`
+  - Changed: `CONFIGURATION_SUMMARY.md`
+  - Changed: `ENVIRONMENT_SETUP.md`
+  - Changed: `src/components/ExampleLoadingImplementation.js`
+  - Changed: `src/components/LoadingState.js`
+  - Changed: `src/hooks/useAutoRefresh.js`
+
+**🔄 Deployment Details:**
+- **Source Branch**: `dev/2.7.0`
+- **Target Branch**: `dev/2.7.0`
+- **Build Process**: Development build with source maps
+- **React Version**: Latest
+
+**🎯 Environment Specific Notes:**
+- Development environment deployment
+- Contains latest React components and changes
+- Used for integration testing before production
+- Devtest branch updated for continuous testing
+
+---
+
 ## [2.7.1] - 2025-07-22
 
 ### 🎯 Production Release

@@ -3,6 +3,7 @@ import { Card, Spinner, Alert, Modal, Button } from 'react-bootstrap';
 import { API_BASE_URL } from '../utils/api';
 import { useNavigate } from 'react-router-dom';
 import { getRelativeTime } from '../services/activityService';
+import { CardLoadingState } from './LoadingState';
 
 /**
  * Recent Activity Card Component
@@ -403,9 +404,11 @@ let allActivities = [];
           <i className="bi bi-clock-history me-2"></i>
           Recent Activity
         </Card.Header>
-        <Card.Body className="text-center py-4">
-          <Spinner animation="border" size="sm" className="me-2" />
-          <span>Loading recent activity...</span>
+        <Card.Body>
+          <CardLoadingState 
+            context="Loading recent activity"
+            message="Fetching orders and transaction data..."
+          />
         </Card.Body>
       </Card>
     );

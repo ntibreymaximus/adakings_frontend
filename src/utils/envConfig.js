@@ -78,7 +78,45 @@ export const envWarn = (...args) => {
   }
 };
 
-export default {
+// Get API base URL based on environment
+export const getApiBaseUrl = () => {
+  const env = getCurrentEnvironment();
+  if (env === 'local') {
+    return process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
+  }
+  return process.env.REACT_APP_API_BASE_URL || process.env.REACT_APP_BACKEND_BASE_URL;
+};
+
+// Get WebSocket URL based on environment
+export const getWebSocketUrl = () => {
+  const apiUrl = getApiBaseUrl();
+  return apiUrl.replace(/^http/, 'ws');
+};
+
+// Get environment configuration
+export const getEnvironmentConfig = () => {
+  const env = getCurrentEnvironment();
+  return {
+    environment: env,
+    apiBaseUrl: getApiBaseUrl(),
+    webSocketUrl: getWebSocketUrl(),
+    isLocal: isLocal(),
+    isDevelopment: isDevelopment(),
+    isProduction: isProduction(),
+    debugMode: isDebugMode(),
+    loggingEnabled: isLoggingEnabled()
+  };
+};
+
+// Log environment information
+export const logEnvironmentInfo = () => {
+  if (isLoggingEnabled()) {
+    const config = getEnvironmentConfig();
+    console.log('Environment Configuration:', config);
+  }
+};
+
+const envConfig = {
   getCurrentEnvironment,
   isEnvironment,
   isLocal,
@@ -87,7 +125,13 @@ export default {
   isDebugMode,
   isLoggingEnabled,
   getApiConfig,
+  getApiBaseUrl,
+  getWebSocketUrl,
+  getEnvironmentConfig,
+  logEnvironmentInfo,
   envLog,
   envError,
-  envWarn,
+  envWarn
 };
+
+export default envConfig;

@@ -1,8 +1,8 @@
-// Custom hook for managing modal state with autoreload support
-// This hook ensures that modal content is updated when WebSocket events occur
+// Custom hook for managing modal state with auto-refresh support
+// This hook ensures that modal content is updated with 15-second polling
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useAutoreloadUpdates } from './useWebSocket';
+import { useModalAutoRefresh } from './useAutoRefresh';
 import optimizedToast from '../utils/toastUtils';
 
 /**
@@ -28,43 +28,28 @@ export function useModalWithAutoreload({
     selectedItemRef.current = selectedItem;
   }, [selectedItem]);
 
-  // Setup autoreload for WebSocket updates
-  useAutoreloadUpdates((data) => {
-    // Check if the update is for our model type
-    if (data.model === modelType || (modelType === 'Order' && data.model === 'Payment')) {
-      console.log(`📡 Modal autoreload: ${modelType} update received:`, data);
-      
-      // If we have a selected item and modal is open
-      if (selectedItemRef.current && showModal && data.object_id) {
-        const isSelectedItemUpdated = selectedItemRef.current.id === data.object_id;
+  // Setup auto-refresh for modal updates
+  useModalAutoRefresh({
+    modelType,
+    onDataUpdate: (data) => {
+      // Only refresh if modal is open and we have a selected item
+      if (selectedItemRef.current && showModal) {
+        console.log(`🔄 Modal auto-refresh: ${modelType} data refreshed`);
         
-        if (isSelectedItemUpdated) {
-          console.log('🔄 Current modal item was updated via autoreload');
-          
-          // If data update callback is provided, call it
-          if (onDataUpdate) {
-            onDataUpdate(data);
-          }
-          
-          // Check if we should close the modal on external updates
-          if (autoCloseOnExternalUpdate && data.source !== 'current_user') {
-            optimizedToast.info('Item was updated externally. Modal will close.');
-            setShowModal(false);
-          } else {
-            // Show subtle notification about the update
-            const changeInfo = data.changes 
-              ? Object.keys(data.changes).join(', ') 
-              : 'content';
-            
-            optimizedToast.info(`Modal ${changeInfo} refreshed`, {
-              autoClose: 1500,
-              hideProgressBar: true,
-              position: 'bottom-right'
-            });
-          }
+        // If data update callback is provided, call it
+        if (onDataUpdate) {
+          onDataUpdate(data);
         }
+        
+        // Show subtle notification about the refresh
+        optimizedToast.info('Modal content refreshed', {
+          autoClose: 1500,
+          hideProgressBar: true,
+          position: 'bottom-right'
+        });
       }
-    }
+    },
+    enabled: showModal // Only refresh when modal is open
   });
 
   // Open modal with selected item

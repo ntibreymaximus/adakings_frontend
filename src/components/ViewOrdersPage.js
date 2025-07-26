@@ -17,7 +17,7 @@ import { API_BASE_URL } from '../utils/api';
 import SimpleUserTracking from './SimpleUserTracking';
 import DeliveryRiderSelector from './DeliveryRiderSelector';
 import MenuItemsStatsCard from './MenuItemsStatsCard';
-import { useAutoreloadUpdates } from '../hooks/useWebSocket';
+import { useOrderAutoRefresh } from '../hooks/useAutoRefresh';
 
 // Optimized ViewOrdersPage with instant loading
 const ViewOrdersPage = memo(() => {
@@ -88,72 +88,63 @@ const [orderForAssignment, setOrderForAssignment] = useState(null);
   // Ref to track if we're already handling a modal opening
   const isHandlingModalRef = useRef(false);
   
-  // Setup autoreload to refresh orders when system events occur
-  useAutoreloadUpdates((data) => {
-    // Check if the update is for an order model
-    if (data.model === 'Order' || data.model === 'Payment') {
-      console.log('📡 Autoreload update received:', data);
+  // Setup auto-refresh to refresh orders every 30 seconds in the background
+  const { manualRefresh, pause, resume, isActive } = useOrderAutoRefresh(() => {
+    console.log('🔄 Auto-refresh: Refreshing orders data...');
+    
+    // Refresh orders without showing loader for smooth experience
+    fetchOrders(false);
+    
+    // If we have a selected order and modals are open, update modal content
+    if (selectedOrder) {
+      console.log('🔄 Selected order modal - updating content via auto-refresh');
       
-      // Refresh orders without showing loader for smooth experience
-      fetchOrders(false);
-      
-      // If we have a selected order and modals are open, check if it's the same order
-      if (selectedOrder && data.object_id) {
-        const isSelectedOrderUpdated = selectedOrder.id === data.object_id;
-        
-        if (isSelectedOrderUpdated) {
-          console.log('🔄 Selected order was updated via autoreload - updating modal content');
-          
-          // Refresh the selected order data to update modal content WITHOUT closing modals
-          setTimeout(() => {
-            setAllOrders(currentOrders => {
-              const updatedOrder = currentOrders.find(order => order.id === selectedOrder.id);
-              if (updatedOrder) {
-                console.log('✅ Updating modal with fresh order data:', updatedOrder);
-                setSelectedOrder(updatedOrder);
-                
-                // Show subtle notification that modal content was refreshed
-                if (showOrderDetailsModal || showPaymentModal || showStatusModal) {
-                  optimizedToast.info('Modal content refreshed', {
-                    autoClose: 1000,
-                    hideProgressBar: true,
-                    position: 'bottom-center',
-                    toastId: 'modal-refresh' // Prevent duplicate toasts
-                  });
-                }
-                
-                // If payment modal is open and order payment status changed, update payment form
-                if (showPaymentModal && data.model === 'Payment') {
-                  // Update payment amount if balance changed
-                  const balanceDue = parseFloat(updatedOrder.balance_due || 0);
-                  if (balanceDue > 0 && !isRefundMode) {
-                    setPaymentAmount(balanceDue.toFixed(2));
-                  }
-                  
-                  // Check if we should switch to refund mode
-                  const isOverpaid = updatedOrder.payment_status === 'OVERPAID' || 
-                                    (updatedOrder.amount_overpaid && parseFloat(updatedOrder.amount_overpaid) > 0);
-                  if (isOverpaid && !isRefundMode) {
-                    setIsRefundMode(true);
-                    setNewPaymentMode('CASH');
-                    setPaymentAmount(updatedOrder.amount_overpaid || '0.00');
-                    optimizedToast.info('Switched to refund mode due to overpayment');
-                  }
-                }
+      // Refresh the selected order data to update modal content WITHOUT closing modals
+      setTimeout(() => {
+        setAllOrders(currentOrders => {
+          const updatedOrder = currentOrders.find(order => order.id === selectedOrder.id);
+          if (updatedOrder) {
+            console.log('✅ Updating modal with fresh order data:', updatedOrder);
+            setSelectedOrder(updatedOrder);
+            
+            // Show subtle notification that modal content was refreshed
+            if (showOrderDetailsModal || showPaymentModal || showStatusModal) {
+              optimizedToast.info('Modal data refreshed', {
+                autoClose: 1000,
+                hideProgressBar: true,
+                position: 'bottom-right',
+                toastId: 'modal-refresh' // Prevent duplicate toasts
+              });
+            }
+            
+            // If payment modal is open, update payment form data
+            if (showPaymentModal) {
+              // Update payment amount if balance changed
+              const balanceDue = parseFloat(updatedOrder.balance_due || 0);
+              if (balanceDue > 0 && !isRefundMode) {
+                setPaymentAmount(balanceDue.toFixed(2));
               }
-              return currentOrders;
-            });
-          }, 300); // Small delay to ensure fetchOrders completes
-        }
-      }
-      
-      // Show non-intrusive notification about the update
-      const message = data.type === 'created' 
-        ? `New ${data.model.toLowerCase()} created`
-        : `${data.model} updated`;
-      
-      optimizedToast.info(message, {
-        autoClose: 2000,
+              
+              // Check if we should switch to refund mode
+              const isOverpaid = updatedOrder.payment_status === 'OVERPAID' || 
+                                (updatedOrder.amount_overpaid && parseFloat(updatedOrder.amount_overpaid) > 0);
+              if (isOverpaid && !isRefundMode) {
+                setIsRefundMode(true);
+                setNewPaymentMode('CASH');
+                setPaymentAmount(updatedOrder.amount_overpaid || '0.00');
+                optimizedToast.info('Switched to refund mode due to overpayment');
+              }
+            }
+          }
+          return currentOrders;
+        });
+      }, 300); // Small delay to ensure fetchOrders completes
+    }
+    
+    // Show subtle notification about the refresh (less frequent to avoid spam)
+    if (Math.random() < 0.3) { // Only show 30% of the time
+      optimizedToast.info('Orders refreshed', {
+        autoClose: 1500,
         hideProgressBar: true,
         position: 'bottom-right'
       });

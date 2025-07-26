@@ -4,7 +4,6 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { PWAProvider, usePWA } from './contexts/PWAContext';
 import { EnvironmentProvider } from './contexts/EnvironmentContext';
 import { setAuthContext, setupAutoLogoutTimer, setupVisibilityCheck } from './utils/authInterceptor';
-import websocketService from './services/websocketService';
 import useInactivityTimeout from './hooks/useInactivityTimeout';
 import { initializeOfflineServices } from './utils/serviceWorkerRegistration';
 import LoginPage from './components/LoginPage';
@@ -69,24 +68,10 @@ function AppContent() {
     };
   }, [userData, logout, checkTokenValidity]);
 
-// Initialize offline services and WebSocket
+// Initialize offline services
 useEffect(() => {
     initializeOfflineServices();
-    
-    // Initialize WebSocket service
-    websocketService.init();
-
-    return () => {
-        websocketService.disconnect();
-    };
 }, []);
-
-// Authenticate WebSocket when user data is available
-useEffect(() => {
-    if (userData && userData.access_token) {
-        websocketService.authenticate(userData.access_token);
-    }
-}, [userData]);
 
   // Setup keyboard shortcut for PWA manager (Ctrl+Shift+P)
   useEffect(() => {
